@@ -389,6 +389,10 @@ export async function getRecordsByTimeRange(database: QueryDatabase, client: str
   return sba.getSupabaseRecordsByTimeRange(database.env, client, start, end);
 }
 
+export async function getDailyTraffic(database: QueryDatabase, days: number): Promise<t.DailyTrafficSnapshot> {
+  return sba.getSupabaseDailyTraffic(database.env, days);
+}
+
 export async function getRecordsByTimeRangeLimited(
   database: QueryDatabase,
   client: string,

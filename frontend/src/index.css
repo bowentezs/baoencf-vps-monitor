@@ -669,11 +669,11 @@ body {
   width: 100%;
   min-width: 0;
   flex-wrap: nowrap;
-  padding-right: 88px;
+  padding-right: 122px;
 }
 
 .node-card-header[data-has-message='true'] .node-card-title-row {
-  padding-right: 114px;
+  padding-right: 148px;
 }
 
 .node-card-title-row .rt-Text {

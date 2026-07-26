@@ -15,6 +15,7 @@ import { clearCachedPublicBootstrap, fetchPublicBootstrap, getCachedPublicBootst
 import { mergePublicClientPatch, normalizePublicClients } from '../utils/publicClients';
 import { fetchWithBootstrapRetry } from '../utils/api';
 import { getLocalStorageItem } from '../utils/browserStorage';
+import { latestDailyTrafficByClient, normalizeDailyTrafficResponse } from '../utils/dailyTraffic';
 import WebsiteMonitorList, { WebsiteMonitorSummary } from '../components/WebsiteMonitorList';
 import { subscribeWebsiteMonitorsUpdated, type WebsiteMonitorsUpdateDetail } from '../utils/websiteMonitorEvents';
 import { notifyPublicDataReady, subscribePublicDataUpdated } from '../utils/publicDataEvents';
@@ -239,6 +240,7 @@ export default function Index() {
   const [websitesLoading, setWebsitesLoading] = useState(monitorMode === 'websites' && websites.length === 0);
   const [websitesError, setWebsitesError] = useState<string | null>(null);
   const [websitePeriodHours, setWebsitePeriodHours] = useState(24);
+  const [dailyTraffic, setDailyTraffic] = useState(() => latestDailyTrafficByClient(null));
   const offlinePosition = useMemo(loadOfflinePosition, []);
 
   const handleWebsitePeriodChange = (hours: number) => {
@@ -248,6 +250,28 @@ export default function Index() {
   };
 
   // Load client list
+  useEffect(() => {
+    let cancelled = false;
+    if (authLoading || monitorMode !== 'servers') return () => { cancelled = true; };
+    const loadDailyTraffic = () => {
+      const suffix = isAuthenticated ? '&include_hidden=1' : '';
+      fetchWithBootstrapRetry(`/api/traffic/daily?days=1${suffix}`, { cache: 'no-store' })
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.json();
+        })
+        .then((payload) => {
+          if (!cancelled) setDailyTraffic(latestDailyTrafficByClient(normalizeDailyTrafficResponse(payload)));
+        })
+        .catch(() => {
+          if (!cancelled) setDailyTraffic({});
+        });
+    };
+    loadDailyTraffic();
+    const timer = window.setInterval(loadDailyTraffic, 30_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [authLoading, isAuthenticated, monitorMode]);
+
   useEffect(() => {
     let cancelled = false;
     if (authLoading) {
@@ -440,6 +464,7 @@ export default function Index() {
           key={client.uuid}
           client={client}
           live={ld.data[client.uuid]}
+          todayTraffic={dailyTraffic[client.uuid]}
           online={ld.online.includes(client.uuid)}
           includeHidden={isAuthenticated}
         />
@@ -475,6 +500,7 @@ export default function Index() {
           <NodeDisplay
             nodes={sortedClients}
             liveData={liveMap}
+            dailyTraffic={dailyTraffic}
             gridRenderer={renderGrid}
             offlinePosition={offlinePosition}
             includeHidden={isAuthenticated}

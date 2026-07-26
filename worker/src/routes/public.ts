@@ -30,6 +30,8 @@ import { getCloudflareClientIp } from '../utils/request-ip';
 import { readLiveSnapshot, readRateLimitResult } from '../utils/do-response';
 import { readJsonWithLimit } from '../utils/request-body';
 import { base64ToBytes } from '../utils/theme-package';
+import { buildDailyTrafficResponse, normalizeDailyTrafficSnapshot } from '../utils/daily-traffic';
+import { dailyTrafficPublicCacheIdentity, parseDailyTrafficQuery } from '../utils/daily-traffic-query';
 
 const publicRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 type PublicContext = Context<{ Bindings: Bindings; Variables: Variables }>;
@@ -282,20 +284,28 @@ function withPublicCacheHeader(c: PublicContext, response: Response, maxAgeSecon
   });
 }
 
-async function getPublicEdgeCache(c: PublicContext, maxAgeSeconds: number): Promise<Response | null> {
+async function getPublicEdgeCache(
+  c: PublicContext,
+  maxAgeSeconds: number,
+  cacheRequest: Request = publicCacheRequest(c),
+): Promise<Response | null> {
   if (c.req.method !== 'GET' || typeof caches === 'undefined') return null;
   try {
-    const cached = await caches.default.match(publicCacheRequest(c));
+    const cached = await caches.default.match(cacheRequest);
     return cached ? withPublicCacheHeader(c, cached, maxAgeSeconds, 'edge-hit') : null;
   } catch {
     return null;
   }
 }
 
-function putPublicEdgeCache(c: PublicContext, response: Response): void {
+function putPublicEdgeCache(
+  c: PublicContext,
+  response: Response,
+  cacheRequest: Request = publicCacheRequest(c),
+): void {
   if (c.req.method !== 'GET' || typeof caches === 'undefined') return;
   try {
-    const put = caches.default.put(publicCacheRequest(c), response.clone());
+    const put = caches.default.put(cacheRequest, response.clone());
     if (c.executionCtx?.waitUntil) {
       c.executionCtx.waitUntil(put.catch(() => undefined));
     } else {
@@ -330,16 +340,16 @@ function putPublicMetadataEdgeCache(c: PublicContext, response: Response): void 
   }
 }
 
-async function getPublicHistoryCache(c: PublicContext, key: string): Promise<Response | null> {
+async function getPublicHistoryCache(c: PublicContext, key: string, cacheRequest?: Request): Promise<Response | null> {
   const entry = publicHistoryCache.get(key);
   if (entry && cacheIsFresh(entry)) {
     return publicJsonResponse(c, entry.value, PUBLIC_HISTORY_CACHE_SECONDS, 'memory-hit');
   }
   if (entry) publicHistoryCache.delete(key);
-  return getPublicEdgeCache(c, PUBLIC_HISTORY_CACHE_SECONDS);
+  return getPublicEdgeCache(c, PUBLIC_HISTORY_CACHE_SECONDS, cacheRequest);
 }
 
-function setPublicHistoryCache(c: PublicContext, key: string, value: unknown): Response {
+function setPublicHistoryCache(c: PublicContext, key: string, value: unknown, cacheRequest?: Request): Response {
   if (publicHistoryCache.size >= PUBLIC_HISTORY_CACHE_MAX_ENTRIES) {
     const oldestKey = publicHistoryCache.keys().next().value;
     if (oldestKey) publicHistoryCache.delete(oldestKey);
@@ -349,7 +359,7 @@ function setPublicHistoryCache(c: PublicContext, key: string, value: unknown): R
     expiresAt: Date.now() + PUBLIC_HISTORY_CACHE_MS,
   });
   const response = publicJsonResponse(c, value, PUBLIC_HISTORY_CACHE_SECONDS, 'miss');
-  putPublicEdgeCache(c, response);
+  putPublicEdgeCache(c, response, cacheRequest);
   return response;
 }
 
@@ -1493,6 +1503,40 @@ publicRoutes.get('/records/load', async (c) => {
     });
   }
   return publicHistoryResult(c, prepared, records);
+});
+
+publicRoutes.get('/traffic/daily', async (c) => {
+  const limited = await guardPublicHistory(c, 'daily-traffic');
+  if (limited) return limited;
+  const query = parseDailyTrafficQuery(c.req.url);
+  if (!query.ok) return c.json({ error: query.error }, 400);
+  const { days } = query;
+  const includeHidden = query.includeHiddenRequested && await hasAdminSession(c);
+  const cacheIdentity = dailyTrafficPublicCacheIdentity(c.req.url, days);
+  if (!includeHidden) {
+    const cached = await getPublicHistoryCache(c, cacheIdentity.key, cacheIdentity.request);
+    if (cached) return cached;
+  }
+
+  const database = getDatabase(c.env);
+  const [clients, rawSnapshot, live] = await Promise.all([
+    getPublicClientsSnapshot(c, database, false, includeHidden),
+    db.getDailyTraffic(database, days),
+    c.env.LIVE_DATA
+      .get(c.env.LIVE_DATA.idFromName('global'))
+      .fetch(new Request(`https://do/live${includeHidden ? '?include_hidden=1' : ''}`, { method: 'GET' }))
+      .then(response => readLiveSnapshot(response))
+      .then(snapshot => snapshot ?? { online: [], count: 0 }),
+  ]);
+  const result = buildDailyTrafficResponse({
+    snapshot: normalizeDailyTrafficSnapshot(rawSnapshot),
+    visibleClients: clients.clients.map(client => client.uuid),
+    liveData: live.data,
+    days,
+  });
+  return includeHidden
+    ? privateJsonResponse(result)
+    : setPublicHistoryCache(c, cacheIdentity.key, result, cacheIdentity.request);
 });
 
 // 获取 GPU 记录

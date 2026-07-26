@@ -2,6 +2,7 @@
  * Shared TypeScript interfaces for CF VPS Monitor frontend
  */
 import { LiveRecord } from './contexts/LiveDataContext';
+import type { DailyTrafficUsage } from './utils/dailyTraffic';
 
 export interface ClientInfo {
   uuid: string;
@@ -41,5 +42,7 @@ export interface LiveDataMap {
   data: Record<string, LiveRecord>;
   clients?: Array<{ uuid: string; name?: string; lastReportTime?: number; region?: string }>;
 }
+
+export type DailyTrafficMap = Record<string, DailyTrafficUsage>;
 
 export type { LiveRecord };

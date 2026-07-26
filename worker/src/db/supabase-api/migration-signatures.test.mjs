@@ -10,6 +10,7 @@ assert.deepEqual(migrationFiles, [
   '3_feature_schema.sql',
   '4_rpc_api.sql',
   '5_runtime_defaults.sql',
+  '6_daily_traffic.sql',
 ]);
 assert.deepEqual(BUNDLED_SUPABASE_MIGRATIONS.map(({ version }) => version), [
   '1_core_schema',
@@ -17,11 +18,13 @@ assert.deepEqual(BUNDLED_SUPABASE_MIGRATIONS.map(({ version }) => version), [
   '3_feature_schema',
   '4_rpc_api',
   '5_runtime_defaults',
+  '6_daily_traffic',
 ]);
 
 const featureSchemaSql = await readFile(new URL('3_feature_schema.sql', migrationsUrl), 'utf8');
 const migrationSql = await readFile(new URL('../../../../supabase/migrations/4_rpc_api.sql', import.meta.url), 'utf8');
 const runtimeDefaultsSql = await readFile(new URL('5_runtime_defaults.sql', migrationsUrl), 'utf8');
+const dailyTrafficSql = await readFile(new URL('6_daily_traffic.sql', migrationsUrl), 'utf8');
 const generatedSql = await readFile(new URL('../../generated/supabase-migrations.ts', import.meta.url), 'utf8');
 const agentRoutesSql = await readFile(new URL('../../routes/client.ts', import.meta.url), 'utf8');
 const allMigrationSql = await Promise.all(migrationFiles.map((name) => readFile(new URL(name, migrationsUrl), 'utf8'))).then((sources) => sources.join('\n'));
@@ -77,3 +80,6 @@ assert.match(migrationSql, /totp_last_used_step\s*=\s*-1/i);
 assert.match(migrationSql, /recovery_code_hashes\s*=\s*'\[\]'::jsonb/i);
 assert.match(migrationSql, /input_code_hash\s*!~\s*'\^\[A-Za-z0-9_-\]\{43\}\$'/i);
 assert.match(runtimeDefaultsSql, /\('webhook_url', ''\)/i);
+assert.match(dailyTrafficSql, /create or replace function public\.cfm_daily_traffic\(input_days integer default 7\)/i);
+assert.match(dailyTrafficSql, /timezone\('Asia\/Shanghai', time\)/i);
+assert.match(dailyTrafficSql, /grant execute on function public\.cfm_daily_traffic\(integer\) to service_role/i);

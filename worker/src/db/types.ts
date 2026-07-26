@@ -80,6 +80,25 @@ export interface MonitorRecord {
   uptime: number;
 }
 
+export interface DailyTrafficRow {
+  client: string;
+  day: string;
+  up: number;
+  down: number;
+}
+
+export interface DailyTrafficBaseline {
+  client: string;
+  time: string;
+  net_total_up: number;
+  net_total_down: number;
+}
+
+export interface DailyTrafficSnapshot {
+  series: DailyTrafficRow[];
+  latest: DailyTrafficBaseline[];
+}
+
 export interface PagedResult<T> {
   data: T[];
   total: number;

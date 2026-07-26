@@ -1,13 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, Box, Card, Flex, IconButton, Separator, Text, Tooltip } from '@radix-ui/themes';
-import { Activity, ArrowDown, ArrowUp, BarChart3, TrendingUp } from 'lucide-react';
+import { Activity, ArrowDown, ArrowUp, BarChart3, CalendarDays, TrendingUp } from 'lucide-react';
 import Flag from './Flag';
 import PriceTags from './PriceTags';
+import DailyTrafficChartFloat from './DailyTrafficChartFloat';
 import MiniPingChartFloat from './MiniPingChartFloat';
 import { formatBytes, formatUptime } from '../utils/format';
 import { formatTrafficLimitLabel, parseTrafficLimitType } from '../utils/traffic';
 import { ClientInfo, LiveRecord } from '../types';
+import type { DailyTrafficUsage } from '../utils/dailyTraffic';
 import { getOSDisplay } from '../utils/osIcon';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { formatCpuCardLabel, formatCpuSpec } from '../utils/cpuFormat';
@@ -17,6 +19,7 @@ import { getExpiryInfo } from '../utils/billing';
 interface NodeCardProps {
   client: ClientInfo;
   live?: LiveRecord;
+  todayTraffic?: DailyTrafficUsage;
   online: boolean;
   includeHidden?: boolean;
 }
@@ -130,12 +133,16 @@ function RingMetric({
 function NetworkSummary({
   uploadSpeed,
   downloadSpeed,
+  todayUp,
+  todayDown,
   totalUp,
   totalDown,
   uptimeLabel,
 }: {
   uploadSpeed: string;
   downloadSpeed: string;
+  todayUp?: number;
+  todayDown?: number;
   totalUp: number;
   totalDown: number;
   uptimeLabel: string;
@@ -157,6 +164,25 @@ function NetworkSummary({
             <ArrowDown size={13} />
             <span className="node-network-direction">下</span>
             <strong>{downloadSpeed}/s</strong>
+          </span>
+        </div>
+      </div>
+
+      <div className="node-network-summary-row" data-monitor-role="network-daily-traffic-summary">
+        <Text className="node-network-summary-label" size="1" weight="bold">
+          <CalendarDays size={14} />
+          今日流量
+        </Text>
+        <div className="node-network-summary-values">
+          <span className="node-network-value is-up">
+            <ArrowUp size={13} />
+            <span className="node-network-direction">上</span>
+            <strong>{todayUp === undefined ? '-' : formatBytes(todayUp)}</strong>
+          </span>
+          <span className="node-network-value is-down">
+            <ArrowDown size={13} />
+            <span className="node-network-direction">下</span>
+            <strong>{todayDown === undefined ? '-' : formatBytes(todayDown)}</strong>
           </span>
         </div>
       </div>
@@ -208,7 +234,7 @@ function NodeIpBadges({ client, className }: { client: ClientInfo; className?: s
   );
 }
 
-export default function NodeCard({ client, live, online, includeHidden = false }: NodeCardProps) {
+export default function NodeCard({ client, live, online, todayTraffic, includeHidden = false }: NodeCardProps) {
   const isMobile = useIsMobile();
   const defaultLive: LiveRecord = {
     cpu: 0,
@@ -237,6 +263,8 @@ export default function NodeCard({ client, live, online, includeHidden = false }
   const diskPct = diskTotal > 0 ? (d.disk / diskTotal) * 100 : 0;
   const totalUp = d.net_total_up || 0;
   const totalDown = d.net_total_down || 0;
+  const todayUp = todayTraffic?.up;
+  const todayDown = todayTraffic?.down;
   const uploadSpeed = formatBytes(d.net_out || 0);
   const downloadSpeed = formatBytes(d.net_in || 0);
   const osConfig = getOSDisplay(client.os || '');
@@ -322,6 +350,16 @@ export default function NodeCard({ client, live, online, includeHidden = false }
                   </IconButton>
                 }
               />
+              <DailyTrafficChartFloat
+                uuid={client.uuid}
+                clientName={client.name}
+                includeHidden={includeHidden}
+                trigger={
+                  <IconButton className="node-card-action" data-node-card-action="true" variant="ghost" size="2" aria-label="查看每日流量" title="查看每日流量趋势">
+                    <BarChart3 size={16} />
+                  </IconButton>
+                }
+              />
               <Badge color={online ? 'green' : 'red'} variant="solid" radius="full">
                 {online ? '在线' : '离线'}
               </Badge>
@@ -383,6 +421,8 @@ export default function NodeCard({ client, live, online, includeHidden = false }
               <NetworkSummary
                 uploadSpeed={uploadSpeed}
                 downloadSpeed={downloadSpeed}
+                todayUp={todayUp}
+                todayDown={todayDown}
                 totalUp={totalUp}
                 totalDown={totalDown}
                 uptimeLabel={uptimeFooterLabel}
@@ -399,6 +439,8 @@ export default function NodeCard({ client, live, online, includeHidden = false }
               <NetworkSummary
                 uploadSpeed={uploadSpeed}
                 downloadSpeed={downloadSpeed}
+                todayUp={todayUp}
+                todayDown={todayDown}
                 totalUp={totalUp}
                 totalDown={totalDown}
                 uptimeLabel={uptimeFooterLabel}
