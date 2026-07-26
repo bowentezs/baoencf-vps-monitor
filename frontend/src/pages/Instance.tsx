@@ -26,7 +26,7 @@ import {
 import type { ClientInfo } from '../types';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Area, AreaChart
+  ResponsiveContainer, Area, AreaChart, Bar, BarChart
 } from 'recharts';
 import {
   buildPingChartRows,
@@ -40,6 +40,8 @@ import {
 } from '../utils/pingChart';
 import { buildMonitorChartData, getMonitorChartRenderData } from '../utils/monitorChartData';
 import { monitorYAxisProps, pingYAxisProps, wideYAxisProps } from '../utils/monitorChartAxis';
+import { formatBytes } from '../utils/format';
+import { normalizeDailyTrafficResponse, type DailyTrafficRow } from '../utils/dailyTraffic';
 
 const formatSpeed = (bytes: number): string => {
   if (!bytes || bytes === 0) return '0 B/s';
@@ -61,6 +63,7 @@ const formatUptime = (seconds: number): string => {
 
 type TimeRange = '1h' | '4h' | '24h' | '3d';
 type ChartTab = 'cpu' | 'ram' | 'disk' | 'network' | 'connections' | 'process' | 'temp' | 'gpu';
+type TrafficRangeDays = 7 | 30;
 
 const timeRangeMs: Record<TimeRange, number> = {
   '1h': 3600000,
@@ -86,6 +89,7 @@ const timeRangePointLimit: Record<TimeRange, number> = {
 const monitorChartMargin = { top: 12, right: 16, bottom: 4, left: 4 };
 const monitorChartHeight = 296;
 const pingChartHeight = 210;
+const dailyTrafficChartHeight = 256;
 
 function historyQuery(params: Record<string, string | number | undefined>): string {
   const query = new URLSearchParams();
@@ -112,6 +116,10 @@ export default function Instance() {
   const [pingError, setPingError] = useState<string | null>(null);
   const [shouldLoadPing, setShouldLoadPing] = useState(false);
   const [gpuRecords, setGpuRecords] = useState<PublicGpuRecord[]>([]);
+  const [trafficRangeDays, setTrafficRangeDays] = useState<TrafficRangeDays>(7);
+  const [dailyTraffic, setDailyTraffic] = useState<DailyTrafficRow[]>([]);
+  const [dailyTrafficLoading, setDailyTrafficLoading] = useState(true);
+  const [dailyTrafficError, setDailyTrafficError] = useState(false);
   const pingSectionRef = useRef<HTMLDivElement | null>(null);
   const { liveData } = useLiveData();
   const liveRecord = uuid ? liveData?.data?.[uuid] : undefined;
@@ -178,6 +186,29 @@ export default function Instance() {
   useEffect(() => {
     loadRecords(timeRange);
   }, [loadRecords, timeRange]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!uuid || authLoading) return () => { cancelled = true; };
+    setDailyTrafficLoading(true);
+    setDailyTrafficError(false);
+    publicFetch(`/traffic/daily?days=${trafficRangeDays}${isAuthenticated ? '&include_hidden=1' : ''}`)
+      .then((payload) => {
+        const normalized = normalizeDailyTrafficResponse(payload);
+        if (!normalized) throw new Error('Invalid daily traffic response');
+        if (!cancelled) setDailyTraffic(normalized.data.filter((row) => row.client === uuid));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDailyTraffic([]);
+          setDailyTrafficError(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDailyTrafficLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [uuid, trafficRangeDays, authLoading, isAuthenticated]);
 
   useEffect(() => {
     setShouldLoadPing(false);
@@ -287,6 +318,11 @@ export default function Instance() {
   const pingChartRows = buildPingChartRows(pingSeriesWithRecords);
   const pingYAxisDomain = getPingYAxisDomain(pingSeriesWithRecords);
   const pingXAxisDomain = getPingTimeDomain(pingSeriesWithRecords, timeRangeHours[timeRange]);
+  const dailyTrafficChartData = dailyTraffic.map((row) => ({
+    ...row,
+    label: row.day.slice(5).replace('-', '/'),
+  }));
+  const todayTraffic = dailyTraffic[dailyTraffic.length - 1];
 
   return (
     <div className="instance-page">
@@ -321,6 +357,56 @@ export default function Instance() {
           )}
         </Flex>
         <DetailsGrid client={client} live={latest} compact remark={client.public_remark} />
+      </Card>
+
+      <Card className="instance-daily-traffic-card" mb="4">
+        <Flex justify="between" align="center" mb="3" gap="3" wrap="wrap">
+          <Box>
+            <Text weight="bold" as="p">每日流量</Text>
+            <Text size="1" color="gray" as="p">
+              北京时间 · 今日 ↑ {todayTraffic ? formatBytes(todayTraffic.up) : '-'} ↓ {todayTraffic ? formatBytes(todayTraffic.down) : '-'}
+            </Text>
+          </Box>
+          <SegmentedControl.Root
+            size="1"
+            value={String(trafficRangeDays)}
+            onValueChange={(value) => setTrafficRangeDays(value === '30' ? 30 : 7)}
+          >
+            <SegmentedControl.Item value="7">7天</SegmentedControl.Item>
+            <SegmentedControl.Item value="30">30天</SegmentedControl.Item>
+          </SegmentedControl.Root>
+        </Flex>
+        <Box style={{ height: dailyTrafficChartHeight }}>
+          {dailyTrafficLoading ? (
+            <Flex align="center" justify="center" style={{ height: '100%' }}>
+              <Text size="2" color="gray">加载中</Text>
+            </Flex>
+          ) : dailyTrafficError ? (
+            <Flex align="center" justify="center" style={{ height: '100%' }}>
+              <Text size="2" color="gray">每日流量暂不可用</Text>
+            </Flex>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dailyTrafficChartData} margin={{ top: 12, right: 12, bottom: 4, left: 4 }}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
+                <XAxis
+                  dataKey="label"
+                  fontSize={12}
+                  minTickGap={16}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis {...wideYAxisProps} tickFormatter={(value) => formatBytes(Number(value))} />
+                <Tooltip
+                  labelFormatter={(label) => `${String(label)} 北京时间`}
+                  formatter={(value: number, name) => [formatBytes(Number(value)), name]}
+                />
+                <Bar dataKey="up" name="上传" fill="var(--blue-9)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="down" name="下载" fill="var(--green-9)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </Box>
       </Card>
 
       {/* Chart section */}

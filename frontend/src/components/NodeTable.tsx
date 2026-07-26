@@ -11,12 +11,13 @@ import MiniPingChart from './MiniPingChart';
 import PriceTags from './PriceTags';
 import { formatBytes, formatPercent, formatSpeed, formatUptime } from '../utils/format';
 import { getOSImage, getOSName } from '../utils/osIcon';
-import { ClientInfo, LiveDataMap, LiveRecord } from '../types';
+import { ClientInfo, DailyTrafficMap, LiveDataMap, LiveRecord } from '../types';
 import { formatCpuSpec } from '../utils/cpuFormat';
 
 interface NodeTableProps {
   nodes: ClientInfo[];
   liveData: LiveDataMap;
+  dailyTraffic?: DailyTrafficMap;
   includeHidden?: boolean;
 }
 
@@ -124,11 +125,13 @@ function ExpandedNodeDetails({
   node,
   live,
   lastReportTime,
+  todayTraffic,
   includeHidden = false,
 }: {
   node: ClientInfo;
   live?: LiveRecord;
   lastReportTime?: number;
+  todayTraffic?: DailyTrafficMap[string];
   includeHidden?: boolean;
 }) {
   return (
@@ -172,6 +175,12 @@ function ExpandedNodeDetails({
               value={`↑ ${formatSpeed(live?.net_out || 0)} ↓ ${formatSpeed(live?.net_in || 0)}`}
             />
             <DetailRow
+              label="今日流量"
+              value={todayTraffic
+                ? `↑ ${formatBytes(todayTraffic.up)} ↓ ${formatBytes(todayTraffic.down)}`
+                : '-'}
+            />
+            <DetailRow
               label="总流量"
               value={`↑ ${formatBytes(live?.net_total_up || 0)} ↓ ${formatBytes(live?.net_total_down || 0)}`}
             />
@@ -195,7 +204,7 @@ function ExpandedNodeDetails({
   );
 }
 
-export default function NodeTable({ nodes, liveData, includeHidden = false }: NodeTableProps) {
+export default function NodeTable({ nodes, liveData, dailyTraffic = {}, includeHidden = false }: NodeTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('manual');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
@@ -260,13 +269,14 @@ export default function NodeTable({ nodes, liveData, includeHidden = false }: No
           cmp = (a.price || 0) - (b.price || 0);
           break;
         case 'traffic':
-          cmp = ((aLive?.net_total_up || 0) + (aLive?.net_total_down || 0)) - ((bLive?.net_total_up || 0) + (bLive?.net_total_down || 0));
+          cmp = ((dailyTraffic[a.uuid]?.up || 0) + (dailyTraffic[a.uuid]?.down || 0))
+            - ((dailyTraffic[b.uuid]?.up || 0) + (dailyTraffic[b.uuid]?.down || 0));
           break;
       }
 
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [nodes, sortKey, sortDir, liveData, onlineSet]);
+  }, [nodes, sortKey, sortDir, liveData, onlineSet, dailyTraffic]);
 
   const toggleExpanded = (uuid: string) => {
     setExpandedRows((current) =>
@@ -315,7 +325,7 @@ export default function NodeTable({ nodes, liveData, includeHidden = false }: No
             <SortHeader column="disk" style={{ width: 118 }}>硬盘</SortHeader>
             <SortHeader column="network" style={{ width: 142 }}>网络</SortHeader>
             <SortHeader column="price" style={{ width: 108 }}>价格</SortHeader>
-            <SortHeader column="traffic" style={{ width: 166 }}>流量</SortHeader>
+            <SortHeader column="traffic" style={{ width: 166 }}>今日流量</SortHeader>
           </Table.Row>
         </Table.Header>
 
@@ -328,6 +338,7 @@ export default function NodeTable({ nodes, liveData, includeHidden = false }: No
             const diskPct = formatPercent(live?.disk || 0, node.disk_total);
             const isExpanded = expandedRows.includes(node.uuid);
             const uptimeLabel = formatUptime(live?.uptime || 0);
+            const todayTraffic = dailyTraffic[node.uuid];
 
             return (
               <React.Fragment key={node.uuid}>
@@ -417,9 +428,13 @@ export default function NodeTable({ nodes, liveData, includeHidden = false }: No
                     )}
                   </Table.Cell>
                   <Table.Cell>
-                    <Text size="2" style={{ whiteSpace: 'nowrap' }}>
-                      ↑ {formatBytes(live?.net_total_up || 0)} ↓ {formatBytes(live?.net_total_down || 0)}
-                    </Text>
+                    {todayTraffic ? (
+                      <Text size="2" style={{ whiteSpace: 'nowrap' }}>
+                        ↑ {formatBytes(todayTraffic.up)} ↓ {formatBytes(todayTraffic.down)}
+                      </Text>
+                    ) : (
+                      <Text size="2" color="gray">-</Text>
+                    )}
                   </Table.Cell>
                 </Table.Row>
 
@@ -429,6 +444,7 @@ export default function NodeTable({ nodes, liveData, includeHidden = false }: No
                       <ExpandedNodeDetails
                         node={node}
                         live={live}
+                        todayTraffic={dailyTraffic[node.uuid]}
                         lastReportTime={lastReportMap.get(node.uuid)}
                         includeHidden={includeHidden}
                       />

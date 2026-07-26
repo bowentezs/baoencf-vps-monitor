@@ -15,13 +15,14 @@ import {
 } from '@radix-ui/themes';
 import { Grid3X3, Search, Table2, X } from 'lucide-react';
 import NodeTable from './NodeTable';
-import { ClientInfo, LiveDataMap } from '../types';
+import { ClientInfo, DailyTrafficMap, LiveDataMap } from '../types';
 import { getLocalStorageItem, setLocalStorageItem } from '../utils/browserStorage';
 import { filterMonitorNodes, getNodeGroups, NodeStatusFilter } from '../utils/monitorView';
 
 interface NodeDisplayProps {
   nodes: ClientInfo[];
   liveData: LiveDataMap;
+  dailyTraffic?: DailyTrafficMap;
   gridRenderer: (nodes: ClientInfo[], liveData: LiveDataMap) => React.ReactNode;
   offlinePosition?: 'first' | 'keep' | 'last';
   includeHidden?: boolean;
@@ -30,6 +31,7 @@ interface NodeDisplayProps {
 export default function NodeDisplay({
   nodes,
   liveData,
+  dailyTraffic = {},
   gridRenderer,
   offlinePosition = 'keep',
   includeHidden = false,
@@ -191,7 +193,7 @@ export default function NodeDisplay({
         <>
           {viewMode === 'grid'
             ? gridRenderer(filteredNodes, liveData)
-            : <NodeTable nodes={filteredNodes} liveData={liveData} includeHidden={includeHidden} />}
+            : <NodeTable nodes={filteredNodes} liveData={liveData} dailyTraffic={dailyTraffic} includeHidden={includeHidden} />}
         </>
       )}
     </Box>
