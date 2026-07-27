@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Flex, Text, Button, TextField,
+  Flex, Grid, Text, Button, TextField,
   Dialog, Badge, Switch, Table, Tabs, Select,
   Box, Checkbox, TextArea,
 } from '@radix-ui/themes';
@@ -124,6 +124,18 @@ export default function AdminNotifications() {
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [editingLoad, setEditingLoad] = useState<LoadNotification | null>(null);
   const [loadForm, setLoadForm] = useState<LoadNotificationForm>({});
+
+  const toggleLoadClient = (uuid: string) => {
+    setLoadForm((current) => {
+      const selected = Array.isArray(current.clients) ? current.clients : [];
+      return {
+        ...current,
+        clients: selected.includes(uuid)
+          ? selected.filter((clientUuid) => clientUuid !== uuid)
+          : [...selected, uuid],
+      };
+    });
+  };
 
   useEffect(() => {
     setActiveTab(toNotificationTab(urlTab));
@@ -531,9 +543,16 @@ export default function AdminNotifications() {
   };
 
   const saveLoadNotification = async () => {
+    const selectedClients = Array.isArray(loadForm.clients) ? loadForm.clients : [];
+    if (loadForm.all_clients !== true && selectedClients.length === 0) {
+      toast.error('请选择至少一台服务器，或开启“应用到所有服务器”');
+      return;
+    }
+
     const payload = {
       ...loadForm,
-      clients: loadForm.all_clients ? [] : loadForm.clients || [],
+      all_clients: loadForm.all_clients === true,
+      clients: loadForm.all_clients ? [] : selectedClients,
     };
 
     if (editingLoad?.id) {
@@ -1542,6 +1561,60 @@ export default function AdminNotifications() {
                 <Text size="2" weight="bold">应用到所有服务器</Text>
               </Flex>
             </label>
+            {loadForm.all_clients !== true && (
+              <Box style={{ border: '1px solid var(--gray-5)', borderRadius: 8, padding: 12 }}>
+                <Flex align="center" justify="between" gap="2" mb="2">
+                  <Text size="2" weight="bold">选择服务器</Text>
+                  <Badge variant="soft" color="blue">
+                    已选 {Array.isArray(loadForm.clients) ? loadForm.clients.length : 0} 台
+                  </Badge>
+                </Flex>
+                {clients.length === 0 ? (
+                  <Text size="2" color="gray">暂无可选服务器</Text>
+                ) : (
+                  <Grid columns={{ initial: '1', sm: '2' }} gap="2" style={{ maxHeight: 220, overflowY: 'auto' }}>
+                    {clients.map((client) => {
+                      const selected = Array.isArray(loadForm.clients) && loadForm.clients.includes(client.uuid);
+                      const detail = [clientDisplayIp(client), client.region].filter(Boolean).join(' / ');
+                      return (
+                        <Box
+                          key={client.uuid}
+                          role="button"
+                          tabIndex={0}
+                          style={{
+                            padding: 10,
+                            cursor: 'pointer',
+                            borderRadius: 6,
+                            border: selected ? '1px solid var(--blue-8)' : '1px solid var(--gray-5)',
+                            background: selected ? 'var(--blue-2)' : 'var(--color-panel-solid)',
+                          }}
+                          onClick={() => toggleLoadClient(client.uuid)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              toggleLoadClient(client.uuid);
+                            }
+                          }}
+                        >
+                          <Flex align="center" gap="2">
+                            <Checkbox
+                              aria-label={`选择服务器 ${client.name || client.uuid}`}
+                              checked={selected}
+                              onClick={(event) => event.stopPropagation()}
+                              onCheckedChange={() => toggleLoadClient(client.uuid)}
+                            />
+                            <Flex direction="column" style={{ minWidth: 0 }}>
+                              <Text size="2" weight="medium" truncate>{client.name || '未命名'}</Text>
+                              {detail && <Text size="1" color="gray" truncate>{detail}</Text>}
+                            </Flex>
+                          </Flex>
+                        </Box>
+                      );
+                    })}
+                  </Grid>
+                )}
+              </Box>
+            )}
           </Flex>
           <Flex gap="2" justify="end" mt="4">
             <Button variant="soft" color="gray" onClick={() => setLoadDialogOpen(false)}>取消</Button>
