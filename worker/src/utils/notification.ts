@@ -120,10 +120,19 @@ export function validateLoadNotificationInput(
     .filter((client): client is string => typeof client === 'string')
     .map(client => client.trim())
     .filter(Boolean);
+  const hasAllClientsField = Object.prototype.hasOwnProperty.call(input, 'all_clients');
+  if (hasAllClientsField && typeof input.all_clients !== 'boolean') {
+    errors.push('all_clients 必须是布尔值');
+  }
+  const allClients = hasAllClientsField ? input.all_clients === true : clients.length === 0;
+  const targetClients = allClients ? [] : clients;
   if (clients.length > 200) {
     errors.push('客户端数量不能超过 200 个');
   }
-  if (clients.some(client => !allowedClientIds.has(client))) {
+  if (!allClients && targetClients.length === 0) {
+    errors.push('定向负载通知必须选择至少一个客户端');
+  }
+  if (targetClients.some(client => !allowedClientIds.has(client))) {
     errors.push('客户端列表包含不存在的节点');
   }
 
@@ -153,7 +162,7 @@ export function validateLoadNotificationInput(
     item: {
       ...(options.requireId ? { id } : {}),
       name,
-      clients,
+      clients: targetClients,
       metric,
       threshold,
       ratio,
