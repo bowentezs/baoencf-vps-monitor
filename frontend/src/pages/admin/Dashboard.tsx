@@ -589,7 +589,52 @@ function FieldInput({
   );
 }
 
-function EditDialog({ client, open, onOpenChange, onSaved }: { client: AdminClient | null; open: boolean; onOpenChange: (v: boolean) => void; onSaved: (uuid: string, patch: Partial<AdminClient>, saved?: Partial<AdminClient> & { uuid: string }) => void }) {
+const CUSTOM_GROUP_VALUE = '__cf_monitor_custom_group__';
+
+function GroupInput({ value, groups, onChange }: { value: string; groups: string[]; onChange: (value: string) => void }) {
+  const normalizedValue = value.trim();
+  const selectedValue = groups.includes(normalizedValue) ? normalizedValue : CUSTOM_GROUP_VALUE;
+
+  return (
+    <div>
+      <Text size="2" weight="bold" style={{ display: 'block', marginBottom: 4 }}>分组</Text>
+      <div className="admin-node-group-editor">
+        <TextField.Root
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="输入新分组"
+        />
+        <Select.Root
+          value={selectedValue}
+          onValueChange={(nextValue) => {
+            if (nextValue !== CUSTOM_GROUP_VALUE) onChange(nextValue);
+          }}
+        >
+          <Select.Trigger aria-label="选择已有分组" />
+          <Select.Content>
+            <Select.Item value={CUSTOM_GROUP_VALUE} disabled>
+              {normalizedValue ? '自定义分组' : '选择已有分组'}
+            </Select.Item>
+            {groups.map((group) => (
+              <Select.Item key={group} value={group}>{group}</Select.Item>
+            ))}
+          </Select.Content>
+        </Select.Root>
+      </div>
+      <Text size="1" color="gray" style={{ display: 'block', marginTop: 4 }}>
+        可直接输入新分组，也可从已有分组中选择
+      </Text>
+    </div>
+  );
+}
+
+function EditDialog({ client, groups, open, onOpenChange, onSaved }: {
+  client: AdminClient | null;
+  groups: string[];
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSaved: (uuid: string, patch: Partial<AdminClient>, saved?: Partial<AdminClient> & { uuid: string }) => void;
+}) {
   const apiFetch = useApi();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<Record<string, unknown>>({});
@@ -652,7 +697,7 @@ function EditDialog({ client, open, onOpenChange, onSaved }: { client: AdminClie
             <FieldInput label="名称" value={String(form.name || '')} onChange={v => update('name', v)} />
             <FieldInput label="私有备注" value={String(form.remark || '')} onChange={v => update('remark', v)} textarea />
             <FieldInput label="公开备注" value={String(form.public_remark || '')} onChange={v => update('public_remark', v)} textarea />
-            <FieldInput label="分组" value={String(form.group || '')} onChange={v => update('group', v)} />
+            <GroupInput value={String(form.group || '')} groups={groups} onChange={v => update('group', v)} />
             <FieldInput label="标签 (分号分隔)" value={String(form.tags || '')} onChange={v => update('tags', v)} />
             <Separator size="4" />
             <Text size="2" weight="bold">计费信息</Text>
@@ -1176,7 +1221,7 @@ export default function AdminDashboard() {
           }
         }}
       />
-      <EditDialog client={editClient} open={editOpen} onOpenChange={setEditOpen} onSaved={(uuid, patch, saved) => {
+      <EditDialog client={editClient} groups={groups} open={editOpen} onOpenChange={setEditOpen} onSaved={(uuid, patch, saved) => {
         const updated = saved || { ...(editClient || { uuid }), ...patch, uuid };
         setClients((prev) => prev.map((client) => client.uuid === uuid ? { ...client, ...updated } : client));
         notifyPublicDataUpdated({

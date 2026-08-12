@@ -3115,6 +3115,16 @@ html[data-monitor-theme='next'] .node-network-value strong {
   padding-bottom: 18px;
 }
 
+.admin-node-group-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 8px;
+}
+
+.admin-node-group-editor .rt-SelectTrigger {
+  width: 100%;
+}
+
 .admin-node-detail-list {
   width: min(100%, 480px);
   margin-inline: auto;
@@ -4495,6 +4505,10 @@ html[data-monitor-theme='next'] .node-network-value strong {
   .admin-node-edit-form,
   .admin-node-detail-list {
     width: 100%;
+  }
+
+  .admin-node-group-editor {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .admin-node-detail-row {
