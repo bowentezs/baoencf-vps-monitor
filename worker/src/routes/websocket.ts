@@ -365,8 +365,15 @@ wsRoutes.get('/live/clients', async (c) => {
   const doId = c.env.LIVE_DATA.idFromName('global');
   const stub = c.env.LIVE_DATA.get(doId);
 
-  const response = await stub.fetch(new Request(`https://do/live${includeHidden ? '?include_hidden=1' : ''}`, { method: 'GET' }));
-  const snapshot = await readLiveSnapshot(response) ?? { online: [], count: 0 };
+  const response = await stub
+    .fetch(new Request(`https://do/live${includeHidden ? '?include_hidden=1' : ''}`, { method: 'GET' }))
+    .catch(() => null);
+  const snapshot = response ? await readLiveSnapshot(response) : null;
+  if (!snapshot) {
+    c.header('Cache-Control', 'no-store');
+    c.header('Retry-After', '2');
+    return c.json({ error: 'Live data temporarily unavailable' }, 503);
+  }
   c.header('Cache-Control', includeHidden ? 'no-store' : `public, max-age=${LIVE_CLIENTS_CACHE_SECONDS}, s-maxage=${LIVE_CLIENTS_CACHE_SECONDS}, stale-while-revalidate=${LIVE_CLIENTS_CACHE_SECONDS * 2}`);
   return c.json(snapshot);
 });

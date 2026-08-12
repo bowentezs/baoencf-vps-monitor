@@ -11,6 +11,7 @@ export interface PublicBootstrapPayload {
   clients?: ClientInfo[];
   nodes?: ClientInfo[];
   live?: LiveDataResponse | null;
+  live_available?: boolean;
   metadata_version?: string;
   snapshot_at?: number;
   server_time?: number;
@@ -52,6 +53,7 @@ function normalizePublicBootstrap(payload: unknown, options: { includeHidden?: b
     clients: record.clients === undefined ? undefined : normalizePublicClients(record.clients, options),
     nodes: record.nodes === undefined ? undefined : normalizePublicClients(record.nodes, options),
     live: record.live === undefined ? undefined : normalizeLiveDataResponse(record.live),
+    live_available: typeof record.live_available === 'boolean' ? record.live_available : undefined,
     metadata_version: typeof record.metadata_version === 'string' ? record.metadata_version : undefined,
     snapshot_at: typeof record.snapshot_at === 'number' && Number.isFinite(record.snapshot_at) ? record.snapshot_at : undefined,
     server_time: typeof record.server_time === 'number' && Number.isFinite(record.server_time) ? record.server_time : undefined,

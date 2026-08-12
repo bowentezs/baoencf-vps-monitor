@@ -231,6 +231,7 @@ export default function Index() {
   const location = useLocation();
   const { authLoading, isAuthenticated } = useAuth();
   const { liveData, error } = useLiveData();
+  const liveStatusKnown = liveData !== null && error === null;
   const monitorMode = new URLSearchParams(location.search).get('view') === 'websites' ? 'websites' : 'servers';
   const initialBootstrap = useMemo(() => getCachedPublicBootstrap(), []);
   const [clients, setClients] = useState<ClientInfo[]>(() => initialBootstrap?.clients || []);
@@ -442,7 +443,7 @@ export default function Index() {
 
   // Apply offline server position sorting
   const sortedClients = useMemo(() => {
-    if (offlinePosition === 'keep') return displayClients;
+    if (!liveStatusKnown || offlinePosition === 'keep') return displayClients;
     const onlineSet = liveMap.online;
     return [...displayClients].sort((a, b) => {
       const aOnline = onlineSet.includes(a.uuid);
@@ -451,11 +452,11 @@ export default function Index() {
       if (offlinePosition === 'first') return aOnline ? 1 : -1;
       return aOnline ? -1 : 1;
     });
-  }, [displayClients, offlinePosition, liveMap.online]);
+  }, [displayClients, liveStatusKnown, offlinePosition, liveMap.online]);
 
   const apiError = !clientsLoading && displayClients.length === 0 ? (clientsError || error) : null;
 
-  const statusCards = buildDashboardStatusCards(stats);
+  const statusCards = buildDashboardStatusCards(stats, liveStatusKnown);
 
   const renderGrid = (nodes: ClientInfo[], ld: LiveDataMap) => (
     <Box className="node-card-grid" style={nodeCardGridStyle}>
@@ -466,6 +467,7 @@ export default function Index() {
           live={ld.data[client.uuid]}
           todayTraffic={dailyTraffic[client.uuid]}
           online={ld.online.includes(client.uuid)}
+          statusKnown={liveStatusKnown}
           includeHidden={isAuthenticated}
         />
       ))}
@@ -504,6 +506,7 @@ export default function Index() {
             gridRenderer={renderGrid}
             offlinePosition={offlinePosition}
             includeHidden={isAuthenticated}
+            statusKnown={liveStatusKnown}
           />
         </React.Suspense>
       ) : (
