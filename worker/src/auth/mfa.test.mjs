@@ -8,7 +8,7 @@ import {
   normalizeRecoveryCode,
 } from './mfa.ts';
 
-const env = { JWT_SECRET: '0123456789abcdef0123456789abcdef' };
+const env = { JWT_SECRET: 'TEST_DIFFERENT_JWT_SECRET_PLACEHOLDER_FOR_UNIT_TESTS_654321' };
 
 test('encrypts TOTP secrets with random IV and user-bound authentication', async () => {
   const first = await encryptTotpSecret('JBSWY3DPEHPK3PXP', 'user-a', env);
@@ -20,7 +20,7 @@ test('encrypts TOTP secrets with random IV and user-bound authentication', async
   const [version, iv, data] = first.split('.');
   const tamperedData = `${data.startsWith('A') ? 'B' : 'A'}${data.slice(1)}`;
   await assert.rejects(() => decryptTotpSecret(`${version}.${iv}.${tamperedData}`, 'user-a', env));
-  await assert.rejects(() => decryptTotpSecret(first, 'user-a', { JWT_SECRET: 'abcdef0123456789abcdef0123456789' }));
+  await assert.rejects(() => decryptTotpSecret(first, 'user-a', { JWT_SECRET: 'TEST_WRONG_JWT_SECRET_PLACEHOLDER_FOR_UNIT_TESTS_123456' }));
 });
 
 test('generates eight unique 120-bit recovery codes and stable hashes', async () => {

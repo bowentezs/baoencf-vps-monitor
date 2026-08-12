@@ -3,7 +3,7 @@ import test from 'node:test';
 import { generateMfaSetupToken, generateMfaToken, verifyMfaSetupToken, verifyMfaToken } from './mfa-token.ts';
 import { AuthConfigurationError } from './jwt.ts';
 
-const env = { JWT_SECRET: '0123456789abcdef0123456789abcdef' };
+const env = { JWT_SECRET: 'TEST_JWT_SECRET_PLACEHOLDER_FOR_UNIT_TESTS_ONLY_123456' };
 const identity = {
   userId: 'user-1',
   username: 'admin',
