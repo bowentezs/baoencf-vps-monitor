@@ -19,6 +19,7 @@ interface NodeTableProps {
   liveData: LiveDataMap;
   dailyTraffic?: DailyTrafficMap;
   includeHidden?: boolean;
+  statusKnown?: boolean;
 }
 
 type SortKey = 'manual' | 'name' | 'os' | 'status' | 'cpu' | 'ram' | 'disk' | 'network' | 'price' | 'traffic';
@@ -204,7 +205,7 @@ function ExpandedNodeDetails({
   );
 }
 
-export default function NodeTable({ nodes, liveData, dailyTraffic = {}, includeHidden = false }: NodeTableProps) {
+export default function NodeTable({ nodes, liveData, dailyTraffic = {}, includeHidden = false, statusKnown = true }: NodeTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('manual');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
@@ -234,8 +235,8 @@ export default function NodeTable({ nodes, liveData, dailyTraffic = {}, includeH
 
   const sortedNodes = useMemo(() => {
     return [...nodes].sort((a, b) => {
-      const aOnline = onlineSet.has(a.uuid);
-      const bOnline = onlineSet.has(b.uuid);
+      const aOnline = statusKnown && onlineSet.has(a.uuid);
+      const bOnline = statusKnown && onlineSet.has(b.uuid);
       const aLive = liveData?.data?.[a.uuid];
       const bLive = liveData?.data?.[b.uuid];
 
@@ -276,7 +277,7 @@ export default function NodeTable({ nodes, liveData, dailyTraffic = {}, includeH
 
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [nodes, sortKey, sortDir, liveData, onlineSet, dailyTraffic]);
+  }, [nodes, sortKey, sortDir, liveData, onlineSet, dailyTraffic, statusKnown]);
 
   const toggleExpanded = (uuid: string) => {
     setExpandedRows((current) =>
@@ -331,7 +332,7 @@ export default function NodeTable({ nodes, liveData, dailyTraffic = {}, includeH
 
         <Table.Body>
           {sortedNodes.map((node) => {
-            const isOnline = onlineSet.has(node.uuid);
+            const isOnline = statusKnown && onlineSet.has(node.uuid);
             const live = liveData?.data?.[node.uuid];
             const cpuVal = live?.cpu || 0;
             const ramPct = formatPercent(live?.ram || 0, node.mem_total);
@@ -381,8 +382,8 @@ export default function NodeTable({ nodes, liveData, dailyTraffic = {}, includeH
                   </Table.Cell>
                   <Table.Cell className="node-table-status-cell">
                     <Flex className="node-table-status-stack" gap="1" align="center">
-                      <Badge color={isOnline ? 'green' : 'red'} variant="soft" size="1">
-                        {isOnline ? '在线' : '离线'}
+                      <Badge color={!statusKnown ? 'gray' : isOnline ? 'green' : 'red'} variant="soft" size="1">
+                        {!statusKnown ? '状态未知' : isOnline ? '在线' : '离线'}
                       </Badge>
                       {isOnline && (
                         <Text size="1" color="gray" className="node-uptime-nowrap" title={uptimeLabel}>

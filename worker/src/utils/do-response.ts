@@ -41,6 +41,7 @@ function finiteNumber(value: unknown, fallback: number): number {
 }
 
 export async function readLiveSnapshot(response: Response): Promise<LiveSnapshot | null> {
+  if (!response.ok) return null;
   const value = await readJsonObject(response);
   if (
     !value ||

@@ -26,6 +26,7 @@ interface NodeDisplayProps {
   gridRenderer: (nodes: ClientInfo[], liveData: LiveDataMap) => React.ReactNode;
   offlinePosition?: 'first' | 'keep' | 'last';
   includeHidden?: boolean;
+  statusKnown?: boolean;
 }
 
 export default function NodeDisplay({
@@ -35,6 +36,7 @@ export default function NodeDisplay({
   gridRenderer,
   offlinePosition = 'keep',
   includeHidden = false,
+  statusKnown = true,
 }: NodeDisplayProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
     return getLocalStorageItem('nodeViewMode') === 'table' ? 'table' : 'grid';
@@ -45,6 +47,11 @@ export default function NodeDisplay({
   const searchRef = useRef<HTMLDivElement>(null);
 
   const groups = useMemo(() => getNodeGroups(nodes), [nodes]);
+  const effectiveStatusFilter = statusKnown ? statusFilter : 'all';
+
+  useEffect(() => {
+    if (!statusKnown) setStatusFilter('all');
+  }, [statusKnown]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -75,10 +82,10 @@ export default function NodeDisplay({
     return filterMonitorNodes(nodes, liveData, {
       searchTerm,
       selectedGroup,
-      statusFilter,
-      offlinePosition,
+      statusFilter: effectiveStatusFilter,
+      offlinePosition: statusKnown ? offlinePosition : 'keep',
     });
-  }, [nodes, liveData, searchTerm, selectedGroup, statusFilter, offlinePosition]);
+  }, [nodes, liveData, searchTerm, selectedGroup, effectiveStatusFilter, offlinePosition, statusKnown]);
 
   const onlineVisibleCount = filteredNodes.filter((node) =>
     liveData.online.includes(node.uuid),
@@ -121,8 +128,8 @@ export default function NodeDisplay({
               <Badge size="1" variant="soft" color="blue">
                 当前结果 {filteredNodes.length}
               </Badge>
-              <Badge size="1" variant="soft" color="green">
-                在线 {onlineVisibleCount}
+              <Badge size="1" variant="soft" color={statusKnown ? 'green' : 'gray'}>
+                在线 {statusKnown ? onlineVisibleCount : '--'}
               </Badge>
               <Badge size="1" variant="soft" color="gray">
                 总节点 {nodes.length}
@@ -133,9 +140,12 @@ export default function NodeDisplay({
           <Flex className="node-filter-bottom-row" align="center" gap="2">
             <Box className="node-status-filter">
               <SegmentedControl.Root
-                value={statusFilter}
-                onValueChange={(value) => setStatusFilter(value as NodeStatusFilter)}
+                value={effectiveStatusFilter}
+                onValueChange={(value) => {
+                  if (statusKnown || value === 'all') setStatusFilter(value as NodeStatusFilter);
+                }}
                 size="1"
+                aria-disabled={!statusKnown}
               >
                 <SegmentedControl.Item value="all">全部</SegmentedControl.Item>
                 <SegmentedControl.Item value="online">在线</SegmentedControl.Item>
@@ -193,7 +203,7 @@ export default function NodeDisplay({
         <>
           {viewMode === 'grid'
             ? gridRenderer(filteredNodes, liveData)
-            : <NodeTable nodes={filteredNodes} liveData={liveData} dailyTraffic={dailyTraffic} includeHidden={includeHidden} />}
+            : <NodeTable nodes={filteredNodes} liveData={liveData} dailyTraffic={dailyTraffic} includeHidden={includeHidden} statusKnown={statusKnown} />}
         </>
       )}
     </Box>

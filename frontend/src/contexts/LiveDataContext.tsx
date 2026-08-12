@@ -16,6 +16,11 @@ import {
 import { clearCachedPublicSettings, fetchPublicSettings, normalizePublicSettings, setCachedPublicSettings } from '../utils/publicSettings';
 import { clearCachedPublicBootstrap, fetchPublicBootstrap, getCachedPublicBootstrap } from '../utils/publicBootstrap';
 import { normalizeLiveDataResponse, normalizeViewerTokenResponse } from '../utils/liveDataResponse';
+import {
+  isEmptyLiveSnapshot,
+  LIVE_EMPTY_SNAPSHOT_GRACE_MS,
+  shouldDeferLiveSnapshot,
+} from '../utils/liveSnapshotGuard';
 import { notifyPublicDataUpdated, subscribePublicDataUpdated } from '../utils/publicDataEvents';
 import { notifyWebsiteMonitorsUpdated, type WebsiteMonitorsUpdateDetail } from '../utils/websiteMonitorEvents';
 import { useAuth } from './AuthContext';
@@ -123,10 +128,6 @@ function isMetadataChangedMessage(value: unknown): value is LiveDataMetadataChan
   return isRecord(value) && value.type === 'metadata_changed';
 }
 
-function isEmptyLiveSnapshot(snapshot: LiveDataResponse) {
-  return snapshot.count === 0 && snapshot.online.length === 0 && snapshot.clients.length === 0;
-}
-
 export function applyLiveUpdate(
   current: LiveDataResponse | null,
   message: LiveDataUpdateMessage,
@@ -222,6 +223,10 @@ export function LiveDataProvider({ children, enabled = true, viewer = true }: Li
   const [error, setError] = useState<string | null>(null);
   const [viewerExpired, setViewerExpired] = useState(false);
   const [viewerExpiresAt, setViewerExpiresAt] = useState<number | null>(null);
+  const liveDataRef = useRef<LiveDataResponse | null>(null);
+  const pendingEmptySnapshotRef = useRef<LiveDataResponse | null>(null);
+  const emptySnapshotTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRemovalTimeoutsRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialSnapshotTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -234,6 +239,63 @@ export function LiveDataProvider({ children, enabled = true, viewer = true }: Li
   const activeSinceRef = useRef<number | null>(
     enabled && viewer ? Date.now() : null,
   );
+
+  const clearPendingEmptySnapshot = useCallback(() => {
+    pendingEmptySnapshotRef.current = null;
+    if (emptySnapshotTimeoutRef.current) {
+      clearTimeout(emptySnapshotTimeoutRef.current);
+      emptySnapshotTimeoutRef.current = null;
+    }
+  }, []);
+
+  const commitLiveData = useCallback((next: LiveDataResponse | null) => {
+    liveDataRef.current = next;
+    setLiveData(next);
+  }, []);
+
+  const cancelPendingRemoval = useCallback((clientId: string) => {
+    const timeout = pendingRemovalTimeoutsRef.current.get(clientId);
+    if (!timeout) return;
+    clearTimeout(timeout);
+    pendingRemovalTimeoutsRef.current.delete(clientId);
+  }, []);
+
+  const clearPendingRemovals = useCallback(() => {
+    for (const timeout of pendingRemovalTimeoutsRef.current.values()) clearTimeout(timeout);
+    pendingRemovalTimeoutsRef.current.clear();
+  }, []);
+
+  const applyLiveSnapshot = useCallback((next: LiveDataResponse) => {
+    if (!shouldDeferLiveSnapshot(liveDataRef.current, next)) {
+      clearPendingEmptySnapshot();
+      clearPendingRemovals();
+      commitLiveData(next);
+      return true;
+    }
+
+    pendingEmptySnapshotRef.current = next;
+    if (!emptySnapshotTimeoutRef.current) {
+      emptySnapshotTimeoutRef.current = setTimeout(() => {
+        emptySnapshotTimeoutRef.current = null;
+        const pending = pendingEmptySnapshotRef.current;
+        pendingEmptySnapshotRef.current = null;
+        if (pending) commitLiveData(pending);
+      }, LIVE_EMPTY_SNAPSHOT_GRACE_MS);
+    }
+    return false;
+  }, [clearPendingEmptySnapshot, clearPendingRemovals, commitLiveData]);
+
+  const scheduleLiveRemove = useCallback((message: LiveDataRemoveMessage) => {
+    if (pendingRemovalTimeoutsRef.current.has(message.client)) return;
+    const timeout = setTimeout(() => {
+      pendingRemovalTimeoutsRef.current.delete(message.client);
+      commitLiveData(applyLiveRemove(liveDataRef.current, message));
+    }, LIVE_EMPTY_SNAPSHOT_GRACE_MS);
+    pendingRemovalTimeoutsRef.current.set(message.client, timeout);
+  }, [commitLiveData]);
+
+  useEffect(() => clearPendingEmptySnapshot, [clearPendingEmptySnapshot]);
+  useEffect(() => clearPendingRemovals, [clearPendingRemovals]);
 
   const expireViewerSession = useCallback(() => {
     wsExpiredRef.current = true;
@@ -291,14 +353,14 @@ export function LiveDataProvider({ children, enabled = true, viewer = true }: Li
       const data = normalizeLiveDataResponse(await res.json());
       if (!data) throw new Error('Invalid live data response');
       applyLiveMetadataVersion(data.metadata_version);
-      setLiveData(current => current && !isEmptyLiveSnapshot(current) && isEmptyLiveSnapshot(data) ? current : data);
+      applyLiveSnapshot(data);
       setError(null);
     } catch (error: unknown) {
       setError(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
-  }, [authLoading, includeHidden]);
+  }, [applyLiveSnapshot, authLoading, includeHidden]);
 
   const refresh = useCallback(() => {
     fetchLiveData();
@@ -332,7 +394,7 @@ export function LiveDataProvider({ children, enabled = true, viewer = true }: Li
       const live = normalizeLiveDataResponse(payload?.live);
       rememberInitialLiveMetadataVersion(payload?.metadata_version || live?.metadata_version);
       if (live) {
-        setLiveData(current => current && !isEmptyLiveSnapshot(current) && isEmptyLiveSnapshot(live) ? current : live);
+        applyLiveSnapshot(live);
         setLoading(false);
       }
     };
@@ -382,7 +444,7 @@ export function LiveDataProvider({ children, enabled = true, viewer = true }: Li
       window.removeEventListener(LIVE_POLL_SETTINGS_UPDATED_EVENT, handleSettingsUpdated);
       unsubscribePublicData();
     };
-  }, [authLoading, enabled, includeHidden, viewer]);
+  }, [applyLiveSnapshot, authLoading, enabled, includeHidden, viewer]);
 
   useEffect(() => {
     if (authLoading) {
@@ -419,7 +481,7 @@ export function LiveDataProvider({ children, enabled = true, viewer = true }: Li
         const live = normalizeLiveDataResponse(bootstrap?.live);
         rememberInitialLiveMetadataVersion(bootstrap?.metadata_version || live?.metadata_version);
         if (live) {
-          setLiveData(current => current && !isEmptyLiveSnapshot(current) && isEmptyLiveSnapshot(live) ? current : live);
+          applyLiveSnapshot(live);
           setLoading(false);
         }
         const tokenResponse = await fetch('/api/ws/live-token');
@@ -445,7 +507,6 @@ export function LiveDataProvider({ children, enabled = true, viewer = true }: Li
       ws.addEventListener('open', () => {
         if (wsRef.current !== ws) return;
         wsOpenRef.current = true;
-        setError(null);
         clearInitialSnapshotTimeout();
         initialSnapshotTimeoutRef.current = setTimeout(() => {
           if (!cancelled && wsRef.current === ws) {
@@ -462,31 +523,26 @@ export function LiveDataProvider({ children, enabled = true, viewer = true }: Li
             const { type: _type, ...snapshot } = message;
             const normalized = normalizeLiveDataResponse(snapshot);
             if (!normalized) return;
-            if (isEmptyLiveSnapshot(normalized)) {
-              setLiveData(current => current && !isEmptyLiveSnapshot(current) ? current : normalized);
-              setLoading(false);
-              setError(null);
-              void fetchLiveData();
-              return;
-            }
-            setLiveData(normalized);
+            applyLiveSnapshot(normalized);
             setLoading(false);
             setError(null);
-            if ((snapshot.count || 0) === 0 && snapshot.online.length === 0) {
+            if (isEmptyLiveSnapshot(normalized)) {
               void fetchLiveData();
             }
             return;
           }
           if (isUpdateMessage(message)) {
             clearInitialSnapshotTimeout();
-            setLiveData(current => applyLiveUpdate(current, message));
+            clearPendingEmptySnapshot();
+            cancelPendingRemoval(message.client);
+            commitLiveData(applyLiveUpdate(liveDataRef.current, message));
             setLoading(false);
             setError(null);
             return;
           }
           if (isRemoveMessage(message)) {
             clearInitialSnapshotTimeout();
-            setLiveData(current => applyLiveRemove(current, message));
+            scheduleLiveRemove(message);
             setLoading(false);
             return;
           }
@@ -563,7 +619,7 @@ export function LiveDataProvider({ children, enabled = true, viewer = true }: Li
         ws.close();
       }
     };
-  }, [authLoading, enabled, ensureFallbackViewerWindow, expireViewerSession, fetchLiveData, includeHidden, viewer]);
+  }, [applyLiveSnapshot, authLoading, cancelPendingRemoval, clearPendingEmptySnapshot, commitLiveData, enabled, ensureFallbackViewerWindow, expireViewerSession, fetchLiveData, includeHidden, scheduleLiveRemove, viewer]);
 
   // 轮询
   useEffect(() => {

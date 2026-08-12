@@ -539,6 +539,17 @@ async function readAdminClientsSnapshotOverlay(c: PublicContext): Promise<AdminC
   };
 }
 
+async function readPublicLiveSnapshot(c: PublicContext, includeHidden: boolean) {
+  try {
+    const response = await c.env.LIVE_DATA
+      .get(c.env.LIVE_DATA.idFromName('global'))
+      .fetch(new Request(`https://do/live${includeHidden ? '?include_hidden=1' : ''}`, { method: 'GET' }));
+    return await readLiveSnapshot(response);
+  } catch {
+    return null;
+  }
+}
+
 function applyPublicClientsOverlay(clients: PublicClient[], overlay: AdminClientsSnapshotOverlay | null, includeHidden = false): PublicClient[] {
   if (!overlay) return clients;
   const removed = new Set(overlay.removed);
@@ -1417,22 +1428,21 @@ publicRoutes.get('/public/bootstrap', async (c) => {
   const [settings, snapshot, live] = await Promise.all([
     getPublicSettings(getDatabase(c.env), fresh),
     getPublicClientsSnapshot(c, getDatabase(c.env), fresh, includeHidden),
-    c.env.LIVE_DATA
-      .get(c.env.LIVE_DATA.idFromName('global'))
-      .fetch(new Request(`https://do/live${includeHidden ? '?include_hidden=1' : ''}`, { method: 'GET' }))
-      .then(response => readLiveSnapshot(response))
-      .then(snapshot => snapshot ?? { online: [], count: 0 }),
+    readPublicLiveSnapshot(c, includeHidden),
   ]);
   const payload = {
     settings,
     clients: snapshot.clients,
     nodes: snapshot.nodes,
     live,
+    live_available: live !== null,
     metadata_version: String(snapshot.expiresAt),
     snapshot_at: Date.now(),
     server_time: Date.now(),
   };
-  return includeHidden ? privateJsonResponse(payload) : setPublicMetadataResponse(c, payload, !fresh);
+  return includeHidden || live === null
+    ? privateJsonResponse(payload)
+    : setPublicMetadataResponse(c, payload, !fresh);
 });
 
 // 获取客户端最近的监控记录
@@ -1522,16 +1532,12 @@ publicRoutes.get('/traffic/daily', async (c) => {
   const [clients, rawSnapshot, live] = await Promise.all([
     getPublicClientsSnapshot(c, database, false, includeHidden),
     db.getDailyTraffic(database, days),
-    c.env.LIVE_DATA
-      .get(c.env.LIVE_DATA.idFromName('global'))
-      .fetch(new Request(`https://do/live${includeHidden ? '?include_hidden=1' : ''}`, { method: 'GET' }))
-      .then(response => readLiveSnapshot(response))
-      .then(snapshot => snapshot ?? { online: [], count: 0 }),
+    readPublicLiveSnapshot(c, includeHidden),
   ]);
   const result = buildDailyTrafficResponse({
     snapshot: normalizeDailyTrafficSnapshot(rawSnapshot),
     visibleClients: clients.clients.map(client => client.uuid),
-    liveData: live.data,
+    liveData: live?.data,
     days,
   });
   return includeHidden

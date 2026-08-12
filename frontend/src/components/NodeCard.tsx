@@ -21,6 +21,7 @@ interface NodeCardProps {
   live?: LiveRecord;
   todayTraffic?: DailyTrafficUsage;
   online: boolean;
+  statusKnown?: boolean;
   includeHidden?: boolean;
 }
 
@@ -234,7 +235,7 @@ function NodeIpBadges({ client, className }: { client: ClientInfo; className?: s
   );
 }
 
-export default function NodeCard({ client, live, online, todayTraffic, includeHidden = false }: NodeCardProps) {
+export default function NodeCard({ client, live, online, statusKnown = true, todayTraffic, includeHidden = false }: NodeCardProps) {
   const isMobile = useIsMobile();
   const defaultLive: LiveRecord = {
     cpu: 0,
@@ -270,7 +271,7 @@ export default function NodeCard({ client, live, online, todayTraffic, includeHi
   const osConfig = getOSDisplay(client.os || '');
   const trafficLimitLabel = formatTrafficLimitLabel(client.traffic_limit, client.traffic_limit_type);
   const uptimeLabel = online && d.uptime > 0 ? formatUptime(d.uptime) : '-';
-  const uptimeFooterLabel = online ? uptimeLabel : '当前离线';
+  const uptimeFooterLabel = !statusKnown ? '状态暂不可用' : online ? uptimeLabel : '当前离线';
   const memDetail = `${formatBytes(d.ram)} / ${formatBytes(memTotal)}`;
   const diskDetail = `${formatBytes(d.disk)} / ${formatBytes(diskTotal)}`;
   const cpuDetail = formatCpuCardLabel(client.cpu_name, client.cpu_cores);
@@ -300,7 +301,7 @@ export default function NodeCard({ client, live, online, todayTraffic, includeHi
   return (
     <Card
       className="node-card"
-      style={{ width: '100%', margin: '0 auto', opacity: online ? 1 : 0.75 }}
+      style={{ width: '100%', margin: '0 auto', opacity: statusKnown && !online ? 0.75 : 1 }}
       id={client.uuid}
     >
       <Link className="node-card-link" to={`/instance/${client.uuid}`} onClick={handleCardLinkClick} style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -360,8 +361,8 @@ export default function NodeCard({ client, live, online, todayTraffic, includeHi
                   </IconButton>
                 }
               />
-              <Badge color={online ? 'green' : 'red'} variant="solid" radius="full">
-                {online ? '在线' : '离线'}
+              <Badge color={!statusKnown ? 'gray' : online ? 'green' : 'red'} variant="solid" radius="full">
+                {!statusKnown ? '状态未知' : online ? '在线' : '离线'}
               </Badge>
             </Flex>
           </Flex>
