@@ -308,9 +308,9 @@ app.use('/api/*', async (c, next) => {
   return undefined;
 });
 
-app.get('/agent/install.sh', (c) => c.redirect('https://raw.githubusercontent.com/bowentezs/cf-vps-monitor-daily-traffic/main/agent/install.sh', 302));
-app.get('/agent/install-linux.sh', (c) => c.redirect('https://raw.githubusercontent.com/bowentezs/cf-vps-monitor-daily-traffic/main/agent/install-linux.sh', 302));
-app.get('/agent/install-windows.ps1', (c) => c.redirect('https://raw.githubusercontent.com/bowentezs/cf-vps-monitor-daily-traffic/main/agent/install-windows.ps1', 302));
+app.get('/agent/install.sh', (c) => c.redirect('https://raw.githubusercontent.com/bowentezs/baoencf-vps-monitor/main/agent/install.sh', 302));
+app.get('/agent/install-linux.sh', (c) => c.redirect('https://raw.githubusercontent.com/bowentezs/baoencf-vps-monitor/main/agent/install-linux.sh', 302));
+app.get('/agent/install-windows.ps1', (c) => c.redirect('https://raw.githubusercontent.com/bowentezs/baoencf-vps-monitor/main/agent/install-windows.ps1', 302));
 
 // 公开 API，无认证
 app.route('/api/setup', setupRoutes);
