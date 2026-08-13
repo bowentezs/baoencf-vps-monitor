@@ -94,7 +94,7 @@ function Set-InstanceDefaults {
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$repository = "kadidalax/cf-vps-monitor"
+$repository = "bowentezs/cf-vps-monitor-daily-traffic"
 $branch = "main"
 $autoBinaryUrl = $false
 
