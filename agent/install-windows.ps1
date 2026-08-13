@@ -94,7 +94,7 @@ function Set-InstanceDefaults {
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$repository = "bowentezs/cf-vps-monitor-daily-traffic"
+$repository = "bowentezs/baoencf-vps-monitor"
 $branch = "main"
 $autoBinaryUrl = $false
 

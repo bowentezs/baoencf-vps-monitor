@@ -1,4 +1,4 @@
-![Stars](https://img.shields.io/github/stars/bowentezs/cf-vps-monitor-daily-traffic?style=for-the-badge&logo=github&label=Stars&color=ffb000) ![Forks](https://img.shields.io/github/forks/bowentezs/cf-vps-monitor-daily-traffic?style=for-the-badge&logo=github&label=Forks&color=2ea44f) ![License](https://img.shields.io/github/license/bowentezs/cf-vps-monitor-daily-traffic?style=for-the-badge&color=blue)
+![Stars](https://img.shields.io/github/stars/bowentezs/baoencf-vps-monitor?style=for-the-badge&logo=github&label=Stars&color=ffb000) ![Forks](https://img.shields.io/github/forks/bowentezs/baoencf-vps-monitor?style=for-the-badge&logo=github&label=Forks&color=2ea44f) ![License](https://img.shields.io/github/license/bowentezs/baoencf-vps-monitor?style=for-the-badge&color=blue)
 # CF VPS Monitor
 
 CF VPS Monitor 是一个轻量 VPS 探针面板，使用 Cloudflare Workers 承载前端、API、实时连接和定时任务，使用 Durable Objects 协调实时状态，使用 Supabase Postgres 保存配置和历史数据，使用 Go Agent 在服务器上采集指标。
@@ -64,7 +64,7 @@ CF VPS Monitor 是一个轻量 VPS 探针面板，使用 Cloudflare Workers 承�
 
 ### 直接一键部署
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bowentezs/cf-vps-monitor-daily-traffic)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bowentezs/baoencf-vps-monitor)
 
 1. 在 [Supabase](https://supabase.com/dashboard/) 创建或选择项目。
 2. 打开 Supabase 项目 **Project Overview** 页面复制 `Project URL`；打开 **Project Settings -> API Keys -> Publishable and secret API keys**，复制 **Secret keys** 中的 `default` Secret key，格式通常为 `sb_secret_...`。
@@ -112,7 +112,7 @@ Unix 安装命令会自动判断 Linux、Alpine/OpenRC、macOS、FreeBSD，以�
 卸载单个 Unix 实例：
 
 ```bash
-wget -qO- 'https://raw.githubusercontent.com/bowentezs/cf-vps-monitor-daily-traffic/refs/heads/main/agent/install.sh' | sh -s -- --uninstall -i 实例ID
+wget -qO- 'https://raw.githubusercontent.com/bowentezs/baoencf-vps-monitor/refs/heads/main/agent/install.sh' | sh -s -- --uninstall -i 实例ID
 ```
 
 卸载单个 Windows 实例：
@@ -125,7 +125,7 @@ wget -qO- 'https://raw.githubusercontent.com/bowentezs/cf-vps-monitor-daily-traf
 
 ## 后台一键同步更新
 
-后台固定检测 [bowentezs/cf-vps-monitor-daily-traffic](https://github.com/bowentezs/cf-vps-monitor-daily-traffic) `main` 分支的最新推送编码。进入后台 `关于 -> 版本更新`，保存“你的部署仓库地址”，以后检测到推送编码不一致时会显示同步入口。
+后台固定检测 [bowentezs/baoencf-vps-monitor](https://github.com/bowentezs/baoencf-vps-monitor) `main` 分支的最新推送编码。进入后台 `关于 -> 版本更新`，保存“你的部署仓库地址”，以后检测到推送编码不一致时会显示同步入口。
 
 ### 如果是 Fork 原仓库部署【推荐】
 
@@ -191,10 +191,10 @@ cd agent && go test ./...
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=bowentezs%2Fcf-vps-monitor-daily-traffic&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=bowentezs%2Fbaoencf-vps-monitor&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=bowentezs%2Fcf-vps-monitor-daily-traffic&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=bowentezs%2Fcf-vps-monitor-daily-traffic&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=bowentezs%2Fcf-vps-monitor-daily-traffic&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=bowentezs%2Fbaoencf-vps-monitor&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=bowentezs%2Fbaoencf-vps-monitor&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=bowentezs%2Fbaoencf-vps-monitor&type=date&legend=top-left" />
  </picture>
 </a>
