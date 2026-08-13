@@ -179,7 +179,7 @@ export default function AdminAbout() {
                     <Badge size="2" variant="soft" color="green">Cloudflare Workers</Badge>
                   </Flex>
                 </Box>
-                <Button variant="soft" onClick={() => openExternal('https://github.com/kadidalax/cf-vps-monitor')} aria-label="GitHub">
+                <Button variant="soft" onClick={() => openExternal('https://github.com/bowentezs/cf-vps-monitor-daily-traffic')} aria-label="GitHub">
                   <Github size={16} />
                 </Button>
               </Flex>
@@ -261,7 +261,7 @@ export default function AdminAbout() {
                 </Box>
 
                 <Flex align="center" justify="between" gap="3" wrap="wrap" mt="auto">
-                  <Text size="1" color="gray">更新源：kadidalax/cf-vps-monitor/main</Text>
+                  <Text size="1" color="gray">更新源：bowentezs/cf-vps-monitor-daily-traffic/main</Text>
                   <Flex align="center" gap="2">
                     {updateSettingsMessage && (
                       <Text size="1" color={updateSettingsMessage === '已保存' ? 'green' : 'red'}>{updateSettingsMessage}</Text>
