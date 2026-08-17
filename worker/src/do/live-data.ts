@@ -66,6 +66,11 @@ const RECORD_PERSISTENCE_SETTING_KEYS = [
 ];
 const HTTP_CLIENT_MIN_TTL_MS = 30_000;
 const HTTP_CLIENT_MAX_TTL_MS = 24 * 60 * 60 * 1000;
+// WebSocket 上报的客户端判死 TTL（毫秒）。
+// 必须大于 agent 空闲上报间隔（live_poll_idle_interval_sec 默认 120s），否则空闲节点会被误判离线；
+// 同时与离线预警宽限期（grace_period 默认 180s）和 HTTP 上报默认 TTL（boundedHttpTtlMs 默认 180s）对齐，
+// 确保「页面判离线」不晚于「离线预警发出」，根治「预警已发但页面仍显示在线」。
+const AGENT_WS_STALE_MS = 180_000;
 const HTTP_CLIENT_REPORT_MAX_BODY_BYTES = 512 * 1024;
 const HTTP_CLIENT_META_MAX_BODY_BYTES = 16 * 1024;
 const HTTP_ADMIN_CLIENTS_SNAPSHOT_MAX_BODY_BYTES = 256 * 1024;
@@ -1780,7 +1785,7 @@ export class LiveDataDO {
         const reportTime = this.reportTimestamp(rawReport, now);
         const isLast = index === reports.length - 1;
         if (isLast) {
-          const report = this.updateClientReport(clientId, clientName, hidden, rawReport, reportTime, undefined, ws);
+          const report = this.updateClientReport(clientId, clientName, hidden, rawReport, reportTime, now + AGENT_WS_STALE_MS, ws);
           reportsToPersist.push({ report, reportTime });
           this.runBackground('ping_persistence', this.persistPingResultsFromReport(clientId, rawReport, reportTime));
           this.runBackground('website_probe_persistence', this.persistWebsiteProbeResultsFromReport(clientId, rawReport, reportTime));
@@ -1804,12 +1809,13 @@ export class LiveDataDO {
         this.runBackground('do_basic_info_sync', this.syncBasicInfoFromReport(clientId, clientName, hidden, basicInfoReport));
       }
       this.runBackground('do_record_persistence', this.persistReportsSequential(clientId, reportsToPersist));
+      this.runBackground('do_agent_expiry', this.scheduleExpiryAlarm(now));
       return;
     }
 
     const rawReport = unwrapMonitorReportEnvelope(data);
     const reportTime = this.reportTimestamp(rawReport, now);
-    const report = this.updateClientReport(clientId, clientName, hidden, rawReport, reportTime, undefined, ws);
+    const report = this.updateClientReport(clientId, clientName, hidden, rawReport, reportTime, now + AGENT_WS_STALE_MS, ws);
     this.runBackground('ping_persistence', this.persistPingResultsFromReport(clientId, rawReport, reportTime));
     this.runBackground('website_probe_persistence', this.persistWebsiteProbeResultsFromReport(clientId, rawReport, reportTime));
     this.runBackground('do_basic_info_sync', this.syncBasicInfoFromReport(clientId, clientName, hidden, rawReport));
@@ -1824,6 +1830,7 @@ export class LiveDataDO {
 
     // 持久化放在实时响应之后，避免数据库写入延迟阻塞 Agent WebSocket ack。
     this.runBackground('do_agent_policy', this.sendCurrentPolicyToAgent(ws, now, false, false, clientId));
+    this.runBackground('do_agent_expiry', this.scheduleExpiryAlarm(now));
     this.runBackground('do_record_persistence', this.persistReport(clientId, report, reportTime));
   }
 
