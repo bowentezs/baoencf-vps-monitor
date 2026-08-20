@@ -308,9 +308,21 @@ app.use('/api/*', async (c, next) => {
   return undefined;
 });
 
-app.get('/agent/install.sh', (c) => c.redirect('https://raw.githubusercontent.com/bowentezs/baoencf-vps-monitor/main/agent/install.sh', 302));
-app.get('/agent/install-linux.sh', (c) => c.redirect('https://raw.githubusercontent.com/bowentezs/baoencf-vps-monitor/main/agent/install-linux.sh', 302));
-app.get('/agent/install-windows.ps1', (c) => c.redirect('https://raw.githubusercontent.com/bowentezs/baoencf-vps-monitor/main/agent/install-windows.ps1', 302));
+function agentSourceAssetUrl(asset: string, commit: string): string {
+  return `https://raw.githubusercontent.com/bowentezs/baoencf-vps-monitor/${commit}/agent/${asset}`;
+}
+
+function redirectToAgentSourceAsset(c: AppContext, asset: string): Response {
+  const commit = String(c.env.CURRENT_GIT_COMMIT || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{40}$/.test(commit)) {
+    return c.json({ error: 'Agent installer is unavailable until a deployment commit is configured.' }, 503);
+  }
+  return c.redirect(agentSourceAssetUrl(asset, commit), 302);
+}
+
+app.get('/agent/install.sh', (c) => redirectToAgentSourceAsset(c, 'install.sh'));
+app.get('/agent/install-linux.sh', (c) => redirectToAgentSourceAsset(c, 'install-linux.sh'));
+app.get('/agent/install-windows.ps1', (c) => redirectToAgentSourceAsset(c, 'install-windows.ps1'));
 
 // 公开 API，无认证
 app.route('/api/setup', setupRoutes);
