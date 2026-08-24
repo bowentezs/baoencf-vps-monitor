@@ -504,6 +504,15 @@ async function removeLiveClient(c: AdminContext, uuid: string): Promise<void> {
   }));
 }
 
+async function removeAgentAuthSnapshot(c: AdminContext, uuid: string, tokenHash?: string): Promise<void> {
+  const stub = liveDataStub(c);
+  await stub.fetch(new Request('https://do/agent-auth/remove', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uuid, token_hash: tokenHash || '' }),
+  }));
+}
+
 async function disconnectLiveClient(c: AdminContext, uuid: string): Promise<void> {
   const stub = liveDataStub(c);
   await stub.fetch(new Request('https://do/client-remove', {
@@ -1607,6 +1616,8 @@ adminRoutes.post('/clients/:uuid/token/rotate', async (c) => {
   invalidateAgentClientAuthCache({ uuid, token });
   await Promise.all([
     disconnectLiveClient(c, uuid).catch(() => undefined),
+    // 先删除旧 token 的 DO 认证快照，再写入新快照，避免轮换后旧 token 仍可通过残留快照认证。
+    removeAgentAuthSnapshot(c, uuid, client.token_hash).catch(() => undefined),
     updatedClient ? syncAgentAuthClient(c, updatedClient) : Promise.resolve(),
     purgeAdminClientsEdgeCache(c),
   ]);
