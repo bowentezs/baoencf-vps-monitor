@@ -1752,9 +1752,15 @@ publicRoutes.get('/live', async (c) => {
   const doUrl = new URL(c.req.url);
   if (includeHidden) doUrl.searchParams.set('include_hidden', '1');
   else doUrl.searchParams.delete('include_hidden');
+  // /api/live 是无认证的 HTTP 快照端点：剥离 Upgrade/Connection 头，
+  // 防止任意客户端以 role=agent 的 WS 升级请求触达 DO，踢掉真实 agent 连接。
+  const forwardHeaders = new Headers(c.req.raw.headers);
+  forwardHeaders.delete('upgrade');
+  forwardHeaders.delete('connection');
+  const forwardRequest = new Request(doUrl.toString(), { ...c.req.raw, headers: forwardHeaders });
   const response = includeHidden
-    ? privateJsonResponse(await (await stub.fetch(new Request(doUrl.toString(), c.req.raw))).json())
-    : withPublicCacheHeader(c, await stub.fetch(new Request(doUrl.toString(), c.req.raw)), PUBLIC_LIVE_CACHE_SECONDS, 'miss');
+    ? privateJsonResponse(await (await stub.fetch(forwardRequest)).json())
+    : withPublicCacheHeader(c, await stub.fetch(forwardRequest), PUBLIC_LIVE_CACHE_SECONDS, 'miss');
   if (!includeHidden) putPublicEdgeCache(c, response);
   return response;
 });

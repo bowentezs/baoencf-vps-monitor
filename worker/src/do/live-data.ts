@@ -570,12 +570,19 @@ export class LiveDataDO {
     const now = Date.now();
     const onlineClients = Array.from(this.clients.values())
       .filter(c => (includeHidden || !c.hidden) && (!c.expiresAt || c.expiresAt > now))
-      .map(c => ({
-        ...(c.lastReport || {}),
-        uuid: c.uuid,
-        name: c.name,
-        lastReportTime: c.lastReportTime,
-      }));
+      .map(c => {
+        const report = { ...(c.lastReport || {}) };
+        if (!includeHidden) {
+          // 公开快照隐藏节点公网 IP，与元数据接口 toPublicClient 的 has_ipv4/has_ipv6 设计一致。
+          const hasIpv4 = typeof report.ipv4 === 'string' && isPublicIpAddress(report.ipv4);
+          const hasIpv6 = typeof report.ipv6 === 'string' && isPublicIpAddress(report.ipv6);
+          delete report.ipv4;
+          delete report.ipv6;
+          report.has_ipv4 = hasIpv4;
+          report.has_ipv6 = hasIpv6;
+        }
+        return { ...report, uuid: c.uuid, name: c.name, lastReportTime: c.lastReportTime };
+      });
     const liveData = onlineClients.reduce<Record<string, LiveSnapshotClient>>((acc, client) => {
       acc[client.uuid] = client;
       return acc;
