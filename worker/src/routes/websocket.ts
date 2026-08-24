@@ -236,7 +236,7 @@ function jwtSecret(c: WsContext): string {
 }
 
 wsRoutes.get('/clients/report', async (c) => {
-  const token = bearerToken(c) || String(c.req.query('token') || '').trim();
+  const token = bearerToken(c);
 
   if (!token) {
     return c.json({ error: 'Missing token' }, 401);

@@ -468,7 +468,8 @@ function preferredRegion(...values: unknown[]): string {
 }
 
 function preferredPublicIp(reported: unknown, fallback = '', current = ''): string {
-  for (const value of [reported, fallback, current]) {
+  // 数据库里已配置的 IP 优先，避免 NAT 场景下 agent 探测到的出口 IP 覆盖后台配置。
+  for (const value of [current, reported, fallback]) {
     const ip = nonEmptyString(value);
     if (ip && isPublicIpAddress(ip)) return ip;
   }
@@ -733,7 +734,10 @@ async function syncBasicInfoFromReportBatch(
     (inferredIpv4 !== undefined && oldIpv4 !== inferredIpv4) ||
     (inferredIpv6 !== undefined && oldIpv6 !== inferredIpv6);
   const edgeRegion = requestRegion(c);
+  const reportedName = nonEmptyString(basicInfoPayload.name, '');
   const patch = buildChangedClientPatch(oldClient, {
+    // agent 上报的 name 只用于填充空名称或占位默认名，避免覆盖后台手动改过的节点名。
+    name: reportedName && (!oldClient?.name || oldClient.name === '未命名服务器') ? reportedName : (oldClient?.name || ''),
     cpu_name: nonEmptyString(basicInfoPayload.cpu_name, oldClient?.cpu_name || ''),
     virtualization: nonEmptyString(basicInfoPayload.virtualization, oldClient?.virtualization || ''),
     arch: nonEmptyString(basicInfoPayload.arch, oldClient?.arch || ''),
@@ -1105,7 +1109,10 @@ clientRoutes.post('/uploadBasicInfo', clientAuth, async (c) => {
       (inferredIpv6 !== undefined && oldIpv6 !== inferredIpv6);
     const edgeRegion = requestRegion(c);
 
+    const reportedName = nonEmptyString(body.name, '');
     const patch = buildChangedClientPatch(oldClient, {
+      // agent 上报的 name 只用于填充空名称或占位默认名，避免覆盖后台手动改过的节点名。
+      name: reportedName && (!oldClient?.name || oldClient.name === '未命名服务器') ? reportedName : (oldClient?.name || ''),
       cpu_name: nonEmptyString(body.cpu_name, oldClient?.cpu_name || ''),
       virtualization: nonEmptyString(body.virtualization, oldClient?.virtualization || ''),
       arch: nonEmptyString(body.arch, oldClient?.arch || ''),

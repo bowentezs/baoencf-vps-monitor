@@ -1223,7 +1223,7 @@ func runHTTPReporter() {
 }
 
 func runWebSocketReporter() {
-	endpoint, err := webSocketEndpoint(serverURL, token)
+	endpoint, err := webSocketEndpoint(serverURL, clientName)
 	if err != nil {
 		log.Fatalf("invalid WebSocket endpoint: %v", err)
 	}
@@ -2029,6 +2029,21 @@ func diskUsageTotals() (int64, int64) {
 		return usedDisk, totalDisk
 	}
 
+	// 容器环境（LXC/OpenVZ 等）：/proc/self/mounts 常包含宿主的 /boot 等绑定分区，
+	// 累加会让页面总容量偏大。只统计根挂载点，overlay/容器根由 disk.Usage("/") 返回配额。
+	if isLinuxContainer() {
+		for _, partition := range selected {
+			if partition.Mountpoint == "/" {
+				usage, err := disk.Usage("/")
+				if err != nil {
+					return 0, 0
+				}
+				return int64(usage.Used), int64(usage.Total)
+			}
+		}
+		return 0, 0
+	}
+
 	deviceMap := map[string]*disk.UsageStat{}
 	for _, partition := range selected {
 		usage, err := disk.Usage(partition.Mountpoint)
@@ -2821,7 +2836,7 @@ func isLocalHTTPHost(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-func webSocketEndpoint(server string, _ string) (string, error) {
+func webSocketEndpoint(server string, name string) (string, error) {
 	parsed, err := url.Parse(server)
 	if err != nil {
 		return "", err
@@ -2837,7 +2852,11 @@ func webSocketEndpoint(server string, _ string) (string, error) {
 	}
 
 	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/api/clients/report"
-	parsed.RawQuery = ""
+	query := parsed.Query()
+	if trimmed := strings.TrimSpace(name); trimmed != "" {
+		query.Set("name", trimmed)
+	}
+	parsed.RawQuery = query.Encode()
 	return parsed.String(), nil
 }
 

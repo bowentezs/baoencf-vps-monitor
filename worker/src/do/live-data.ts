@@ -683,6 +683,19 @@ export class LiveDataDO {
       if (inferredRegion && (!patch.region || isDetailedRegion(inferredRegion))) patch.region = inferredRegion;
     }
     if (Object.keys(patch).length === 0) return;
+
+    // 数据库已配置的 IP/地区优先，避免 NAT 场景下 agent 探测的出口 IP 覆盖后台配置。
+    const database = this.getQueryDatabase();
+    if (database) {
+      const existing = await db.getClient(database, clientId);
+      if (existing) {
+        if (isPublicIpAddress(existing.ipv4)) delete patch.ipv4;
+        if (isPublicIpAddress(existing.ipv6)) delete patch.ipv6;
+        if (this.isUsefulRegion(existing.region)) delete patch.region;
+      }
+    }
+    if (Object.keys(patch).length === 0) return;
+
     this.applyInferredNetworkMetadataToLiveReport(clientId, patch, now);
 
     const signature = JSON.stringify(patch);
@@ -694,7 +707,6 @@ export class LiveDataDO {
     await this.upsertAdminClientSnapshot(client);
     this.broadcastMetadataChanged({ clients: { upsert: [this.publicClientMetadata(client)] } });
 
-    const database = this.getQueryDatabase();
     if (!database) return;
     await db.updateClient(database, clientId, patch as Partial<db.Client>);
   }
@@ -1497,6 +1509,7 @@ export class LiveDataDO {
     if (!isObjectPayload(basicInfo)) return;
     const patch: Record<string, unknown> = {};
     const stringFields = [
+      'name',
       'cpu_name',
       'virtualization',
       'arch',
@@ -1518,6 +1531,14 @@ export class LiveDataDO {
         }
         if (field === 'region' && !this.isUsefulRegion(text)) continue;
         patch[field] = text;
+      }
+    }
+    // agent 上报的 name 只用于填充空名称，避免覆盖后台手动改过的节点名。
+    if (typeof patch.name === 'string') {
+      const database = this.getQueryDatabase();
+      if (database) {
+        const existing = await db.getClient(database, clientId);
+        if (existing?.name && existing.name !== '未命名服务器') delete patch.name;
       }
     }
     for (const field of numberFields) {
