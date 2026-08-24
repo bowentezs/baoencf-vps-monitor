@@ -1,5 +1,6 @@
 name = "cf-vps-monitor"
 main = "worker/src/index.ts"
+account_id = "53e55b6bd3bb558dbed83edcf5c5d268"
 compatibility_date = "2026-06-21"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
