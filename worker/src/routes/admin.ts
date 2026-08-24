@@ -13,7 +13,7 @@ import { buildTotpUri, generateTotpSecret, verifyTotpCode } from '../auth/totp';
 import { invalidateAdminSessionCache } from '../auth/admin-session';
 import { hashPassword, validateAdminPasswordStrength, verifyPassword } from '../auth/password';
 import { clearMfaStepUpCookie, setAdminSessionCookie, setMfaStepUpCookie } from '../auth/session';
-import { SETTING_SCHEMA, buildAdminSettings, sanitizeSettingsForStorage } from '../settings/schema';
+import { SETTING_SCHEMA, SENSITIVE_SETTING_KEYS, buildAdminSettings, sanitizeSettingsForStorage } from '../settings/schema';
 import {
   BACKUP_ENCRYPTION_ALGORITHM,
   ENCRYPTED_BACKUP_SCHEMA_ID,
@@ -2211,8 +2211,17 @@ adminRoutes.get('/settings', async (c) => {
     return c.json(scoped);
   }
 
-  const settings = await db.getAllSettings(database, isQueryFlagEnabled(c.req.query('refresh')));
-  return c.json(buildAdminSettings(settings));
+  const settings = buildAdminSettings(await db.getAllSettings(database, isQueryFlagEnabled(c.req.query('refresh'))));
+  // 无 scope 的全量返回同样脱敏敏感字段（与 notification scope 一致），避免密钥明文外泄。
+  for (const key of SENSITIVE_SETTING_KEYS) {
+    if (settings[key]) {
+      settings[`${key}_set`] = 'true';
+      delete settings[key];
+    } else {
+      settings[`${key}_set`] = 'false';
+    }
+  }
+  return c.json(settings);
 });
 
 // 修改设置
@@ -2817,6 +2826,7 @@ adminRoutes.post('/account/chpasswd', async (c) => {
       return c.json({ error: '用户不存在' }, 404);
     }
     invalidateAdminSessionCache(userId);
+    await deleteAdminSessionEdgeCache(c, userId, user.session_version).catch(() => undefined);
 
     let token: string;
     try {
