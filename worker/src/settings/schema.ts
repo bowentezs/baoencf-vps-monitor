@@ -343,6 +343,7 @@ export type SettingKey = keyof typeof SETTING_SCHEMA;
 
 export const SETTING_KEYS = Object.keys(SETTING_SCHEMA) as SettingKey[];
 export const PUBLIC_SETTING_KEYS = SETTING_KEYS.filter(key => SETTING_SCHEMA[key].public);
+export const SENSITIVE_SETTING_KEYS = SETTING_KEYS.filter(key => 'sensitive' in SETTING_SCHEMA[key] && SETTING_SCHEMA[key].sensitive === true);
 const SETTING_KEY_SET = new Set<string>(SETTING_KEYS);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

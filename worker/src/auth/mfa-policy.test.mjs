@@ -20,8 +20,19 @@ const protectedRequests = [
   ['POST', '/api/admin/account/mfa/disable'],
 ];
 
-for (const [method, path] of protectedRequests) {
-  test(`protects ${method} ${path}`, () => {
+const configWriteRequests = [
+  ['POST', '/api/admin/settings'],
+  ['POST', '/api/admin/ping/add'],
+  ['POST', '/api/admin/ping/edit'],
+  ['POST', '/api/admin/websites/add'],
+  ['POST', '/api/admin/websites/edit'],
+  ['POST', '/api/admin/websites/delete'],
+  ['POST', '/api/admin/notification/offline/edit'],
+  ['POST', '/api/admin/notification/load/add'],
+];
+
+for (const [method, path] of configWriteRequests) {
+  test(`protects config write ${method} ${path}`, () => {
     assert.equal(isMfaStepUpProtectedRequest(method, path), true);
   });
 }
