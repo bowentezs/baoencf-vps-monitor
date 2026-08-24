@@ -54,14 +54,17 @@ func TestNormalizeServerURLRejectsInvalidInput(t *testing.T) {
 func TestWebSocketEndpoint(t *testing.T) {
 	tests := []struct {
 		server string
+		name   string
 		want   string
 	}{
-		{server: "https://example.com", want: "wss://example.com/api/clients/report"},
-		{server: "http://127.0.0.1:8787/base", want: "ws://127.0.0.1:8787/base/api/clients/report"},
+		{server: "https://example.com", name: "", want: "wss://example.com/api/clients/report"},
+		{server: "https://example.com", name: "US-DALLAS", want: "wss://example.com/api/clients/report?name=US-DALLAS"},
+		{server: "http://127.0.0.1:8787/base", name: "", want: "ws://127.0.0.1:8787/base/api/clients/report"},
+		{server: "http://127.0.0.1:8787/base", name: "node 1", want: "ws://127.0.0.1:8787/base/api/clients/report?name=node+1"},
 	}
 
 	for _, tc := range tests {
-		got, err := webSocketEndpoint(tc.server, "token")
+		got, err := webSocketEndpoint(tc.server, tc.name)
 		if err != nil {
 			t.Fatalf("webSocketEndpoint() error = %v", err)
 		}
