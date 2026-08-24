@@ -602,6 +602,9 @@ start_pre() {
   export CF_MONITOR_MOUNT_INCLUDE CF_MONITOR_MOUNT_EXCLUDE CF_MONITOR_NIC_INCLUDE CF_MONITOR_NIC_EXCLUDE
   export CF_MONITOR_TRAFFIC_RESET_DAY CF_MONITOR_TRAFFIC_STATE_FILE
   checkpath -d -m 0755 -o ${AGENT_USER}:${AGENT_USER} "${STATE_DIR}"
+  touch "/var/log/\${RC_SVCNAME}.log"
+  chown ${AGENT_USER}:${AGENT_USER} "/var/log/\${RC_SVCNAME}.log"
+  chmod 0644 "/var/log/\${RC_SVCNAME}.log"
 }
 EOF
 )
