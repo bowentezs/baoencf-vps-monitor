@@ -11,6 +11,17 @@ export type OfflineNotificationEvent =
       recoveredAt: string;
     };
 
+export function latestOfflineReferenceTime(
+  liveTime: string | null | undefined,
+  persistedTime: string | null | undefined,
+): string | null {
+  const liveMs = liveTime ? Date.parse(liveTime) : Number.NaN;
+  const persistedMs = persistedTime ? Date.parse(persistedTime) : Number.NaN;
+  if (Number.isFinite(liveMs) && (!Number.isFinite(persistedMs) || liveMs >= persistedMs)) return liveTime!;
+  if (Number.isFinite(persistedMs)) return persistedTime!;
+  return null;
+}
+
 export function evaluateOfflineNotificationEvent(args: {
   now: Date;
   clientCreatedAt: string | null | undefined;
