@@ -148,8 +148,9 @@ export default function Login() {
   const handleRecoverySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const needsSecretKey = recoveryStatus?.admin_present === true;
-    if ((needsSecretKey && !recoveryKey) || !recoveryUsername || !recoveryPassword) {
-      toast.error(needsSecretKey ? '请填写 Supabase Secret key、用户名和新密码' : '请填写用户名和密码');
+    const needsBootstrapToken = recoveryStatus?.admin_present === false;
+    if (((needsSecretKey || needsBootstrapToken) && !recoveryKey) || !recoveryUsername || !recoveryPassword) {
+      toast.error(needsSecretKey ? '请填写 Supabase Secret key、用户名和新密码' : '请填写管理员初始化密钥、用户名和密码');
       return;
     }
 
@@ -160,6 +161,7 @@ export default function Login() {
         password: recoveryPassword,
       };
       if (needsSecretKey) payload.supabase_secret_key = recoveryKey;
+      if (needsBootstrapToken) payload.bootstrap_token = recoveryKey;
       const response = await fetch('/api/admin/recovery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -325,15 +327,15 @@ export default function Login() {
         {recoveryMode && (
           <form onSubmit={handleRecoverySubmit}>
             <Flex direction="column" gap="4">
-              {needsSecretKey && <label htmlFor="recovery-secret-key">
+              {(needsSecretKey || recoveryStatus?.admin_present === false) && <label htmlFor="recovery-secret-key">
                 <Text size="2" weight="bold" style={{ marginBottom: 6, display: 'inline-block' }}>
-                  Supabase Secret key
+                  {needsSecretKey ? 'Supabase Secret key' : '管理员初始化密钥'}
                 </Text>
                 <TextField.Root
                   id="recovery-secret-key"
                   size="3"
                   type="password"
-                  placeholder="请输入 Supabase Secret key"
+                  placeholder={needsSecretKey ? '请输入 Supabase Secret key' : '请输入部署时设置的初始化密钥'}
                   value={recoveryKey}
                   onChange={(e) => setRecoveryKey(e.target.value)}
                   autoComplete="off"

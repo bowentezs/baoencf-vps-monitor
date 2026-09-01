@@ -14,5 +14,10 @@ export function shouldDeferLiveSnapshot(
   current: LiveSnapshotShape | null,
   next: LiveSnapshotShape,
 ): boolean {
-  return isEmptyLiveSnapshot(next) && (!current || !isEmptyLiveSnapshot(current));
+  if (!current) return isEmptyLiveSnapshot(next);
+  if (isEmptyLiveSnapshot(current)) return false;
+  if (isEmptyLiveSnapshot(next)) return true;
+
+  const currentOnlineCount = current.online.length;
+  return currentOnlineCount >= 3 && next.online.length * 2 < currentOnlineCount;
 }

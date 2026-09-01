@@ -56,6 +56,7 @@ type RuntimeBindings = {
   SUPABASE_SECRET_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   JWT_SECRET?: string;
+  ADMIN_BOOTSTRAP_TOKEN?: string;
   SETUP_DIAGNOSTICS_ENABLED?: string;
   CURRENT_GIT_COMMIT?: string;
 };
