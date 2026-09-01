@@ -28,6 +28,7 @@ import { NOTIFICATION_DISPATCH_SETTING_KEYS, dispatchNotification } from './util
 import { clearScheduledDatabaseStartupFailure, recordScheduledDatabaseStartupFailure } from './utils/scheduled-observability';
 import { sanitizeSetupDiagnosticDetail } from './utils/setup-diagnostics';
 import { getCloudflareClientIp } from './utils/request-ip';
+import { readLiveSnapshot } from './utils/do-response';
 import {
   checkWebsiteMonitorHttp,
   shouldNotifyWebsiteDown,
@@ -42,7 +43,7 @@ import {
   buildWebsiteRecoveryNotification,
   type NotificationMessage,
 } from './utils/notification-templates';
-import { evaluateOfflineNotificationEvent } from './utils/offline-notification';
+import { evaluateOfflineNotificationEvent, latestOfflineReferenceTime } from './utils/offline-notification';
 import type {
   Client as MonitorClient,
   ExpiryNotification,
@@ -456,6 +457,7 @@ interface ScheduledRunContext {
   getSettings(): Promise<ScheduledSettings>;
   getAdminSettings(): Promise<ScheduledAdminSettings>;
   getClients(clientIds?: string[]): Promise<ScheduledMonitorClient[]>;
+  getLiveReportTimes(clientIds: string[]): Promise<Map<string, string> | null>;
 }
 
 function normalizeScheduledClientIds(clientIds: string[] | undefined): string[] | null {
@@ -473,6 +475,7 @@ export function createScheduledRunContext(env: Bindings): ScheduledRunContext {
   let settingsPromise: Promise<ScheduledSettings> | null = null;
   let adminSettingsPromise: Promise<ScheduledAdminSettings> | null = null;
   let clientsPromise: Promise<ScheduledMonitorClient[]> | null = null;
+  let liveReportTimesPromise: Promise<Map<string, string> | null> | null = null;
   const clientsByIdsPromises = new Map<string, Promise<ScheduledMonitorClient[]>>();
 
   return {
@@ -505,6 +508,33 @@ export function createScheduledRunContext(env: Bindings): ScheduledRunContext {
         clientsByIdsPromises.set(cacheKey, promise);
       }
       return promise;
+    },
+    getLiveReportTimes(clientIds) {
+      liveReportTimesPromise ||= (async () => {
+        try {
+          const stub = env.LIVE_DATA.get(env.LIVE_DATA.idFromName('global'));
+          const snapshot = await readLiveSnapshot(await stub.fetch(
+            new Request('https://do/live?include_hidden=1', { method: 'GET' }),
+          ));
+          if (!snapshot?.clients) return null;
+          const result = new Map<string, string>();
+          for (const client of snapshot.clients) {
+            const uuid = typeof client.uuid === 'string' ? client.uuid : '';
+            const timestamp = Number(client.lastReportTime);
+            if (uuid && Number.isFinite(timestamp) && timestamp > 0) {
+              result.set(uuid, new Date(timestamp).toISOString());
+            }
+          }
+          return result;
+        } catch {
+          return null;
+        }
+      })();
+      const requested = new Set(normalizeScheduledClientIds(clientIds) || []);
+      return liveReportTimesPromise.then(times => {
+        if (!times) return null;
+        return new Map([...times].filter(([clientId]) => requested.has(clientId)));
+      });
     },
   };
 }
@@ -570,6 +600,7 @@ async function runOfflineCheck(context: ScheduledRunContext, now: Date): Promise
     enabled.map(item => item.client),
   );
   const latestMap = new Map(latestTimes.map(row => [row.client, row.last_time]));
+  const liveTimes = await context.getLiveReportTimes(enabled.map(item => item.client));
 
   for (const item of enabled) {
     const client = clientMap.get(item.client);
@@ -579,7 +610,7 @@ async function runOfflineCheck(context: ScheduledRunContext, now: Date): Promise
     const event = evaluateOfflineNotificationEvent({
       now,
       clientCreatedAt: client.created_at,
-      lastTime: latestMap.get(item.client),
+      lastTime: latestOfflineReferenceTime(liveTimes?.get(item.client), latestMap.get(item.client)),
       lastNotified: item.last_notified,
       gracePeriodSec: gracePeriod,
       notifyNeverReported,

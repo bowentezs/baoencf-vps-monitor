@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { evaluateOfflineNotificationEvent } from './offline-notification.ts';
+import { evaluateOfflineNotificationEvent, latestOfflineReferenceTime } from './offline-notification.ts';
 
 const now = new Date('2026-07-12T04:10:00.000Z');
 const base = {
@@ -48,3 +48,13 @@ assert.equal(evaluateOfflineNotificationEvent({
   lastNotified: '2026-07-12T04:04:00.000Z',
   notifyNeverReported: false,
 })?.type, 'recovery');
+
+assert.equal(
+  latestOfflineReferenceTime('2026-07-12T04:09:00.000Z', '2026-07-12T04:00:00.000Z'),
+  '2026-07-12T04:09:00.000Z',
+);
+assert.equal(
+  latestOfflineReferenceTime(null, '2026-07-12T04:00:00.000Z'),
+  '2026-07-12T04:00:00.000Z',
+);
+assert.equal(latestOfflineReferenceTime('invalid', null), null);
