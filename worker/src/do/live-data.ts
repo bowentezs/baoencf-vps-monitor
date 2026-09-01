@@ -1442,15 +1442,15 @@ export class LiveDataDO {
       sourceIp: stringField(payload, 'source_ip'),
       region: stringField(payload, 'region'),
     };
-    const now = Number.isFinite(Number(payload.timestamp)) ? Number(payload.timestamp) : Date.now();
+    const now = Date.now();
     const ttlMs = this.boundedHttpTtlMs(payload.ttl_ms);
     const clientName = typeof payload.name === 'string' && payload.name.trim() !== '' ? payload.name.trim() : payload.uuid;
     const hidden = booleanField(payload, 'hidden');
     const reportsToPersist: Array<{ report: JsonObject; reportTime: number }> = [];
     for (let index = 0; index < reports.length; index += 1) {
       const rawReport = reports[index];
-      const reportTime = this.reportTimestamp(rawReport, now);
       const isLast = index === reports.length - 1;
+      const reportTime = isLast ? now : this.reportTimestamp(rawReport, now);
       if (isLast) {
         const report = this.updateClientReport(
           payload.uuid,
@@ -1810,8 +1810,8 @@ export class LiveDataDO {
       const reportsToPersist: Array<{ report: JsonObject; reportTime: number }> = [];
       for (let index = 0; index < reports.length; index += 1) {
         const rawReport = reports[index];
-        const reportTime = this.reportTimestamp(rawReport, now);
         const isLast = index === reports.length - 1;
+        const reportTime = isLast ? now : this.reportTimestamp(rawReport, now);
         if (isLast) {
           const report = this.updateClientReport(clientId, clientName, hidden, rawReport, reportTime, now + AGENT_WS_STALE_MS, ws);
           reportsToPersist.push({ report, reportTime });
@@ -1842,7 +1842,7 @@ export class LiveDataDO {
     }
 
     const rawReport = unwrapMonitorReportEnvelope(data);
-    const reportTime = this.reportTimestamp(rawReport, now);
+  const reportTime = now;
     const report = this.updateClientReport(clientId, clientName, hidden, rawReport, reportTime, now + AGENT_WS_STALE_MS, ws);
     this.runBackground('ping_persistence', this.persistPingResultsFromReport(clientId, rawReport, reportTime));
     this.runBackground('website_probe_persistence', this.persistWebsiteProbeResultsFromReport(clientId, rawReport, reportTime));

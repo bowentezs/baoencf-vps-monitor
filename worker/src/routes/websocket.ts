@@ -9,6 +9,7 @@ import * as db from '../db/queries';
 import { getDatabase } from '../db/provider';
 import { createViewerToken, verifyViewerToken } from '../auth/viewer-token';
 import { getAgentClientIdentityByToken } from './client';
+import { hashAgentToken, isAgentTokenShape } from '../utils/client';
 import { getCloudflareClientIp, isPublicIpAddress } from '../utils/request-ip';
 import { readLiveSnapshot, readRateLimitResult } from '../utils/do-response';
 import { hasAdminSession, invalidatePublicMetadataCache } from './public';
@@ -28,6 +29,8 @@ const LIVE_CLIENTS_CACHE_SECONDS = 2;
 const DEFAULT_VIEWER_TTL_SECONDS = 120;
 const LIVE_VIEWER_WS_PROTOCOL = 'cf-monitor-viewer';
 const LOCAL_WS_RATE_LIMIT_SWEEP_EVERY = 256;
+const AGENT_WS_AUTH_ATTEMPT_RATE_LIMIT_MAX = 60;
+const AGENT_WS_AUTH_FAILURE_RATE_LIMIT_MAX = 6;
 
 let localWsRateLimitSweepCounter = 0;
 const localWsRateLimitBuckets = new Map<string, { count: number; resetAt: number; lastSeenAt: number }>();
@@ -236,15 +239,50 @@ function jwtSecret(c: WsContext): string {
 }
 
 wsRoutes.get('/clients/report', async (c) => {
-  const token = bearerToken(c);
+  const token = bearerToken(c).trim();
+  const ip = requestIp(c);
+  const attemptLimited = await enforceWsRateLimit(
+    c,
+    'agent-ws-auth-attempt',
+    'agent-ws-auth-attempt',
+    ip,
+    AGENT_WS_AUTH_ATTEMPT_RATE_LIMIT_MAX,
+    VIEWER_TOKEN_RATE_LIMIT_WINDOW_MS,
+    'Too many Agent authentication attempts',
+    true,
+  );
+  if (attemptLimited) return attemptLimited;
 
-  if (!token) {
+  if (!isAgentTokenShape(token)) {
+    const tokenKey = token ? await hashAgentToken(token) : 'missing';
+    const failureLimited = await enforceWsRateLimit(
+      c,
+      'agent-ws-auth-failure',
+      'agent-ws-auth-failure',
+      `${ip}:${tokenKey}`,
+      AGENT_WS_AUTH_FAILURE_RATE_LIMIT_MAX,
+      VIEWER_TOKEN_RATE_LIMIT_WINDOW_MS,
+      'Too many failed Agent authentication attempts',
+      true,
+    );
+    if (failureLimited) return failureLimited;
     return c.json({ error: 'Missing token' }, 401);
   }
 
   const database = getDatabase(c.env);
-  const client = await getAgentClientIdentityByToken(database, token, c.env, getCloudflareClientIp(c, ''));
+  const client = await getAgentClientIdentityByToken(database, token, c.env, ip);
   if (!client) {
+    const failureLimited = await enforceWsRateLimit(
+      c,
+      'agent-ws-auth-failure',
+      'agent-ws-auth-failure',
+      `${ip}:${await hashAgentToken(token)}`,
+      AGENT_WS_AUTH_FAILURE_RATE_LIMIT_MAX,
+      VIEWER_TOKEN_RATE_LIMIT_WINDOW_MS,
+      'Too many failed Agent authentication attempts',
+      true,
+    );
+    if (failureLimited) return failureLimited;
     return c.json({ error: 'Invalid token' }, 401);
   }
   const region = requestRegion(c);

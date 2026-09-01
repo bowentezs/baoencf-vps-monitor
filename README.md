@@ -43,6 +43,8 @@ CF VPS Monitor 是一个轻量 VPS 探针面板，使用 Cloudflare Workers 承�
 
 `SUPABASE_SERVICE_ROLE_KEY` 仅作为旧部署兼容变量保留；新部署请使用 `SUPABASE_SECRET_KEY`。
 
+首次部署还必须配置 `ADMIN_BOOTSTRAP_TOKEN`；登录页创建首个管理员时需要输入该值。建议使用至少 32 字节的随机字符串，并在管理员创建完成后将其轮换或删除。
+
 ## 面板部署
 
 ### Fork 原仓库部署【推荐，方便更新】
@@ -89,6 +91,7 @@ npx wrangler login
 $env:SUPABASE_URL="https://xxxx.supabase.co"
 npx wrangler secret put SUPABASE_SECRET_KEY
 npx wrangler secret put JWT_SECRET
+npx wrangler secret put ADMIN_BOOTSTRAP_TOKEN
 npm run deploy
 ```
 

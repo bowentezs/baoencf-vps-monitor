@@ -805,6 +805,10 @@ function readRecoverySecretKey(body: Record<string, unknown>): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function readBootstrapToken(body: Record<string, unknown>): string {
+  return typeof body.bootstrap_token === 'string' ? body.bootstrap_token.trim() : '';
+}
+
 function readRecoveryUsername(body: Record<string, unknown>): string {
   return typeof body.username === 'string' ? body.username.trim() : '';
 }
@@ -1037,6 +1041,7 @@ publicRoutes.post('/admin/recovery', async (c) => {
   if ('response' in parsed) return parsed.response;
 
   const serviceRoleKey = readRecoverySecretKey(parsed.body);
+  const bootstrapToken = readBootstrapToken(parsed.body);
   const username = readRecoveryUsername(parsed.body);
   const password = readRecoveryPassword(parsed.body);
 
@@ -1050,7 +1055,15 @@ publicRoutes.post('/admin/recovery', async (c) => {
   if (userCount > 1) {
     return c.json({ error: '当前存在多个管理员账号，请登录后在账户管理中修改密码' }, 409);
   }
-  if (userCount === 1) {
+  if (userCount === 0) {
+    const expectedBootstrapToken = c.env.ADMIN_BOOTSTRAP_TOKEN?.trim();
+    if (!expectedBootstrapToken) {
+      return c.json({ error: '服务端未配置管理员初始化密钥' }, 503);
+    }
+    if (bootstrapToken.length > MAX_ADMIN_RECOVERY_KEY_LENGTH || !await timingSafeEqualString(bootstrapToken, expectedBootstrapToken)) {
+      return c.json({ error: '管理员初始化密钥无效' }, 403);
+    }
+  } else {
     if (!serviceRoleKey || serviceRoleKey.length > MAX_ADMIN_RECOVERY_KEY_LENGTH) {
       return c.json({ error: 'Supabase Secret key 无效' }, 400);
     }

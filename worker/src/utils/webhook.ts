@@ -78,7 +78,8 @@ function isIPv4MappedIPv6(host: string): boolean {
 function isUnsafeWebhookHostname(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
   if (!host || host === 'localhost' || host.endsWith('.localhost')) return true;
-  if (host === '169.254.169.254' || host === 'fd00:ec2::254') return true;
+  if (host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.home.arpa')) return true;
+  if (host === '169.254.169.254' || host === 'fd00:ec2::254' || host === 'metadata.google.internal' || host === 'metadata.aws.internal') return true;
   if (isAmbiguousNumericHost(host)) return true;
   const ipv4 = parseIPv4(host);
   if (ipv4) return isBlockedIPv4(ipv4);
