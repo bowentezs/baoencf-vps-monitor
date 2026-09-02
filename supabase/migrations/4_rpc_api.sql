@@ -1675,6 +1675,58 @@ begin
 end;
 $$;
 
+create or replace function public.cfm_insert_monitor_records(input_records jsonb)
+returns integer
+language plpgsql
+set search_path = public
+as $$
+declare
+  inserted_count integer;
+begin
+  if input_records is null or jsonb_typeof(input_records) <> 'array' or jsonb_array_length(input_records) = 0 then
+    return 0;
+  end if;
+
+  insert into records (
+    client, time, cpu, gpu, ram, ram_total, swap, swap_total, load, temp,
+    disk, disk_total, net_in, net_out, net_total_up, net_total_down,
+    process_count, connections, connections_udp, uptime
+  )
+  select
+    item->>'client',
+    (item->>'time')::timestamptz,
+    coalesce((item->>'cpu')::double precision, 0),
+    coalesce((item->>'gpu')::double precision, 0),
+    coalesce((item->>'ram')::double precision, 0),
+    coalesce((item->>'ram_total')::double precision, 0),
+    coalesce((item->>'swap')::double precision, 0),
+    coalesce((item->>'swap_total')::double precision, 0),
+    coalesce((item->>'load')::double precision, 0),
+    coalesce((item->>'temp')::double precision, 0),
+    coalesce((item->>'disk')::double precision, 0),
+    coalesce((item->>'disk_total')::double precision, 0),
+    coalesce((item->>'net_in')::double precision, 0),
+    coalesce((item->>'net_out')::double precision, 0),
+    coalesce((item->>'net_total_up')::double precision, 0),
+    coalesce((item->>'net_total_down')::double precision, 0),
+    coalesce((item->>'process_count')::integer, 0),
+    coalesce((item->>'connections')::integer, 0),
+    coalesce((item->>'connections_udp')::integer, 0),
+    coalesce((item->>'uptime')::double precision, 0)
+  from jsonb_array_elements(input_records) item
+  where item->>'client' is not null
+    and (item->>'time')::timestamptz is not null;
+
+  get diagnostics inserted_count = row_count;
+  return inserted_count;
+end;
+$$;
+
+revoke all on function public.cfm_insert_monitor_records(jsonb) from public;
+revoke all on function public.cfm_insert_monitor_records(jsonb) from anon;
+revoke all on function public.cfm_insert_monitor_records(jsonb) from authenticated;
+grant execute on function public.cfm_insert_monitor_records(jsonb) to service_role;
+
 create or replace function public.cfm_insert_gpu_snapshot(input_client text, input_time text, input_gpus jsonb)
 returns void
 language plpgsql

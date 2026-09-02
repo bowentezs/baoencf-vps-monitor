@@ -47,6 +47,11 @@ for (const source of [migrationSql, generatedSql]) {
   assert.doesNotMatch(source, /grant execute on function public\.cfm_public_website_monitor\(integer, integer\)/);
 }
 
+assert.match(migrationSql, /create or replace function public\.cfm_insert_monitor_record\(input_record jsonb\)/i);
+assert.match(migrationSql, /create or replace function public\.cfm_insert_monitor_records\(input_records jsonb\)/i);
+assert.match(migrationSql, /grant execute on function public\.cfm_insert_monitor_records\(jsonb\) to service_role/i);
+assert.match(generatedSql, /cfm_insert_monitor_records/);
+
 assert.match(migrationSql, /drop function if exists public\.cfm_public_website_monitor\(integer, integer\);/);
 
 const mfaSources = [featureSchemaSql + migrationSql, generatedSql];
