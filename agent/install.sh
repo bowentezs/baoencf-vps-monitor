@@ -299,6 +299,7 @@ detect_binary_filename() {
   case "$arch" in
     x86_64|amd64) arch="amd64" ;;
     aarch64|arm64) arch="arm64" ;;
+    i386|i686|386) arch="386" ;;
     *) die "Unsupported CPU architecture for prebuilt agent: ${arch}" ;;
   esac
   printf 'cf-vps-monitor-agent-%s-%s' "$os" "$arch"

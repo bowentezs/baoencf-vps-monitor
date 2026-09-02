@@ -62,6 +62,7 @@ jobs:
 
           build linux amd64 cf-vps-monitor-agent-linux-amd64
           build linux arm64 cf-vps-monitor-agent-linux-arm64
+          build linux 386 cf-vps-monitor-agent-linux-386
           build darwin amd64 cf-vps-monitor-agent-darwin-amd64
           build darwin arm64 cf-vps-monitor-agent-darwin-arm64
           build freebsd amd64 cf-vps-monitor-agent-freebsd-amd64
@@ -72,6 +73,7 @@ jobs:
           (cd dist && sha256sum * > SHA256SUMS)
 
       - name: Generate artifact provenance
+        continue-on-error: true
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: agent/dist/*
@@ -99,11 +101,13 @@ jobs:
 
           if gh release view "$AGENT_VERSION_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$AGENT_VERSION_TAG" \
+              --latest \
               --title "CF VPS Monitor Agent ${AGENT_VERSION}" \
               --notes "$release_notes" \
               --repo "$GITHUB_REPOSITORY"
           else
             gh release create "$AGENT_VERSION_TAG" \
+              --latest \
               --verify-tag \
               --title "CF VPS Monitor Agent ${AGENT_VERSION}" \
               --notes "$release_notes" \
