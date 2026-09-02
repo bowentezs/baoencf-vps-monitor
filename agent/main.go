@@ -745,6 +745,24 @@ func (s *pingReportState) applyPolicy(policy agentPolicy) {
 	}
 }
 
+const maxConcurrentProbes = 16
+const minProbeBudget = 5 * time.Second
+const maxProbeBudget = 30 * time.Second
+
+// probeBudget 根据当前上报间隔推导探测预算：上报越频繁预算越短，
+// 防止大量慢速探测阻塞采样与心跳；预算用尽时丢弃未完成结果，
+// 调度器已记录 lastRun，下个周期按任务间隔自然恢复节奏。
+func probeBudget(intervalSec int) time.Duration {
+	budget := time.Duration(intervalSec) * time.Second
+	if budget < minProbeBudget {
+		budget = minProbeBudget
+	}
+	if budget > maxProbeBudget {
+		budget = maxProbeBudget
+	}
+	return budget
+}
+
 func (s *pingReportState) appendDueResults(report *Report, now time.Time) {
 	if s == nil || report == nil {
 		return
@@ -752,7 +770,7 @@ func (s *pingReportState) appendDueResults(report *Report, now time.Time) {
 	if len(s.tasks) > 0 {
 		dueTasks := s.scheduler.dueTasks(s.tasks, now)
 		if len(dueTasks) > 0 {
-			results := runPingTasks(dueTasks)
+			results := runPingTasks(dueTasks, probeBudget(s.intervalSec))
 			if len(results) > 0 {
 				report.PingResults = append(report.PingResults, results...)
 			}
@@ -765,46 +783,107 @@ func (s *pingReportState) appendDueResults(report *Report, now time.Time) {
 	if len(dueWebsiteTasks) == 0 {
 		return
 	}
-	websiteResults := runWebsiteProbeTasks(dueWebsiteTasks)
+	websiteResults := runWebsiteProbeTasks(dueWebsiteTasks, probeBudget(s.intervalSec))
 	if len(websiteResults) > 0 {
 		report.WebsiteProbeResults = append(report.WebsiteProbeResults, websiteResults...)
 	}
 }
 
-func runPingTasks(tasks []PingTask) []PingResult {
-	log.Printf("executing %d ping task(s)", len(tasks))
-	results := make([]PingResult, 0, len(tasks))
-	for _, task := range tasks {
-		var value float64
-		switch strings.ToLower(task.Type) {
-		case "icmp":
-			value = executeICMPPing(task.Target)
-		case "tcp":
-			value = executeTCPPing(task.Target)
-		case "http", "https":
-			value = executeHTTPPing(task.Target)
-		default:
-			value = executeTCPPing(task.Target)
-		}
-		results = append(results, PingResult{
-			TaskID: task.ID,
-			Value:  value,
-		})
+func runPingTasks(tasks []PingTask, budget time.Duration) []PingResult {
+	if len(tasks) == 0 {
+		return nil
 	}
-	return results
+	log.Printf("executing %d ping task(s) (concurrency=%d budget=%s)", len(tasks), maxConcurrentProbes, budget)
+	results := make([]PingResult, len(tasks))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxConcurrentProbes)
+
+	for index, task := range tasks {
+		wg.Add(1)
+		go func(index int, task PingTask) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			var value float64
+			switch strings.ToLower(task.Type) {
+			case "icmp":
+				value = executeICMPPing(task.Target)
+			case "tcp":
+				value = executeTCPPing(task.Target)
+			case "http", "https":
+				value = executeHTTPPing(task.Target)
+			default:
+				value = executeTCPPing(task.Target)
+			}
+			results[index] = PingResult{TaskID: task.ID, Value: value}
+		}(index, task)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(budget):
+		log.Printf("ping execution exceeded %s budget; discarding unfinished results", budget)
+	}
+
+	// 丢弃未完成（TaskID<=0）的条目：Worker 端 validatePingResults 会对无效 task_id 整批拒绝。
+	completed := results[:0]
+	for _, result := range results {
+		if result.TaskID > 0 {
+			completed = append(completed, result)
+		}
+	}
+	return completed
 }
 
-func runWebsiteProbeTasks(tasks []WebsiteProbeTask) []WebsiteProbeResult {
-	log.Printf("executing %d website probe task(s)", len(tasks))
-	results := make([]WebsiteProbeResult, 0, len(tasks))
-	for _, task := range tasks {
-		if strings.EqualFold(task.Method, "TCP") {
-			results = append(results, executeWebsiteTCPProbe(task))
-		} else {
-			results = append(results, executeWebsiteHTTPProbe(task))
+func runWebsiteProbeTasks(tasks []WebsiteProbeTask, budget time.Duration) []WebsiteProbeResult {
+	if len(tasks) == 0 {
+		return nil
+	}
+	log.Printf("executing %d website probe task(s) (concurrency=%d budget=%s)", len(tasks), maxConcurrentProbes, budget)
+	results := make([]WebsiteProbeResult, len(tasks))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxConcurrentProbes)
+
+	for index, task := range tasks {
+		wg.Add(1)
+		go func(index int, task WebsiteProbeTask) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			if strings.EqualFold(task.Method, "TCP") {
+				results[index] = executeWebsiteTCPProbe(task)
+			} else {
+				results[index] = executeWebsiteHTTPProbe(task)
+			}
+		}(index, task)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(budget):
+		log.Printf("website probe execution exceeded %s budget; discarding unfinished results", budget)
+	}
+
+	// 丢弃未完成（MonitorID<=0）的条目，避免上报无效 monitor_id。
+	completed := results[:0]
+	for _, result := range results {
+		if result.MonitorID > 0 {
+			completed = append(completed, result)
 		}
 	}
-	return results
+	return completed
 }
 
 func mustParseCIDRs(cidrs ...string) []*net.IPNet {
@@ -2494,14 +2573,61 @@ var (
 	gpuDetailsMu     sync.Mutex
 )
 
+// globalCPUSampler 全局复用的非阻塞 CPU 利用率采样器。
+var globalCPUSampler = &cpuUsageSampler{}
+
+// cpuUsageSampler 基于两次 cpu.Times 快照的差值计算利用率，全程无阻塞。
+// 注意：gopsutil 的 cpu.Percent(interval>0) 会睡眠整个 interval（如 1 秒）做内部分采样，
+// 在 3 秒上报周期的采集 goroutine 中每轮被卡住 1 秒，是探针卡顿、延迟失真与心跳滞后的根源。
+type cpuUsageSampler struct {
+	mu        sync.Mutex
+	lastTimes []cpu.TimesStat
+}
+
+func (s *cpuUsageSampler) usage() float64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	times, err := cpu.Times(false)
+	if err != nil || len(times) == 0 {
+		return 0
+	}
+	if s.lastTimes == nil {
+		s.lastTimes = make([]cpu.TimesStat, len(times))
+		copy(s.lastTimes, times)
+		return 0
+	}
+
+	var totalDelta, idleDelta float64
+	for i := 0; i < len(times) && i < len(s.lastTimes); i++ {
+		curr, prev := times[i], s.lastTimes[i]
+		totalDelta += curr.Total() - prev.Total()
+		idleDelta += (curr.Idle + curr.Iowait) - (prev.Idle + prev.Iowait)
+	}
+	copy(s.lastTimes, times)
+
+	if totalDelta <= 0 {
+		return 0
+	}
+	if idleDelta > totalDelta {
+		idleDelta = totalDelta
+	}
+	usage := 100 * (1 - idleDelta/totalDelta)
+	if usage < 0 {
+		return 0
+	}
+	if usage > 100 {
+		return 100
+	}
+	return usage
+}
+
 func collectReportWithInterval(intervalSec int) Report {
 	now := time.Now()
 	r := Report{Version: Version, ReportInterval: intervalSec, Timestamp: now.UnixMilli()}
 	r.IPv4, r.IPv6 = localIPAddresses()
 
-	if percent, err := cpu.Percent(time.Second, false); err == nil && len(percent) > 0 {
-		r.CPU = percent[0]
-	}
+	r.CPU = globalCPUSampler.usage()
 	if memory := readMemorySnapshot(); memory.hasRAM {
 		r.RAM = int64(memory.ramUsed)
 		r.RAMTotal = int64(memory.ramTotal)
