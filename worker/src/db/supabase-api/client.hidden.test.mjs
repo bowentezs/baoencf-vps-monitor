@@ -6,6 +6,7 @@ const {
   getSupabaseClientIdentityByToken,
   getSupabaseClientVisibility,
   getSupabasePublicClients,
+  insertSupabaseMonitorRecords,
   updateSupabaseClientAndReturn,
 } = await import('./client.ts');
 
@@ -35,6 +36,9 @@ globalThis.fetch = async (url) => {
   if (rpc === 'cfm_update_client_returning') {
     return Response.json({ uuid: 'updated-hidden', name: 'Hidden', token_hash: 'hash', hidden: 1, auto_renewal: 0 });
   }
+  if (rpc === 'cfm_insert_monitor_records') {
+    return Response.json(2);
+  }
   return Response.json(null);
 };
 
@@ -45,6 +49,13 @@ try {
   assert.equal((await getSupabaseClientByToken(env, 'token')).hidden, true);
   assert.equal((await getSupabaseClientIdentityByToken(env, 'token')).hidden, true);
   assert.equal((await updateSupabaseClientAndReturn(env, 'updated-hidden', { hidden: true })).hidden, true);
+  assert.equal(
+    await insertSupabaseMonitorRecords(env, [
+      { client: 'batch-1', time: '2026-01-01T00:00:00.000Z', cpu: 1 },
+      { client: 'batch-2', time: '2026-01-01T00:00:00.000Z', cpu: 2 },
+    ]),
+    2,
+  );
 } finally {
   globalThis.fetch = originalFetch;
 }

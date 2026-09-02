@@ -381,6 +381,10 @@ export async function insertRecord(database: QueryDatabase, record: t.MonitorRec
   return sba.insertSupabaseMonitorRecord(database.env, record);
 }
 
+export async function insertMonitorRecords(database: QueryDatabase, records: t.MonitorRecord[]): Promise<number> {
+  return sba.insertSupabaseMonitorRecords(database.env, records);
+}
+
 export async function getRecentRecords(database: QueryDatabase, client: string, limit: number = 30): Promise<t.MonitorRecord[]> {
   return sba.getSupabaseRecentRecords(database.env, client, limit);
 }

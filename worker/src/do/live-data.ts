@@ -1936,12 +1936,59 @@ export class LiveDataDO {
     await this.state.storage.put(storageKey, now);
   }
 
+  /**
+   * 批量持久化多条上报记录（Agent 批量上报 / 重连补报路径）。
+   *
+   * 与单条 persistReport 不同：限频（isPersistDue / markPersistAttempt）以整个批次
+   * 为单位只执行一次，批次内全部合法记录通过一次批量 RPC 写入数据库，
+   * 避免多台服务器批量补报时逐条发起 Supabase HTTP 请求导致连接耗尽与请求往返。
+   */
   private async persistReportsSequential(
     clientId: string,
     reports: Array<{ report: JsonObject; reportTime: number }>,
   ): Promise<void> {
+    if (reports.length === 0) return;
+    const database = this.getQueryDatabase();
+    if (!database) return;
+
+    const nowMs = Date.now();
+    if (!(await this.isRecordPersistenceEnabled(nowMs))) return;
+    if (!(await this.canPersistWithinCapacity(nowMs))) return;
+    if (!(await this.isPersistDue(clientId, nowMs))) return;
+    await this.markPersistAttempt(clientId, nowMs);
+
+    const records: db.MonitorRecord[] = [];
+    const gpuSnapshots: Array<{ time: string; gpus: db.GPUInfo[] }> = [];
     for (const item of reports) {
-      await this.persistReport(clientId, item.report, item.reportTime);
+      const reportTime = Number.isFinite(item.reportTime) ? item.reportTime : nowMs;
+      const normalizedReport = normalizeMonitorReport(item.report);
+      records.push(toMonitorRecord(clientId, new Date(reportTime).toISOString(), normalizedReport));
+
+      const gpuDecision = await this.shouldPersistGPUSnapshot(clientId, normalizedReport.gpus, reportTime);
+      if (gpuDecision.persist && gpuDecision.signature) {
+        gpuSnapshots.push({ time: new Date(reportTime).toISOString(), gpus: normalizedReport.gpus });
+        await this.markGPUSnapshotPersisted(clientId, gpuDecision.signature, reportTime);
+      }
+    }
+
+    try {
+      const saved = await db.insertMonitorRecords(database, records);
+      for (const snapshot of gpuSnapshots) {
+        await db.insertGPURecords(database, clientId, snapshot.time, snapshot.gpus);
+      }
+      await this.recordHotPathHealthOk(
+        'do_record_persistence',
+        `batch persisted ${saved} record(s) for ${clientId}`,
+        nowMs,
+      );
+    } catch (error) {
+      await bestEffortRecordHealthEvent(
+        database,
+        'do_record_persistence',
+        'error',
+        `batch record persist failed for ${clientId}: ${errorDetail(error)}`,
+        { auditAction: 'do_record_persistence_error' },
+      );
     }
   }
 

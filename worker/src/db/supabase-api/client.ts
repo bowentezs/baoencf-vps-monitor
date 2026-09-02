@@ -533,6 +533,11 @@ export function insertSupabaseMonitorRecord(env: SupabaseApiEnv, record: Monitor
   return callSupabaseRpc<void>(env, 'cfm_insert_monitor_record', { input_record: record });
 }
 
+export function insertSupabaseMonitorRecords(env: SupabaseApiEnv, records: MonitorRecord[]): Promise<number> {
+  if (records.length === 0) return Promise.resolve(0);
+  return callSupabaseRpc<number>(env, 'cfm_insert_monitor_records', { input_records: records });
+}
+
 export function insertSupabaseGpuRecords(env: SupabaseApiEnv, client: string, time: string, gpus: GPUInfo[]): Promise<void> {
   return callSupabaseRpc<void>(env, 'cfm_insert_gpu_snapshot', {
     input_client: client,
