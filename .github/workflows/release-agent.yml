@@ -4,9 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Agent version tag, for example v2.0.1
+        description: Agent version tag, for example v2.0.4
         required: true
+        default: 'v2.0.4'
         type: string
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   attestations: write
@@ -25,7 +29,7 @@ jobs:
         working-directory: agent
     env:
       CGO_ENABLED: '0'
-      AGENT_VERSION: ${{ inputs.version }}
+      AGENT_VERSION: ${{ inputs.version || github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
