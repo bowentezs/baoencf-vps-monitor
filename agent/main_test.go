@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1026,5 +1027,74 @@ func TestNormalizeTCPTargetAddress(t *testing.T) {
 	}
 	if address != "[2606:4700:4700::1111]:443" || host != "2606:4700:4700::1111" || port != "443" {
 		t.Fatalf("normalizeTCPTargetAddress(ipv6) = %q %q %q", address, host, port)
+	}
+}
+
+func TestCPUUsageSamplerNonBlocking(t *testing.T) {
+	sampler := &cpuUsageSampler{}
+	if got := sampler.usage(); got != 0 {
+		t.Fatalf("first cpuUsageSampler.usage() = %v, want 0 (baseline only)", got)
+	}
+
+	start := time.Now()
+	got := sampler.usage()
+	elapsed := time.Since(start)
+	if got < 0 || got > 100 {
+		t.Fatalf("cpuUsageSampler.usage() = %v, want in [0,100]", got)
+	}
+	// cpu.Times 是非阻塞调用；若耗时接近 1s 说明实现退化为阻塞采样（cpu.Percent(interval>0)）。
+	if elapsed >= time.Second {
+		t.Fatalf("cpuUsageSampler.usage() took %v, want non-blocking (<1s)", elapsed)
+	}
+}
+
+func TestRunPingTasksConcurrent(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer listener.Close()
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			_ = conn.Close()
+		}
+	}()
+
+	oldResolve := resolvePublicIPsForPing
+	resolvePublicIPsForPing = func(context.Context, string) ([]net.IP, error) {
+		return []net.IP{net.ParseIP("127.0.0.1")}, nil
+	}
+	t.Cleanup(func() { resolvePublicIPsForPing = oldResolve })
+
+	port := listener.Addr().(*net.TCPAddr).Port
+	tasks := make([]PingTask, 8)
+	for i := range tasks {
+		tasks[i] = PingTask{
+			ID:     i + 1,
+			Type:   "tcp",
+			Target: net.JoinHostPort("example.test", strconv.Itoa(port)),
+		}
+	}
+
+	start := time.Now()
+	results := runPingTasks(tasks, 10*time.Second)
+	elapsed := time.Since(start)
+
+	if len(results) != len(tasks) {
+		t.Fatalf("runPingTasks() returned %d results, want %d", len(results), len(tasks))
+	}
+	for _, result := range results {
+		if result.TaskID != result.TaskID || result.Value < 0 {
+			t.Fatalf("unexpected ping result: %+v", result)
+		}
+	}
+	// 8 个任务并发执行（本地 TCP 毫秒级），整体耗时需明显小于串行 8 倍时长。
+	if elapsed >= 2*time.Second {
+		t.Fatalf("runPingTasks() took %v, want concurrent execution (<2s)", elapsed)
 	}
 }
