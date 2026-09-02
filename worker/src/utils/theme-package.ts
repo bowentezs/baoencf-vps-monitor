@@ -339,6 +339,15 @@ function cssVarValue(value: unknown): string {
   return String(value).replace(/[;{}]/g, '').trim();
 }
 
+export function sanitizeCustomCss(css: string): string {
+  if (!css) return '';
+  return css
+    .replace(/@import\s+[^;]+;?/gi, '')
+    .replace(/url\s*\(\s*['"]?\s*(?:javascript|vbscript|data\s*:\s*text\/html):[^)]*\)/gi, '')
+    .replace(/expression\s*\([^)]*\)/gi, '')
+    .replace(/behavior\s*:[^;]+;?/gi, '');
+}
+
 export function buildThemeCss({
   styleCss,
   config,
@@ -354,6 +363,6 @@ export function buildThemeCss({
   return [
     variables.length > 0 ? `:root {\n${variables.join('\n')}\n}` : '',
     styleCss,
-    customCss.slice(0, MAX_CUSTOM_CSS_BYTES),
+    sanitizeCustomCss(customCss.slice(0, MAX_CUSTOM_CSS_BYTES)),
   ].filter(Boolean).join('\n\n');
 }

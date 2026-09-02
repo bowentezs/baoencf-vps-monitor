@@ -47,6 +47,7 @@ pnpm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
+how*
 
 # Generated binaries
 *.exe

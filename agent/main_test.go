@@ -114,11 +114,18 @@ func TestWebSocketReconnectDelaySlowsAuthFailures(t *testing.T) {
 	reconnectInterval = 5
 	defer func() { reconnectInterval = oldReconnectInterval }()
 
-	if got := webSocketReconnectDelay(errors.New("401 Unauthorized")); got != 10*time.Minute {
+	if got := webSocketReconnectDelay(errors.New("401 Unauthorized"), 1); got != 10*time.Minute {
 		t.Fatalf("auth failure reconnect delay = %s, want 10m", got)
 	}
-	if got := webSocketReconnectDelay(errors.New("dial tcp timeout")); got != 5*time.Second {
-		t.Fatalf("network failure reconnect delay = %s, want 5s", got)
+	// 网络失败走指数退避 + ±20% 抖动：attempts=1 时基数为 reconnectInterval(5s)。
+	if got := webSocketReconnectDelay(errors.New("dial tcp timeout"), 1); got < 4*time.Second || got > 6*time.Second {
+		t.Fatalf("network failure reconnect delay = %s, want within [4s, 6s]", got)
+	}
+	// 连续失败时退避时间应随 attempts 增长。
+	first := webSocketReconnectDelay(errors.New("dial tcp timeout"), 1)
+	fifth := webSocketReconnectDelay(errors.New("dial tcp timeout"), 5)
+	if fifth < first {
+		t.Fatalf("reconnect delay should grow with attempts: first=%s fifth=%s", first, fifth)
 	}
 }
 
@@ -433,8 +440,8 @@ func TestTrafficResetPeriodKey(t *testing.T) {
 func TestTrafficResetStatePathIsStableAcrossTokenRotation(t *testing.T) {
 	t.Setenv("CF_MONITOR_TRAFFIC_STATE_FILE", "")
 
-	pathA := trafficResetStatePath("token-a")
-	pathB := trafficResetStatePath("token-b")
+	pathA := trafficResetStatePath()
+	pathB := trafficResetStatePath()
 	if pathA != pathB {
 		t.Fatalf("trafficResetStatePath changed across token rotation: %q != %q", pathA, pathB)
 	}
@@ -448,7 +455,7 @@ func TestTrafficResetTrackerKeepsMonthlyDeltasAcrossTokenRotation(t *testing.T) 
 	t.Setenv("CF_MONITOR_TRAFFIC_STATE_FILE", statePath)
 
 	scope := "wan"
-	first := newTrafficResetTracker(1, "token-a", scope)
+	first := newTrafficResetTracker(1, scope)
 	now := time.Date(2026, time.June, 10, 12, 0, 0, 0, time.UTC)
 	bootedBeforePeriod := time.Date(2026, time.May, 10, 12, 0, 0, 0, time.UTC)
 	up, down := first.adjustSinceBoot(1000, 2000, now, bootedBeforePeriod)
@@ -460,7 +467,7 @@ func TestTrafficResetTrackerKeepsMonthlyDeltasAcrossTokenRotation(t *testing.T) 
 		t.Fatalf("monthly traffic after delta = %d/%d, want 500/600", up, down)
 	}
 
-	rotated := newTrafficResetTracker(1, "token-b", scope)
+	rotated := newTrafficResetTracker(1, scope)
 	up, down = rotated.adjustSinceBoot(1700, 3000, now.Add(2*time.Minute), bootedBeforePeriod)
 	if up != 700 || down != 1000 {
 		t.Fatalf("monthly traffic after token rotation = %d/%d, want 700/1000", up, down)
@@ -471,7 +478,7 @@ func TestTrafficResetTrackerStartsWithSystemTotalsWhenBootedInCurrentPeriod(t *t
 	statePath := filepath.Join(t.TempDir(), "traffic-state.json")
 	t.Setenv("CF_MONITOR_TRAFFIC_STATE_FILE", statePath)
 
-	tracker := newTrafficResetTracker(1, "token", "wan")
+	tracker := newTrafficResetTracker(1, "wan")
 	now := time.Date(2026, time.June, 10, 12, 0, 0, 0, time.UTC)
 	bootedInPeriod := time.Date(2026, time.June, 2, 12, 0, 0, 0, time.UTC)
 	up, down := tracker.adjustSinceBoot(1000, 2000, now, bootedInPeriod)
@@ -502,7 +509,7 @@ func TestTrafficResetTrackerRepairsInstallBaselineWhenBootedInCurrentPeriod(t *t
 		t.Fatal(err)
 	}
 
-	tracker := newTrafficResetTracker(1, "token", "wan")
+	tracker := newTrafficResetTracker(1, "wan")
 	bootedInPeriod := time.Date(2026, time.June, 2, 12, 0, 0, 0, time.UTC)
 	up, down := tracker.adjustSinceBoot(1500, 2600, now.Add(time.Minute), bootedInPeriod)
 	if up != 1500 || down != 2600 {
@@ -532,7 +539,7 @@ func TestTrafficResetTrackerAddsCurrentBootCountersAfterCounterReset(t *testing.
 		t.Fatal(err)
 	}
 
-	tracker := newTrafficResetTracker(1, "token", "wan")
+	tracker := newTrafficResetTracker(1, "wan")
 	bootedInPeriod := time.Date(2026, time.June, 9, 12, 0, 0, 0, time.UTC)
 	up, down := tracker.adjustSinceBoot(700, 800, now.Add(time.Minute), bootedInPeriod)
 	if up != 5700 || down != 12_800 {
@@ -544,12 +551,12 @@ func TestTrafficResetTrackerKeepsMonthlyTrafficAfterRebootInCurrentPeriod(t *tes
 	statePath := filepath.Join(t.TempDir(), "traffic-state.json")
 	t.Setenv("CF_MONITOR_TRAFFIC_STATE_FILE", statePath)
 
-	tracker := newTrafficResetTracker(1, "token", "wan")
+	tracker := newTrafficResetTracker(1, "wan")
 	now := time.Date(2026, time.June, 10, 12, 0, 0, 0, time.UTC)
 	bootedInPeriod := time.Date(2026, time.June, 2, 12, 0, 0, 0, time.UTC)
 	tracker.adjustSinceBoot(5000, 12_000, now, bootedInPeriod)
 
-	restarted := newTrafficResetTracker(1, "token", "wan")
+	restarted := newTrafficResetTracker(1, "wan")
 	bootedAfterReboot := time.Date(2026, time.June, 10, 12, 1, 0, 0, time.UTC)
 	up, down := restarted.adjustSinceBoot(700, 800, now.Add(2*time.Minute), bootedAfterReboot)
 	if up != 5700 || down != 12_800 {
@@ -561,12 +568,12 @@ func TestTrafficResetTrackerDetectsRebootEvenWhenOneCounterIncreases(t *testing.
 	statePath := filepath.Join(t.TempDir(), "traffic-state.json")
 	t.Setenv("CF_MONITOR_TRAFFIC_STATE_FILE", statePath)
 
-	tracker := newTrafficResetTracker(1, "token", "wan")
+	tracker := newTrafficResetTracker(1, "wan")
 	now := time.Date(2026, time.June, 10, 12, 0, 0, 0, time.UTC)
 	bootedInPeriod := time.Date(2026, time.June, 2, 12, 0, 0, 0, time.UTC)
 	tracker.adjustSinceBoot(100, 12_000, now, bootedInPeriod)
 
-	restarted := newTrafficResetTracker(1, "token", "wan")
+	restarted := newTrafficResetTracker(1, "wan")
 	bootedAfterReboot := time.Date(2026, time.June, 10, 12, 1, 0, 0, time.UTC)
 	up, down := restarted.adjustSinceBoot(700, 800, now.Add(2*time.Minute), bootedAfterReboot)
 	if up != 800 || down != 12_800 {
@@ -578,12 +585,12 @@ func TestTrafficResetTrackerTreatsAnyCounterDropAsCounterReset(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "traffic-state.json")
 	t.Setenv("CF_MONITOR_TRAFFIC_STATE_FILE", statePath)
 
-	tracker := newTrafficResetTracker(1, "token", "wan")
+	tracker := newTrafficResetTracker(1, "wan")
 	now := time.Date(2026, time.June, 10, 12, 0, 0, 0, time.UTC)
 	bootedInPeriod := time.Date(2026, time.June, 2, 12, 0, 0, 0, time.UTC)
 	tracker.adjustSinceBoot(100, 12_000, now, bootedInPeriod)
 
-	restarted := newTrafficResetTracker(1, "token", "wan")
+	restarted := newTrafficResetTracker(1, "wan")
 	up, down := restarted.adjustSinceBoot(700, 800, now.Add(2*time.Minute), bootedInPeriod)
 	if up != 800 || down != 12_800 {
 		t.Fatalf("monthly traffic after counter reset = %d/%d, want previous period plus current counters 800/12800", up, down)
@@ -618,7 +625,7 @@ func TestTrafficResetTrackerIgnoresExternalKomariNetStaticHistory(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	tracker := newTrafficResetTracker(1, "token", "wan")
+	tracker := newTrafficResetTracker(1, "wan")
 	bootedBeforePeriod := time.Date(2026, time.May, 10, 12, 0, 0, 0, time.UTC)
 	up, down := tracker.adjustSinceBoot(50, 70, now, bootedBeforePeriod)
 	if up != 0 || down != 0 {
@@ -630,7 +637,7 @@ func TestTrafficResetTrackerDropsPreviousMonthlyPeriod(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "traffic-state.json")
 	t.Setenv("CF_MONITOR_TRAFFIC_STATE_FILE", statePath)
 
-	tracker := newTrafficResetTracker(15, "token", "wan")
+	tracker := newTrafficResetTracker(15, "wan")
 	beforeReset := time.Date(2026, time.June, 14, 23, 0, 0, 0, time.UTC)
 	bootedBeforePeriod := time.Date(2026, time.May, 10, 12, 0, 0, 0, time.UTC)
 	tracker.adjustSinceBoot(1000, 1000, beforeReset, bootedBeforePeriod)
