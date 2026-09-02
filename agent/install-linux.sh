@@ -235,6 +235,7 @@ detect_binary_filename() {
   case "$arch" in
     x86_64|amd64) arch="amd64" ;;
     aarch64|arm64) arch="arm64" ;;
+    i386|i686|386) arch="386" ;;
     *) echo "Unsupported CPU architecture for prebuilt agent: $arch" >&2; exit 1 ;;
   esac
 
