@@ -154,12 +154,14 @@ export function applyLiveUpdate(
     lastReportTime: message.timestamp,
   };
 
+  const exists = base.clients.some(client => client.uuid === uuid);
+  const nextClients = exists
+    ? base.clients.map(client => (client.uuid === uuid ? nextClient : client))
+    : [...base.clients, nextClient];
+
   return {
     online: nextOnline,
-    clients: [
-      ...base.clients.filter(client => client.uuid !== uuid),
-      nextClient,
-    ],
+    clients: nextClients,
     data: {
       ...base.data,
       [uuid]: nextRecord,

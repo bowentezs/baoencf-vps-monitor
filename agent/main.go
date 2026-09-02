@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -1311,15 +1313,18 @@ func runWebSocketReporter() {
 	preparer := &reportPreparer{}
 	pingState := newPingReportState()
 
+	attempts := 0
 	for {
 		conn, err := connectWebSocket(endpoint, token)
 		if err != nil {
-			delay := webSocketReconnectDelay(err)
+			attempts++
+			delay := webSocketReconnectDelay(err, attempts)
 			log.Printf("WebSocket connect failed: %v; reconnecting in %s", err, delay)
 			time.Sleep(delay)
 			continue
 		}
 
+		attempts = 0
 		log.Println("WebSocket connected")
 		_ = runWebSocketSession(
 			conn,
@@ -1333,11 +1338,25 @@ func runWebSocketReporter() {
 	}
 }
 
-func webSocketReconnectDelay(err error) time.Duration {
+func webSocketReconnectDelay(err error, attempts int) time.Duration {
 	if err != nil && (strings.HasPrefix(err.Error(), "401 ") || strings.HasPrefix(err.Error(), "403 ")) {
 		return 10 * time.Minute
 	}
-	return time.Duration(reconnectInterval) * time.Second
+	base := float64(reconnectInterval)
+	if base < 1 {
+		base = 1
+	}
+	factor := math.Pow(1.5, float64(attempts-1))
+	delaySec := base * factor
+	if delaySec > 60.0 {
+		delaySec = 60.0
+	}
+	jitter := (rand.Float64()*0.4 - 0.2) * delaySec
+	finalSec := delaySec + jitter
+	if finalSec < 1.0 {
+		finalSec = 1.0
+	}
+	return time.Duration(finalSec * float64(time.Second))
 }
 
 func runWebSocketSession(
@@ -1886,6 +1905,7 @@ func parseProcMeminfo(data string) memorySnapshot {
 	}
 
 	total := values["MemTotal"]
+	available, hasAvailable := values["MemAvailable"]
 	free := values["MemFree"]
 	cached := values["Cached"]
 	reclaimable := values["SReclaimable"]
@@ -1897,13 +1917,17 @@ func parseProcMeminfo(data string) memorySnapshot {
 
 	snapshot := memorySnapshot{}
 	if total > 0 {
-		usedDiff := free + cached + reclaimable + buffers
-		if total >= usedDiff {
-			snapshot.ramUsed = total - usedDiff
+		if hasAvailable && available <= total {
+			snapshot.ramUsed = total - available
 		} else {
-			snapshot.ramUsed = total - free
+			usedDiff := free + cached + reclaimable + buffers
+			if total >= usedDiff {
+				snapshot.ramUsed = total - usedDiff
+			} else {
+				snapshot.ramUsed = total - free
+			}
+			snapshot.ramUsed += shmem
 		}
-		snapshot.ramUsed += shmem
 		snapshot.ramTotal = total
 		snapshot.hasRAM = true
 	}
@@ -2217,12 +2241,15 @@ func connectionsCount() (int, int) {
 			return tcp, udp
 		}
 	}
-	tcpConns, tcpErr := gnet.Connections("tcp")
-	udpConns, udpErr := gnet.Connections("udp")
-	if tcpErr != nil || udpErr != nil {
-		return 0, 0
+	tcpCount := 0
+	if tcpConns, tcpErr := gnet.Connections("tcp"); tcpErr == nil {
+		tcpCount = len(tcpConns)
 	}
-	return len(tcpConns), len(udpConns)
+	udpCount := 0
+	if udpConns, udpErr := gnet.Connections("udp"); udpErr == nil {
+		udpCount = len(udpConns)
+	}
+	return tcpCount, udpCount
 }
 
 func procNetConnectionsCount(root string) (int, int, error) {
@@ -2320,20 +2347,24 @@ func trafficCounterScope() string {
 	return shortHash(strings.TrimSpace(nicInclude) + "\n" + strings.TrimSpace(nicExclude))
 }
 
-func trafficResetStatePath(_ string) string {
+func trafficResetStatePath(tokenKey string) string {
 	if override := strings.TrimSpace(os.Getenv("CF_MONITOR_TRAFFIC_STATE_FILE")); override != "" {
 		return override
 	}
+	filename := "traffic-state.json"
+	if t := strings.TrimSpace(tokenKey); t != "" {
+		filename = fmt.Sprintf("traffic-state-%s.json", shortHash(t)[:8])
+	}
 	if exePath, err := os.Executable(); err == nil {
 		if dir := filepath.Dir(exePath); strings.TrimSpace(dir) != "" && dir != "." {
-			return filepath.Join(dir, "traffic-state.json")
+			return filepath.Join(dir, filename)
 		}
 	}
 	baseDir, err := os.UserConfigDir()
 	if err != nil || strings.TrimSpace(baseDir) == "" {
 		baseDir = os.TempDir()
 	}
-	return filepath.Join(baseDir, "cf-vps-monitor-agent", "traffic-state.json")
+	return filepath.Join(baseDir, "cf-vps-monitor-agent", filename)
 }
 
 func shortHash(value string) string {
@@ -3017,6 +3048,9 @@ func connectWebSocket(endpoint string, agentToken string) (*safeWebSocketConn, e
 	conn, resp, err := dialer.Dial(endpoint, headers)
 	if err != nil {
 		if resp != nil {
+			if resp.Body != nil {
+				_ = resp.Body.Close()
+			}
 			return nil, fmt.Errorf("%s", resp.Status)
 		}
 		return nil, err
