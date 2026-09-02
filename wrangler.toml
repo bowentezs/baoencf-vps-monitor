@@ -1,6 +1,5 @@
 name = "cf-vps-monitor"
 main = "worker/src/index.ts"
-account_id = "CLOUDFLARE_ACCOUNT_ID_PLACEHOLDER"
 compatibility_date = "2026-06-21"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true

@@ -6,6 +6,7 @@ const RATE_LIMIT_MAX_BODY_BYTES = 2 * 1024;
 export class RateLimitDO {
   private state: DurableObjectState;
   private sweepCounter = 0;
+  private memoryBuckets: Map<string, { count: number; resetAt: number }> = new Map();
 
   constructor(state: DurableObjectState) {
     this.state = state;
@@ -44,21 +45,32 @@ export class RateLimitDO {
     }
 
     const now = Date.now();
-    this.sweepCounter += 1;
-    if (this.sweepCounter % 256 === 0) {
-      await this.cleanupExpiredBuckets(now);
+    const key = `${RATE_LIMIT_STORAGE_PREFIX}${bucket}:${ip}`;
+
+    // 优先读取内存桶，未命中时尝试读取持久化存储
+    let state = this.memoryBuckets.get(key);
+    if (!state || state.resetAt <= now) {
+      const persisted = await this.state.storage.get<{ count: number; resetAt: number }>(key);
+      state = !persisted || persisted.resetAt <= now
+        ? { count: 0, resetAt: now + windowMs }
+        : persisted;
     }
 
-    const key = `${RATE_LIMIT_STORAGE_PREFIX}${bucket}:${ip}`;
-    const current = await this.state.storage.get<{ count: number; resetAt: number }>(key);
-    const state = !current || current.resetAt <= now
-      ? { count: 0, resetAt: now + windowMs }
-      : current;
     state.count += 1;
-    await this.state.storage.put(key, state);
-    await this.scheduleCleanupAlarm(now);
-    if (this.sweepCounter % 1024 === 0) {
-      await this.enforceBucketLimit(now);
+    this.memoryBuckets.set(key, state);
+
+    // 仅在超限（触发封禁惩罚）时异步持久化，正常放行无需耗费 SQLite 写入配额
+    if (state.count > max) {
+      this.state.waitUntil(this.state.storage.put(key, state));
+      await this.scheduleCleanupAlarm(now);
+    }
+
+    this.sweepCounter += 1;
+    if (this.sweepCounter % 256 === 0) {
+      for (const [k, v] of this.memoryBuckets.entries()) {
+        if (v.resetAt <= now) this.memoryBuckets.delete(k);
+      }
+      await this.cleanupExpiredBuckets(now);
     }
 
     const retryAfter = Math.max(1, Math.ceil((state.resetAt - now) / 1000));

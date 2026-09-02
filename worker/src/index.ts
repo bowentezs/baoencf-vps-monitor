@@ -804,40 +804,52 @@ async function runLoadCheck(context: ScheduledRunContext, now: Date): Promise<vo
 
 async function runWebsiteMonitorChecks(context: ScheduledRunContext, now: Date): Promise<void> {
   const monitors = await db.listDueWebsiteMonitors(context.database, now.toISOString(), 50);
-  for (const monitor of monitors) {
-    const check = await checkWebsiteMonitorHttp(monitor);
-    const updated = await db.recordWebsiteCheck(context.database, check);
-    if (!updated) continue;
+  if (monitors.length === 0) return;
 
-    if (shouldNotifyWebsiteDown(updated, now)) {
-      const downSince = updated.down_since ? new Date(updated.down_since).getTime() : now.getTime();
-      const downMinutes = Math.max(0, Math.floor((now.getTime() - downSince) / 60000));
-      const lastStatus = updated.last_error || (updated.last_status_code ? `HTTP ${updated.last_status_code}` : 'network_error');
-      const sent = await sendNotification(context, buildWebsiteAlertNotification({
-        name: updated.name,
-        url: updated.url,
-        downMinutes,
-        lastStatus,
-        checkedAt: check.checked_at,
-      }));
-      await db.markWebsiteMonitorNotified(context.database, updated.id, now.toISOString());
-      await db.insertAuditLog(context.database, 'system', 'website_down', `${sent ? '已发送' : '已记录'}网站告警: ${updated.name}`);
-    }
+  const CONCURRENCY = 6;
+  for (let i = 0; i < monitors.length; i += CONCURRENCY) {
+    const chunk = monitors.slice(i, i + CONCURRENCY);
+    await Promise.allSettled(
+      chunk.map(async (monitor) => {
+        try {
+          const check = await checkWebsiteMonitorHttp(monitor);
+          const updated = await db.recordWebsiteCheck(context.database, check);
+          if (!updated) return;
 
-    if (shouldNotifyWebsiteRecovery(updated)) {
-      const downSince = monitor.down_since ? new Date(monitor.down_since).getTime() : now.getTime();
-      const downMinutes = Math.max(0, Math.floor((now.getTime() - downSince) / 60000));
-      const sent = await sendNotification(context, buildWebsiteRecoveryNotification({
-        name: updated.name,
-        url: updated.url,
-        downMinutes,
-        statusCode: updated.last_status_code,
-        latencyMs: updated.last_latency_ms,
-        eventTime: now,
-      }));
-      await db.markWebsiteMonitorNotified(context.database, updated.id, null);
-      await db.insertAuditLog(context.database, 'system', 'website_recovery', `${sent ? '已发送' : '已记录'}网站恢复: ${updated.name}`);
-    }
+          if (shouldNotifyWebsiteDown(updated, now)) {
+            const downSince = updated.down_since ? new Date(updated.down_since).getTime() : now.getTime();
+            const downMinutes = Math.max(0, Math.floor((now.getTime() - downSince) / 60000));
+            const lastStatus = updated.last_error || (updated.last_status_code ? `HTTP ${updated.last_status_code}` : 'network_error');
+            const sent = await sendNotification(context, buildWebsiteAlertNotification({
+              name: updated.name,
+              url: updated.url,
+              downMinutes,
+              lastStatus,
+              checkedAt: check.checked_at,
+            }));
+            await db.markWebsiteMonitorNotified(context.database, updated.id, now.toISOString());
+            await db.insertAuditLog(context.database, 'system', 'website_down', `${sent ? '已发送' : '已记录'}网站告警: ${updated.name}`);
+          }
+
+          if (shouldNotifyWebsiteRecovery(updated)) {
+            const downSince = monitor.down_since ? new Date(monitor.down_since).getTime() : now.getTime();
+            const downMinutes = Math.max(0, Math.floor((now.getTime() - downSince) / 60000));
+            const sent = await sendNotification(context, buildWebsiteRecoveryNotification({
+              name: updated.name,
+              url: updated.url,
+              downMinutes,
+              statusCode: updated.last_status_code,
+              latencyMs: updated.last_latency_ms,
+              eventTime: now,
+            }));
+            await db.markWebsiteMonitorNotified(context.database, updated.id, null);
+            await db.insertAuditLog(context.database, 'system', 'website_recovery', `${sent ? '已发送' : '已记录'}网站恢复: ${updated.name}`);
+          }
+        } catch (error) {
+          console.error(`[website_monitor] check failed for ${monitor.id}:`, errorDetail(error));
+        }
+      })
+    );
   }
 }
 
