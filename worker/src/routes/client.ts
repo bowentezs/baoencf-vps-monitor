@@ -813,10 +813,15 @@ function rateLimitResponse(c: ClientContext, retryAfter: number, limit: number, 
   return c.json({ error: `请求过于频繁，请 ${retryAfter} 秒后重试` }, 429);
 }
 
+let localAgentRateLimitSweepCounter = 0;
+
 function localAgentRateLimit(c: ClientContext, key: string, max: number, windowMs: number): Response | null {
   const now = Date.now();
-  for (const [bucket, value] of localAgentRateLimitBuckets) {
-    if (value.resetAt <= now) localAgentRateLimitBuckets.delete(bucket);
+  localAgentRateLimitSweepCounter += 1;
+  if (localAgentRateLimitSweepCounter % 64 === 0 || localAgentRateLimitBuckets.size > 500) {
+    for (const [bucket, value] of localAgentRateLimitBuckets) {
+      if (value.resetAt <= now) localAgentRateLimitBuckets.delete(bucket);
+    }
   }
 
   const current = localAgentRateLimitBuckets.get(key);
