@@ -18,6 +18,7 @@ const protectedRequests = [
   ['POST', '/api/admin/account/mfa/enable'],
   ['POST', '/api/admin/account/mfa/recovery-codes'],
   ['POST', '/api/admin/account/mfa/disable'],
+  ['POST', '/api/admin/cron/run'],
 ];
 
 const configWriteRequests = [
@@ -30,6 +31,12 @@ const configWriteRequests = [
   ['POST', '/api/admin/notification/offline/edit'],
   ['POST', '/api/admin/notification/load/add'],
 ];
+
+for (const [method, path] of protectedRequests) {
+  test(`protects sensitive operation ${method} ${path}`, () => {
+    assert.equal(isMfaStepUpProtectedRequest(method, path), true);
+  });
+}
 
 for (const [method, path] of configWriteRequests) {
   test(`protects config write ${method} ${path}`, () => {

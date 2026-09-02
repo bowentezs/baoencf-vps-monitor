@@ -10,6 +10,8 @@ const EXACT_PROTECTED_PATHS = new Set([
   '/api/admin/account/mfa/enable',
   '/api/admin/account/mfa/recovery-codes',
   '/api/admin/account/mfa/disable',
+  // 手动触发维护任务会立即清理历史记录，同样需要 MFA step-up，防止被劫持会话绕过 record/clear 的保护。
+  '/api/admin/cron/run',
 ]);
 
 const CLIENT_SECRET_PATH = /^\/api\/admin\/clients\/[^/]+\/(?:remove|token(?:\/install|\/rotate)?)$/;

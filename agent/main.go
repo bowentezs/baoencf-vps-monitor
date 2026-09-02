@@ -424,7 +424,7 @@ func main() {
 	if token == "" {
 		log.Fatal("missing token: pass --token or set CF_MONITOR_TOKEN")
 	}
-	trafficTracker = newTrafficResetTracker(trafficResetDay, token, trafficCounterScope())
+	trafficTracker = newTrafficResetTracker(trafficResetDay, trafficCounterScope())
 
 	log.Printf("CF VPS Monitor Agent %s", Version)
 	log.Printf("server: %s", serverURL)
@@ -2335,11 +2335,11 @@ func normalizeTrafficResetDay(day int) int {
 	return day
 }
 
-func newTrafficResetTracker(resetDay int, token string, scope string) *trafficResetTracker {
+func newTrafficResetTracker(resetDay int, scope string) *trafficResetTracker {
 	return &trafficResetTracker{
 		resetDay:  normalizeTrafficResetDay(resetDay),
 		scope:     scope,
-		statePath: trafficResetStatePath(token),
+		statePath: trafficResetStatePath(),
 	}
 }
 
@@ -2347,14 +2347,12 @@ func trafficCounterScope() string {
 	return shortHash(strings.TrimSpace(nicInclude) + "\n" + strings.TrimSpace(nicExclude))
 }
 
-func trafficResetStatePath(tokenKey string) string {
+// 状态文件路径不随 token 变化：token 轮换后当月流量计数必须延续。
+func trafficResetStatePath() string {
 	if override := strings.TrimSpace(os.Getenv("CF_MONITOR_TRAFFIC_STATE_FILE")); override != "" {
 		return override
 	}
 	filename := "traffic-state.json"
-	if t := strings.TrimSpace(tokenKey); t != "" {
-		filename = fmt.Sprintf("traffic-state-%s.json", shortHash(t)[:8])
-	}
 	if exePath, err := os.Executable(); err == nil {
 		if dir := filepath.Dir(exePath); strings.TrimSpace(dir) != "" && dir != "." {
 			return filepath.Join(dir, filename)
