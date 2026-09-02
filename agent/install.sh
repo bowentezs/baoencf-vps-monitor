@@ -215,6 +215,9 @@ copy_binary_to() {
   if [ "$DRY_RUN" = "1" ]; then
     echo "[dry-run] install ${src} ${dst}"
   else
+    # 先 unlink 再复制：直接 cp 覆盖正在运行的二进制会报 "Text file busy" 导致升级中断；
+    # rm 后旧进程仍持有旧 inode 正常运行，直到服务 restart 切换到新文件。
+    rm -f "$dst"
     cp "$src" "$dst"
     chmod 0755 "$dst"
   fi
