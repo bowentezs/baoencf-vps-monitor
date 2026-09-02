@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Flex, Card, Text, Badge, Heading,
@@ -91,6 +91,7 @@ const monitorChartHeight = 296;
 const pingChartHeight = 210;
 const dailyTrafficChartHeight = 256;
 
+
 function historyQuery(params: Record<string, string | number | undefined>): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -98,6 +99,7 @@ function historyQuery(params: Record<string, string | number | undefined>): stri
   }
   return query.toString();
 }
+
 export default function Instance() {
   const { uuid } = useParams<{ uuid: string }>();
   const navigate = useNavigate();
@@ -149,43 +151,62 @@ export default function Instance() {
   }, [clients, onlineSet]);
 
   // Load public client info.
-  const loadClient = useCallback(async () => {
+  useEffect(() => {
+    let cancelled = false;
     if (!uuid || authLoading) return;
     setClientLoading(true);
-    try {
-      setError(null);
-      const data = await publicFetch(`/nodes${isAuthenticated ? '?include_hidden=1' : ''}`);
-      const visible = normalizePublicClients(data, { includeHidden: isAuthenticated });
-      setClients(visible);
-      const found = visible.find((c) => c.uuid === uuid) || null;
-      if (found) { setClient(found); } else { setError('服务器不存在'); }
-    } catch { setError('加载失败'); }
-    finally { setClientLoading(false); }
+    setError(null);
+    publicFetch(`/nodes${isAuthenticated ? '?include_hidden=1' : ''}`)
+      .then((data) => {
+        if (cancelled) return;
+        const visible = normalizePublicClients(data, { includeHidden: isAuthenticated });
+        setClients(visible);
+        const found = visible.find((c) => c.uuid === uuid) || null;
+        if (found) {
+          setClient(found);
+        } else {
+          setError('服务器不存在');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError('加载失败');
+      })
+      .finally(() => {
+        if (!cancelled) setClientLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [uuid, authLoading, isAuthenticated]);
 
-  useEffect(() => { loadClient(); }, [loadClient]);
-
   // Load history records
-  const loadRecords = useCallback(async (range: TimeRange) => {
+  useEffect(() => {
+    let cancelled = false;
     if (!uuid || authLoading) return;
     setRecordsLoading(true);
     const endTs = Date.now();
-    const startTs = endTs - timeRangeMs[range];
+    const startTs = endTs - timeRangeMs[timeRange];
     const start = new Date(startTs).toISOString();
     const end = new Date(endTs).toISOString();
-    const limit = timeRangePointLimit[range];
+    const limit = timeRangePointLimit[timeRange];
     setRecordsRangeEnd(endTs);
 
-    try {
-      const data = await publicFetch(`/records/load?${historyQuery({ uuid, start, end, cursor: end, limit, include_hidden: isAuthenticated ? 1 : undefined })}`);
-      setRecords(normalizePublicMonitorRecords(data));
-    } catch {}
-    setRecordsLoading(false);
-  }, [uuid, authLoading, isAuthenticated]);
+    publicFetch(`/records/load?${historyQuery({ uuid, start, end, cursor: end, limit, include_hidden: isAuthenticated ? 1 : undefined })}`)
+      .then((data) => {
+        if (!cancelled) {
+          setRecords(normalizePublicMonitorRecords(data));
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setRecordsLoading(false);
+      });
 
-  useEffect(() => {
-    loadRecords(timeRange);
-  }, [loadRecords, timeRange]);
+    return () => {
+      cancelled = true;
+    };
+  }, [uuid, authLoading, isAuthenticated, timeRange]);
 
   useEffect(() => {
     let cancelled = false;
