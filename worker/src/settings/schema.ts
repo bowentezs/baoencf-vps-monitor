@@ -343,7 +343,7 @@ export const SETTING_SCHEMA = {
     defaultValue: '16',
     public: true,
     min: 0,
-    max: 40,
+    max: 60,
   },
   theme_card_glow: {
     type: 'boolean',

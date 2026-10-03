@@ -359,12 +359,12 @@ export default function SettingsSite() {
             style={{ maxWidth: 420 }}
             value={[Number(settings.theme_card_blur || 16)]}
             min={0}
-            max={40}
+            max={60}
             step={2}
             onValueChange={(vals) => updateSetting('theme_card_blur', String(vals[0]))}
           />
           <Text size="1" color="gray" style={{ display: 'block', marginTop: 4 }}>
-            范围 0px ~ 40px。0px 为晶莹纯透水晶，数值越大色彩折射与饱和度越浓郁，呈现高级微晶磨砂
+            范围 0px ~ 60px。0px 为晶莹纯透水晶，数值越大色彩折射与饱和度越浓郁，呈现高级微晶磨砂
           </Text>
         </div>
 
@@ -440,8 +440,8 @@ export default function SettingsSite() {
           <div style={{ position: 'relative', zIndex: 1, padding: '20px 16px' }}>
             {(() => {
               const cardOpacityNum = Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100;
-              const cardBlurNum = Math.min(40, Math.max(0, Number(settings.theme_card_blur ?? 16)));
-              const blurProgress = cardBlurNum / 40;
+              const cardBlurNum = Math.min(60, Math.max(0, Number(settings.theme_card_blur ?? 16)));
+              const blurProgress = cardBlurNum / 60;
               const glassSaturate = Math.round(110 + blurProgress * 110);
               const glassContrast = Math.round(100 + blurProgress * 15);
               return (
@@ -453,14 +453,14 @@ export default function SettingsSite() {
                     backdropFilter: `blur(${cardBlurNum}px) saturate(${glassSaturate}%) contrast(${glassContrast}%)`,
                     WebkitBackdropFilter: `blur(${cardBlurNum}px) saturate(${glassSaturate}%) contrast(${glassContrast}%)`,
                     background: previewDark
-                      ? `linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(12, 16, 28, ${cardOpacityNum * 0.85})`
-                      : `linear-gradient(135deg, rgba(255, 255, 255, ${cardOpacityNum * 0.40 + 0.04}) 0%, rgba(255, 255, 255, ${cardOpacityNum * 0.10}) 100%), rgba(255, 255, 255, ${cardOpacityNum})`,
+                      ? `linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), radial-gradient(circle at 8% 8%, rgba(139, 92, 246, 0.22), transparent 40%), radial-gradient(circle at 92% 92%, rgba(56, 189, 248, 0.16), transparent 40%), rgba(12, 16, 28, ${cardOpacityNum * (0.35 + blurProgress * 0.45)})`
+                      : `linear-gradient(135deg, rgba(255, 255, 255, ${0.06 + blurProgress * 0.24}) 0%, rgba(255, 255, 255, ${0.02 + blurProgress * 0.08}) 100%), radial-gradient(circle at 50% 0%, rgba(255, 255, 255, ${blurProgress * 0.40}), transparent 75%), rgba(255, 255, 255, ${cardOpacityNum * (0.12 + blurProgress * 0.30)})`,
                     border: previewDark
                       ? '1.5px solid rgba(255, 255, 255, 0.30)'
-                      : `1.5px solid rgba(255, 255, 255, ${cardOpacityNum * 0.45 + 0.45})`,
+                      : `1.5px solid rgba(255, 255, 255, ${0.50 + blurProgress * 0.45})`,
                     boxShadow: previewDark
                       ? '0 0 0 1px rgba(0, 0, 0, 0.35), inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 20px 48px -6px rgba(0, 0, 0, 0.65)'
-                      : '0 0 0 1px rgba(255, 255, 255, 0.70), inset 0 1.5px 2px 0 #ffffff, inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 10px 28px -4px rgba(100, 116, 139, 0.08)',
+                      : '0 0 0 1px rgba(255, 255, 255, 0.75), inset 0 1.5px 2px 0 #ffffff, inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 10px 30px -4px rgba(100, 116, 139, 0.08)',
                     color: previewDark ? '#f8fafc' : '#0f172a',
                     padding: '16px 18px',
                     transition: 'backdrop-filter 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease',
@@ -477,7 +477,7 @@ export default function SettingsSite() {
                         height: 2.5,
                         background: 'linear-gradient(90deg, transparent, #38bdf8, #8b5cf6, #ec4899, #f59e0b, transparent)',
                         opacity: 1,
-                        boxShadow: '0 0 14px rgba(139, 92, 246, 0.9), 0 0 5px #38bdf8',
+                        boxShadow: `0 0 ${10 + blurProgress * 14}px rgba(139, 92, 246, 0.9), 0 0 5px #38bdf8`,
                         zIndex: 2,
                       }}
                     />
@@ -494,22 +494,20 @@ export default function SettingsSite() {
                     </span>
                   </Flex>
 
-                  {/* 仿真指标进度条 (微晶体透光面板) */}
+                  {/* 仿真指标进度条 (微晶体透光面板：彻底镂空，100% 释放磨砂折射) */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                     <div style={{
                       background: previewDark
-                        ? `rgba(255, 255, 255, ${cardOpacityNum * 0.05 + 0.02})`
-                        : `rgba(255, 255, 255, ${cardOpacityNum * 0.30 + 0.06})`,
+                        ? 'rgba(255, 255, 255, 0.03)'
+                        : 'rgba(255, 255, 255, 0.08)',
                       border: previewDark
                         ? '1px solid rgba(255, 255, 255, 0.12)'
-                        : `1px solid rgba(255, 255, 255, ${cardOpacityNum * 0.35 + 0.25})`,
+                        : '1px solid rgba(255, 255, 255, 0.45)',
                       borderRadius: 8,
                       padding: '7px 9px',
                       boxShadow: previewDark
-                        ? 'inset 0 1px 0 rgba(255, 255, 255, 0.10)'
-                        : 'inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(0, 0, 0, 0.04)',
-                      backdropFilter: `blur(${cardBlurNum * 0.4}px) saturate(${glassSaturate}%)`,
-                      WebkitBackdropFilter: `blur(${cardBlurNum * 0.4}px) saturate(${glassSaturate}%)`,
+                        ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08)'
+                        : 'inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.7), 0 2px 8px rgba(0, 0, 0, 0.03)',
                     }}>
                       <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
                         <span>CPU 负载</span>
@@ -521,18 +519,16 @@ export default function SettingsSite() {
                     </div>
                     <div style={{
                       background: previewDark
-                        ? `rgba(255, 255, 255, ${cardOpacityNum * 0.05 + 0.02})`
-                        : `rgba(255, 255, 255, ${cardOpacityNum * 0.30 + 0.06})`,
+                        ? 'rgba(255, 255, 255, 0.03)'
+                        : 'rgba(255, 255, 255, 0.08)',
                       border: previewDark
                         ? '1px solid rgba(255, 255, 255, 0.12)'
-                        : `1px solid rgba(255, 255, 255, ${cardOpacityNum * 0.35 + 0.25})`,
+                        : '1px solid rgba(255, 255, 255, 0.45)',
                       borderRadius: 8,
                       padding: '7px 9px',
                       boxShadow: previewDark
-                        ? 'inset 0 1px 0 rgba(255, 255, 255, 0.10)'
-                        : 'inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(0, 0, 0, 0.04)',
-                      backdropFilter: `blur(${cardBlurNum * 0.4}px) saturate(${glassSaturate}%)`,
-                      WebkitBackdropFilter: `blur(${cardBlurNum * 0.4}px) saturate(${glassSaturate}%)`,
+                        ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08)'
+                        : 'inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.7), 0 2px 8px rgba(0, 0, 0, 0.03)',
                     }}>
                       <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
                         <span>内存占用</span>

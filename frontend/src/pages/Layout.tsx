@@ -127,7 +127,7 @@ export default function Layout() {
   };
 
   const isDark = theme === "dark" || (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  const blurProgress = Math.min(1, Math.max(0, cardBlur / 40));
+  const blurProgress = Math.min(1, Math.max(0, cardBlur / 60));
   const glassSaturate = Math.round(110 + blurProgress * 110);
   const glassContrast = Math.round(100 + blurProgress * 15);
   const layoutStyle: React.CSSProperties & Record<string, string | undefined> = {
@@ -138,6 +138,7 @@ export default function Layout() {
     "--glass-blur": `${cardBlur}px`,
     "--glass-saturate": `${glassSaturate}%`,
     "--glass-contrast": `${glassContrast}%`,
+    "--glass-sheen": blurProgress.toFixed(2),
     "--glass-glow-display": cardGlow ? "block" : "none",
   };
 
