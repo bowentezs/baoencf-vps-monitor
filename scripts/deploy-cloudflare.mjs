@@ -45,8 +45,8 @@ function resolveSupabaseUrl({ allowDryRunFallback = false } = {}) {
     if (allowDryRunFallback) return 'https://dry-run.supabase.co';
     fail('SUPABASE_URL must be set to a real Supabase project URL before deploying.');
   }
-  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(url)) {
-    fail('SUPABASE_URL must be set to a real Supabase project URL before deploying.');
+  if (!/^https:\/\/[a-z0-9.-]+\/?$/i.test(url)) {
+    fail('SUPABASE_URL must be a valid HTTPS URL before deploying.');
   }
   return url.replace(/\/$/, '');
 }
