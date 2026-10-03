@@ -135,11 +135,15 @@ async function getAdminSessionEdgeCache(userId: string, sessionVersion: number):
 
 function putAdminSessionEdgeCache(c: PublicContext, user: Pick<db.User, 'uuid' | 'session_version'>): void {
   if (typeof caches === 'undefined') return;
-  const task = caches.default.put(adminSessionEdgeCacheRequest(user.uuid, user.session_version), new Response('1', {
-    headers: { 'Cache-Control': `public, max-age=${ADMIN_SESSION_EDGE_CACHE_SECONDS}` },
-  })).catch(() => undefined);
-  if (c.executionCtx?.waitUntil) c.executionCtx.waitUntil(task);
-  else void task;
+  try {
+    const task = caches.default.put(adminSessionEdgeCacheRequest(user.uuid, user.session_version), new Response('1', {
+      headers: { 'Cache-Control': `public, max-age=${ADMIN_SESSION_EDGE_CACHE_SECONDS}` },
+    })).catch(() => undefined);
+    if (c.executionCtx?.waitUntil) c.executionCtx.waitUntil(task);
+    else void task;
+  } catch {
+    // Edge cache is an optimization; failures must not break login.
+  }
 }
 
 export async function deleteAdminSessionEdgeCache(

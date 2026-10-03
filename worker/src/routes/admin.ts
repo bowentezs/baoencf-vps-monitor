@@ -2713,7 +2713,7 @@ adminRoutes.post('/account/mfa/step-up', async (c) => {
   }, c.env);
   setMfaStepUpCookie(c, token);
   await db.insertAuditLog(database, user.username, 'mfa_step_up', '完成敏感操作二次确认');
-  return c.json({ success: true, expires_in: 300 });
+  return c.json({ success: true, expires_in: 1800 });
 });
 // 修改用户名
 adminRoutes.post('/account/username', async (c) => {

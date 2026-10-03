@@ -336,7 +336,7 @@ export default function AdminAccount() {
             <Text color="gray">正在读取状态...</Text>
           ) : mfaStatus.enabled && !setup ? (
             <Flex direction="column" gap="4">
-              <Callout.Root color="green"><Callout.Icon><ShieldCheck size={18} /></Callout.Icon><Callout.Text>账户已受双重身份验证保护，敏感操作确认在通过后 5 分钟内有效。</Callout.Text></Callout.Root>
+              <Callout.Root color="green"><Callout.Icon><ShieldCheck size={18} /></Callout.Icon><Callout.Text>账户已受双重身份验证保护，敏感操作确认在通过后 30 分钟内有效。</Callout.Text></Callout.Root>
               <Box className="mfa-status-grid">
                 <Text size="2" color="gray">启用时间</Text><Text size="2">{mfaStatus.enabled_at ? new Date(mfaStatus.enabled_at).toLocaleString() : '-'}</Text>
                 <Text size="2" color="gray">剩余恢复码</Text><Text size="2">{mfaStatus.recovery_codes_remaining} 个</Text>
