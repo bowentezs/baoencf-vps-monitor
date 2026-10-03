@@ -6253,7 +6253,7 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-tile {
   box-shadow: inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.8), 0 2px 8px rgba(0, 0, 0, 0.03) !important;
 }
 
-/* 🍎 苹果级深色液态晶体边框 (透明度纯粹掌控底色浓淡，磨砂度纯粹掌控背景虚化) */
+/* 🍎 苹果液态玻璃 (Liquid Glass) - 深色晶体架构：亚像素棱镜色散与透镜折射 */
 .dark .layout.has-custom-bg .node-card,
 .dark .layout.has-custom-bg .monitor-stat-card,
 .dark .layout.has-custom-bg .monitor-overview,
@@ -6267,17 +6267,21 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel {
   background-color: rgba(12, 16, 28, var(--glass-opacity, 0.70)) !important;
   background-image: 
     linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%),
-    radial-gradient(circle at 8% 8%, rgba(139, 92, 246, 0.20), transparent 40%),
-    radial-gradient(circle at 92% 92%, rgba(56, 189, 248, 0.15), transparent 40%) !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.30) !important;
+    radial-gradient(circle at 10% 10%, rgba(139, 92, 246, 0.22), transparent 45%),
+    radial-gradient(circle at 90% 90%, rgba(56, 189, 248, 0.18), transparent 45%) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.32) !important;
   box-shadow: 
-    0 0 0 1px rgba(0, 0, 0, 0.35),
-    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.85),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.15),
+    0 0 0 1px rgba(0, 0, 0, 0.40),
+    /* 🍎 棱镜色散：顶沿晶体高光与冷青蓝微折射 */
+    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.90),
+    inset 1px 0 2px 0 rgba(56, 189, 248, 0.32),
+    /* 🍎 棱镜色散：底沿与右沿极光紫粉分光 */
+    inset -1px -1.5px 2.5px 0 rgba(192, 132, 252, 0.26),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
     0 20px 48px -6px rgba(0, 0, 0, 0.65) !important;
 }
 
-/* 🍎 苹果级浅色通透晶体边框 (透明度纯粹掌控底色浓淡，磨砂度纯粹掌控背景虚化) */
+/* 🍎 苹果液态玻璃 (Liquid Glass) - 浅色纯净水晶架构：多层双面透光与色散 */
 :root:not(.dark) .layout.has-custom-bg .node-card,
 :root:not(.dark) .layout.has-custom-bg .monitor-stat-card,
 :root:not(.dark) .layout.has-custom-bg .monitor-overview,
@@ -6285,16 +6289,36 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel {
 :root:not(.dark) .layout.has-custom-bg .node-filter-panel {
   background-color: rgba(255, 255, 255, var(--glass-opacity, 0.70)) !important;
   background-image: 
-    linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.02) 100%) !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.80) !important;
+    linear-gradient(135deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.03) 100%),
+    radial-gradient(circle at 15% 15%, rgba(224, 242, 254, 0.35), transparent 50%),
+    radial-gradient(circle at 85% 85%, rgba(250, 232, 255, 0.30), transparent 50%) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.85) !important;
   box-shadow: 
-    0 0 0 1px rgba(255, 255, 255, 0.75),
+    0 0 0 1px rgba(255, 255, 255, 0.80),
+    /* 浅色液态晶体分光折射 */
     inset 0 1.5px 2px 0 #ffffff,
-    inset 0 0 0 1px rgba(255, 255, 255, 0.35),
-    0 10px 30px -4px rgba(100, 116, 139, 0.08) !important;
+    inset 1px 0 2px 0 rgba(56, 189, 248, 0.25),
+    inset -1px -1.5px 2px 0 rgba(236, 72, 153, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.40),
+    0 12px 32px -4px rgba(100, 116, 139, 0.10) !important;
 }
 
-/* 卡片顶沿霓虹流光彩虹条 */
+/* 🍎 液态流光彩虹条 (Liquid Fluid Wave) */
+@keyframes liquidGlassGlowFlow {
+  0% {
+    background-position: 0% 50%;
+    filter: brightness(1) saturate(160%);
+  }
+  50% {
+    background-position: 100% 50%;
+    filter: brightness(1.2) saturate(190%);
+  }
+  100% {
+    background-position: 0% 50%;
+    filter: brightness(1) saturate(160%);
+  }
+}
+
 .layout.has-custom-bg .node-card::before,
 .layout.has-custom-bg .monitor-stat-card::before,
 .layout.has-custom-bg .website-monitor-card::before {
@@ -6305,38 +6329,45 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel {
   left: 0 !important;
   right: 0 !important;
   height: 2.5px !important;
-  background: linear-gradient(90deg, transparent, #38bdf8, #8b5cf6, #ec4899, #f59e0b, transparent) !important;
+  background: linear-gradient(90deg, transparent, #38bdf8 25%, #8b5cf6 50%, #ec4899 75%, transparent) !important;
+  background-size: 200% 100% !important;
+  animation: liquidGlassGlowFlow 8s ease-in-out infinite alternate !important;
   opacity: 1 !important;
   box-shadow: 0 0 14px rgba(139, 92, 246, 0.9), 0 0 5px #38bdf8 !important;
   z-index: 2 !important;
   pointer-events: none !important;
 }
 
-/* 🍎 卡片悬停微浮动与切角高光线爆发 */
+/* 🍎 卡片悬停微浮动与透镜激发高光爆发 */
 .layout.has-custom-bg .node-card:hover,
 .layout.has-custom-bg .monitor-stat-card:hover,
 .layout.has-custom-bg .website-monitor-card:hover {
-  transform: translateY(-4px) scale(1.005) !important;
+  transform: translateY(-4px) scale(1.006) !important;
 }
 
 .dark .layout.has-custom-bg .node-card:hover,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .node-card:hover {
-  border-color: rgba(255, 255, 255, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.65) !important;
   box-shadow: 
-    0 0 0 1px rgba(0, 0, 0, 0.45),
-    inset 0 2px 2px 0 #ffffff,
-    inset 0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 0 0 1px rgba(0, 0, 0, 0.50),
+    inset 0 2px 2.5px 0 #ffffff,
+    inset 1.5px 0 3px 0 rgba(56, 189, 248, 0.45),
+    inset -1.5px -2px 3.5px 0 rgba(192, 132, 252, 0.40),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.40),
     0 24px 64px -6px rgba(0, 0, 0, 0.8),
-    0 0 30px rgba(139, 92, 246, 0.4) !important;
+    0 0 32px rgba(139, 92, 246, 0.45) !important;
 }
 
 :root:not(.dark) .layout.has-custom-bg .node-card:hover {
-  border-color: #fff !important;
+  border-color: #ffffff !important;
   box-shadow: 
-    0 0 0 1px rgba(255, 255, 255, 0.9),
-    inset 0 2.5px 2px 0 #fff,
-    inset 0 0 0 1px rgba(255, 255, 255, 0.8),
-    0 16px 36px -4px rgba(100, 116, 139, 0.12) !important;
+    0 0 0 1px rgba(255, 255, 255, 0.95),
+    inset 0 2.5px 2px 0 #ffffff,
+    inset 1.5px 0 2.5px 0 rgba(56, 189, 248, 0.35),
+    inset -1.5px -2px 2.5px 0 rgba(236, 72, 153, 0.25),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.85),
+    0 16px 38px -4px rgba(100, 116, 139, 0.15),
+    0 0 24px rgba(56, 189, 248, 0.25) !important;
 }
 
 /* 进度条与指标霓虹发光 */
