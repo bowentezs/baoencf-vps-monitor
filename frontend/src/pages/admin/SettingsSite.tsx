@@ -285,6 +285,57 @@ export default function SettingsSite() {
         />
       </SettingCard>
 
+      <SettingCard title="外观与背景壁纸" description="前台桌面端与移动端背景图，支持外链或内置星空预设" defaultOpen>
+        <SettingInput
+          label="桌面端背景图 URL"
+          description="用于 PC 和宽屏设备。支持 HTTPS 外链或站内相对路径（如 /images/gloria/dark-bg.webp）"
+          value={settings.theme_bg_desktop || ''}
+          onChange={(value) => updateSetting('theme_bg_desktop', value)}
+          placeholder="https://... 或 /images/gloria/dark-bg.webp"
+        />
+        <SettingInput
+          label="移动端背景图 URL"
+          description="用于手机竖屏（≤768px），留空则自适应跟随桌面端壁纸"
+          value={settings.theme_bg_mobile || ''}
+          onChange={(value) => updateSetting('theme_bg_mobile', value)}
+          placeholder="可选，留空跟随桌面端"
+        />
+        <SettingInput
+          label="内容区宽度 (%)"
+          description="前台主面板宽度比例，范围 60 到 100，默认 100"
+          value={settings.theme_content_width || '100'}
+          onChange={(value) => updateSetting('theme_content_width', value)}
+          placeholder="100"
+        />
+        <Flex gap="2" wrap="wrap" mt="1">
+          <Button
+            size="2"
+            variant="soft"
+            type="button"
+            onClick={() => {
+              updateSetting('theme_bg_desktop', '/images/gloria/dark-bg.webp');
+              updateSetting('theme_bg_mobile', '/images/gloria/dark-bg.webp');
+              toast.success('已填入 Gloria 极光星空壁纸预设，点击右上角保存即可生效');
+            }}
+          >
+            一键填入 Gloria 极光星空预设
+          </Button>
+          <Button
+            size="2"
+            variant="soft"
+            color="gray"
+            type="button"
+            onClick={() => {
+              updateSetting('theme_bg_desktop', '');
+              updateSetting('theme_bg_mobile', '');
+              toast.info('已清空背景图配置，保存后将恢复默认');
+            }}
+          >
+            清空背景图
+          </Button>
+        </Flex>
+      </SettingCard>
+
       <SettingCard title="备份与恢复" description="导出或导入系统配置" defaultOpen>
         <Flex direction="column" gap="3">
           <Box style={{ border: '1px solid var(--amber-6)', background: 'var(--amber-2)', borderRadius: 8, padding: 12 }}>

@@ -405,6 +405,26 @@ function normalizeSiteLogoUrl(value: unknown): string | null {
   return /^\/api\/site-logo(?:\?v=\d+)?$/.test(raw) ? raw : null;
 }
 
+function normalizeBackgroundUrl(value: unknown): string | null {
+  if (value === '' || value === null || value === undefined) return '';
+  if (typeof value !== 'string') return null;
+  const raw = value.trim();
+  if (!raw || raw.length > 1024 || /[\x00-\x1f\x7f\r\n]/.test(raw)) return null;
+  if (raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('\\')) {
+    return raw;
+  }
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocalHttpHost(url.hostname))) {
+      return null;
+    }
+    if (!url.hostname || url.username || url.password) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function normalizeUpdateRepositoryUrl(value: unknown): string | null {
   if (value === '' || value === null || value === undefined) return '';
   if (typeof value !== 'string') return null;
@@ -527,6 +547,7 @@ export function normalizeSettingValue(
       else if (key === 'webhook_url') normalized = normalizeWebhookUrl(value);
       else if (key === 'webhook_content_type') normalized = normalizeWebhookContentType(value);
       else if (key === 'webhook_headers_json') normalized = normalizeWebhookHeadersJson(value);
+      else if (key === 'theme_bg_desktop' || key === 'theme_bg_mobile') normalized = normalizeBackgroundUrl(value);
       else if (key === 'active_theme') {
         const text = settingToString(value)?.trim() || SETTING_SCHEMA.active_theme.defaultValue;
         const activeTheme = text === 'default' ? 'monitor' : text;

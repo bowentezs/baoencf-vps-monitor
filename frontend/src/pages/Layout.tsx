@@ -107,7 +107,7 @@ export default function Layout() {
   const nextDisplayTheme = displayTheme === "monitor" ? "next" : "monitor";
   const nextThemeLabel =
     theme === "light" ? "切换成深色模式" : theme === "dark" ? "切换成跟随系统" : "切换成浅色模式";
-  const bgUrl = bgUrlDesktop || bgUrlMobile;
+  const hasCustomBg = Boolean(bgUrlDesktop || bgUrlMobile);
   const contentWidth = mainContentWidth >= 100 ? "100%" : `${mainContentWidth}vw`;
   const monitorMode = new URLSearchParams(location.search).get("view") === "websites" ? "websites" : "servers";
   const setMonitorMode = (value: string) => {
@@ -117,10 +117,16 @@ export default function Layout() {
     navigate({ pathname: "/", search: params.toString() ? `?${params}` : "" });
   };
 
+  const layoutStyle: React.CSSProperties & Record<string, string | undefined> = {
+    backgroundColor: hasCustomBg ? "#050816" : "var(--accent-1)",
+    ...(bgUrlDesktop ? { "--bg-desktop": `url(${JSON.stringify(bgUrlDesktop)})` } : {}),
+    ...(bgUrlMobile ? { "--bg-mobile": `url(${JSON.stringify(bgUrlMobile)})` } : {}),
+  };
+
   return (
     <div
-      className={bgUrl ? "layout bg-cover bg-center bg-fixed bg-no-repeat" : "layout"}
-      style={{ backgroundImage: bgUrl ? `url(${JSON.stringify(bgUrl)})` : "none", backgroundColor: bgUrl ? "transparent" : "var(--accent-1)" }}
+      className={hasCustomBg ? "layout has-custom-bg" : "layout"}
+      style={layoutStyle}
     >
       <main
         className="main-content h-full"

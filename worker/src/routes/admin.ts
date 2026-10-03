@@ -123,6 +123,9 @@ const SETTINGS_SCOPE_KEYS = {
     'language',
     'script_domain',
     'site_logo_url',
+    'theme_bg_desktop',
+    'theme_bg_mobile',
+    'theme_content_width',
   ],
   general: [
     'record_enabled',
