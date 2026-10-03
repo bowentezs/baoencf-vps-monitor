@@ -439,11 +439,11 @@ export default function SettingsSite() {
                   ? `linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(12, 16, 28, ${(Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100) * 0.75 + 0.05})`
                   : `linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.50) 100%), rgba(255, 255, 255, ${Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100})`,
                 border: previewDark
-                  ? '1px solid rgba(255, 255, 255, 0.22)'
-                  : '1px solid rgba(255, 255, 255, 0.90)',
+                  ? '1.5px solid rgba(255, 255, 255, 0.30)'
+                  : '1.5px solid rgba(255, 255, 255, 0.95)',
                 boxShadow: previewDark
-                  ? 'inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.10), 0 20px 48px -8px rgba(0, 0, 0, 0.65)'
-                  : 'inset 0 1.5px 1.5px 0 #ffffff, inset 0 0 0 1px rgba(255, 255, 255, 0.45), 0 16px 36px -6px rgba(91, 33, 182, 0.12)',
+                  ? '0 0 0 1px rgba(0, 0, 0, 0.35), inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 20px 48px -6px rgba(0, 0, 0, 0.65)'
+                  : '0 0 0 1px rgba(0, 0, 0, 0.12), inset 0 2px 2px 0 #ffffff, inset 0 0 0 1px rgba(255, 255, 255, 0.55), 0 16px 36px -6px rgba(0, 0, 0, 0.15)',
                 color: previewDark ? '#f8fafc' : '#0f172a',
                 padding: '16px 18px',
                 transition: 'backdrop-filter 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease',

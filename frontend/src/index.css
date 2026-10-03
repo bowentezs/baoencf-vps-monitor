@@ -6139,17 +6139,33 @@ html[data-monitor-theme='next'] .node-network-value strong {
 
 
 /* ========================================================
- * GLORIA AURORA 主题视觉增强 (苹果级液态晶体毛玻璃 · 物理切角双层高光)
+ * GLORIA AURORA 主题视觉增强 (苹果级高反差双层晶体毛玻璃 · 物理切角反光)
  * 作用域严格限定在 .layout 内，绝对不污染后台管理面板
  * ======================================================== */
 
 .layout.has-custom-bg {
+  position: relative;
   background-image: var(--bg-desktop, var(--bg-mobile, none));
   background-position: center center;
   background-repeat: no-repeat;
   background-size: cover;
   background-attachment: fixed;
   background-color: #050816 !important;
+}
+
+/* 🍎 防眩光环境暗角层：确保高光/浅白壁纸下毛玻璃与卡片轮廓依然刀削般清晰 */
+.layout.has-custom-bg::before {
+  content: "" !important;
+  position: fixed !important;
+  inset: 0 !important;
+  background: radial-gradient(circle at 50% 30%, rgba(5, 8, 22, 0.22), rgba(5, 8, 22, 0.50)) !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+.layout.has-custom-bg > * {
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 @media (max-width: 768px) {
@@ -6161,22 +6177,22 @@ html[data-monitor-theme='next'] .node-network-value strong {
 
 /* 顶部导航栏毛玻璃融合 (苹果原生磨砂) */
 .layout .nav-bar {
-  backdrop-filter: blur(18px) saturate(190%) contrast(105%);
-  -webkit-backdrop-filter: blur(18px) saturate(190%) contrast(105%);
+  backdrop-filter: blur(20px) saturate(190%) contrast(105%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%) contrast(105%);
   transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 :root:not(.dark) .layout.has-custom-bg .nav-bar {
-  background: linear-gradient(105deg, rgba(255, 255, 255, 0.78), rgba(238, 250, 255, 0.72) 42%, rgba(251, 235, 255, 0.74)) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.45) !important;
-  box-shadow: 0 8px 28px rgba(91, 33, 182, 0.1) !important;
+  background: linear-gradient(105deg, rgba(255, 255, 255, 0.82), rgba(238, 250, 255, 0.76) 42%, rgba(251, 235, 255, 0.78)) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12) !important;
 }
 
 .dark .layout.has-custom-bg .nav-bar,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .nav-bar {
-  background: rgba(10, 14, 26, 0.70) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), inset 0 -1px 0 rgba(255, 255, 255, 0.08) !important;
+  background: rgba(10, 14, 26, 0.75) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 -1px 0 rgba(255, 255, 255, 0.12) !important;
 }
 
 /* 🍎 节点卡片与概览卡片毛玻璃拟态 (苹果液态晶体架构) */
@@ -6192,15 +6208,15 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .nav-bar {
   transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease !important;
 }
 
-/* 🍎 彻底打通卡片内部子容器的毛玻璃透光通道 (解决被实心灰底挡住的核心问题) */
+/* 🍎 彻底打通卡片内部子容器的毛玻璃透光通道 */
 .layout.has-custom-bg .node-card-system-line,
 .layout.has-custom-bg .node-metric-tile,
 .layout.has-custom-bg .node-network-panel,
 .layout.has-custom-bg .monitor-stat-tile,
 .layout.has-custom-bg .website-monitor-tile {
-  background: rgba(255, 255, 255, 0.04) !important;
-  border: 1px solid rgba(255, 255, 255, 0.09) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
   backdrop-filter: blur(6px) !important;
   -webkit-backdrop-filter: blur(6px) !important;
 }
@@ -6210,12 +6226,12 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .nav-bar {
 :root:not(.dark) .layout.has-custom-bg .node-network-panel,
 :root:not(.dark) .layout.has-custom-bg .monitor-stat-tile,
 :root:not(.dark) .layout.has-custom-bg .website-monitor-tile {
-  background: rgba(255, 255, 255, 0.45) !important;
-  border: 1px solid rgba(255, 255, 255, 0.65) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85) !important;
+  background: rgba(255, 255, 255, 0.55) !important;
+  border: 1px solid rgba(255, 255, 255, 0.75) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
 }
 
-/* 🍎 苹果级深色液态晶体边框 (物理切角内高光反光 + 悬浮深邃阴影) */
+/* 🍎 苹果级深色液态晶体边框 (高反差外轮廓环 + 物理切角反光 + 悬浮深影) */
 .dark .layout.has-custom-bg .node-card,
 .dark .layout.has-custom-bg .monitor-stat-card,
 .dark .layout.has-custom-bg .monitor-overview,
@@ -6225,15 +6241,16 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .monitor-stat-card,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .monitor-overview,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-card {
   background: 
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%),
-    radial-gradient(circle at 8% 8%, rgba(139, 92, 246, 0.16), transparent 35%),
-    radial-gradient(circle at 92% 92%, rgba(56, 189, 248, 0.12), transparent 35%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 100%),
+    radial-gradient(circle at 8% 8%, rgba(139, 92, 246, 0.18), transparent 35%),
+    radial-gradient(circle at 92% 92%, rgba(56, 189, 248, 0.14), transparent 35%),
     rgba(12, 16, 28, calc(var(--glass-opacity, 0.70) * 0.75 + 0.05)) !important;
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.30) !important;
   box-shadow: 
-    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.55),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
-    0 20px 48px -8px rgba(0, 0, 0, 0.65) !important;
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.85),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.15),
+    0 20px 48px -6px rgba(0, 0, 0, 0.65) !important;
 }
 
 /* 🍎 苹果级浅色通透晶体边框 */
@@ -6242,16 +6259,17 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-card {
 :root:not(.dark) .layout.has-custom-bg .monitor-overview,
 :root:not(.dark) .layout.has-custom-bg .website-monitor-card {
   background: 
-    linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.50) 100%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.60) 100%),
     rgba(255, 255, 255, var(--glass-opacity, 0.65)) !important;
-  border: 1px solid rgba(255, 255, 255, 0.90) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.95) !important;
   box-shadow: 
-    inset 0 1.5px 1.5px 0 #ffffff,
-    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
-    0 16px 36px -6px rgba(91, 33, 182, 0.12) !important;
+    0 0 0 1px rgba(0, 0, 0, 0.12),
+    inset 0 2px 2px 0 #ffffff,
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 16px 36px -6px rgba(0, 0, 0, 0.15) !important;
 }
 
-/* 卡片顶沿霓虹流光彩虹条 (增强光晕) */
+/* 卡片顶沿霓虹流光彩虹条 */
 .layout.has-custom-bg .node-card::before,
 .layout.has-custom-bg .monitor-stat-card::before,
 .layout.has-custom-bg .website-monitor-card::before {
@@ -6261,10 +6279,10 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-card {
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  height: 2px !important;
+  height: 2.5px !important;
   background: linear-gradient(90deg, transparent, #38bdf8, #8b5cf6, #ec4899, #f59e0b, transparent) !important;
-  opacity: 0.95 !important;
-  box-shadow: 0 0 12px rgba(139, 92, 246, 0.85), 0 0 4px #38bdf8 !important;
+  opacity: 1 !important;
+  box-shadow: 0 0 14px rgba(139, 92, 246, 0.9), 0 0 5px #38bdf8 !important;
   z-index: 2 !important;
   pointer-events: none !important;
 }
@@ -6273,25 +6291,27 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-card {
 .layout.has-custom-bg .node-card:hover,
 .layout.has-custom-bg .monitor-stat-card:hover,
 .layout.has-custom-bg .website-monitor-card:hover {
-  transform: translateY(-3px) scale(1.004) !important;
+  transform: translateY(-4px) scale(1.005) !important;
 }
 
 .dark .layout.has-custom-bg .node-card:hover,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .node-card:hover {
-  border-color: rgba(255, 255, 255, 0.45) !important;
+  border-color: rgba(255, 255, 255, 0.6) !important;
   box-shadow: 
-    inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.85),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.25),
-    0 24px 60px -6px rgba(0, 0, 0, 0.75),
-    0 0 25px rgba(139, 92, 246, 0.3) !important;
+    0 0 0 1px rgba(0, 0, 0, 0.45),
+    inset 0 2px 2px 0 #ffffff,
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 24px 64px -6px rgba(0, 0, 0, 0.8),
+    0 0 30px rgba(139, 92, 246, 0.4) !important;
 }
 
 :root:not(.dark) .layout.has-custom-bg .node-card:hover {
   border-color: #fff !important;
   box-shadow: 
-    inset 0 2px 1.5px 0 #fff,
-    inset 0 0 0 1px rgba(255, 255, 255, 0.65),
-    0 24px 50px -6px rgba(109, 53, 199, 0.18) !important;
+    0 0 0 1px rgba(0, 0, 0, 0.16),
+    inset 0 2.5px 2px 0 #fff,
+    inset 0 0 0 1px rgba(255, 255, 255, 0.8),
+    0 24px 50px -6px rgba(109, 53, 199, 0.22) !important;
 }
 
 /* 进度条与指标霓虹发光 */
