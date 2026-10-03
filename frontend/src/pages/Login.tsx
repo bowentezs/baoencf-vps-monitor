@@ -325,7 +325,18 @@ export default function Login() {
           </form>
         )}
         {recoveryMode && (
-          <form onSubmit={handleRecoverySubmit}>
+          <form
+            onSubmit={handleRecoverySubmit}
+            onInput={(e) => {
+              const target = e.target as HTMLInputElement;
+              if (target.name === 'new-password' || target.id === 'recovery-password') {
+                setRecoveryPassword(target.value);
+              }
+              if (target.name === 'username' || target.id === 'recovery-username') {
+                setRecoveryUsername(target.value);
+              }
+            }}
+          >
             <Flex direction="column" gap="4">
               {(needsSecretKey || recoveryStatus?.admin_present === false) && <label htmlFor="recovery-secret-key">
                 <Text size="2" weight="bold" style={{ marginBottom: 6, display: 'inline-block' }}>
@@ -338,6 +349,7 @@ export default function Login() {
                   placeholder={needsSecretKey ? '请输入 Supabase Secret key' : '请输入部署时设置的初始化密钥'}
                   value={recoveryKey}
                   onChange={(e) => setRecoveryKey(e.target.value)}
+                  onInput={(e) => setRecoveryKey((e.target as HTMLInputElement).value)}
                   autoComplete="off"
                   autoFocus
                   style={{ width: '100%' }}
@@ -350,10 +362,12 @@ export default function Login() {
                 </Text>
                 <TextField.Root
                   id="recovery-username"
+                  name="username"
                   size="3"
                   placeholder="请输入新用户名"
                   value={recoveryUsername}
                   onChange={(e) => setRecoveryUsername(e.target.value)}
+                  onInput={(e) => setRecoveryUsername((e.target as HTMLInputElement).value)}
                   autoComplete="username"
                   autoFocus={!needsSecretKey}
                   style={{ width: '100%' }}
@@ -367,11 +381,13 @@ export default function Login() {
                 <div style={{ position: 'relative' }}>
                   <TextField.Root
                     id="recovery-password"
+                    name="new-password"
                     size="3"
                     type={showRecoveryPassword ? 'text' : 'password'}
                     placeholder="请输入新密码"
                     value={recoveryPassword}
                     onChange={(e) => setRecoveryPassword(e.target.value)}
+                    onInput={(e) => setRecoveryPassword((e.target as HTMLInputElement).value)}
                     autoComplete="new-password"
                     style={{ width: '100%', paddingRight: 40 }}
                   />

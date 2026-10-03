@@ -252,12 +252,71 @@ export default function AdminAccount() {
       {activeTab === 'password' && (
         <Card className="admin-account-card">
           <Heading size="3" mb="3">更改密码</Heading>
-          <Flex direction="column" gap="3">
-            <label><Text size="2" weight="bold">旧密码</Text><TextField.Root className="admin-account-input" type="password" value={oldPassword} autoComplete="current-password" onChange={e => setOldPassword(e.target.value)} /></label>
-            <label><Text size="2" weight="bold">新密码</Text><TextField.Root className="admin-account-input" type="password" value={newPassword} autoComplete="new-password" onChange={e => setNewPassword(e.target.value)} /></label>
-            <label><Text size="2" weight="bold">确认新密码</Text><TextField.Root className="admin-account-input" type="password" value={confirmPassword} autoComplete="new-password" onChange={e => setConfirmPassword(e.target.value)} /></label>
-            <Button onClick={handleChangePassword} disabled={saving}><Save size={16} />{saving ? '保存中...' : '修改密码'}</Button>
-          </Flex>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleChangePassword();
+            }}
+            onInput={(e) => {
+              const target = e.target as HTMLInputElement;
+              if (target.name === 'current-password') setOldPassword(target.value);
+              if (target.name === 'new-password') setNewPassword(target.value);
+              if (target.name === 'confirm-password') setConfirmPassword(target.value);
+            }}
+          >
+            {/* 隐藏的 username 字段，供 Chrome/Edge 密码管理器关联账户 */}
+            <input
+              type="text"
+              name="username"
+              autoComplete="username"
+              value={user?.username || ''}
+              readOnly
+              style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none', border: 'none' }}
+              tabIndex={-1}
+              aria-hidden="true"
+            />
+            <Flex direction="column" gap="3">
+              <label>
+                <Text size="2" weight="bold">旧密码</Text>
+                <TextField.Root
+                  className="admin-account-input"
+                  name="current-password"
+                  type="password"
+                  value={oldPassword}
+                  autoComplete="current-password"
+                  onChange={e => setOldPassword(e.target.value)}
+                  onInput={e => setOldPassword((e.target as HTMLInputElement).value)}
+                />
+              </label>
+              <label>
+                <Text size="2" weight="bold">新密码</Text>
+                <TextField.Root
+                  className="admin-account-input"
+                  name="new-password"
+                  type="password"
+                  value={newPassword}
+                  autoComplete="new-password"
+                  onChange={e => setNewPassword(e.target.value)}
+                  onInput={e => setNewPassword((e.target as HTMLInputElement).value)}
+                />
+              </label>
+              <label>
+                <Text size="2" weight="bold">确认新密码</Text>
+                <TextField.Root
+                  className="admin-account-input"
+                  name="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  autoComplete="new-password"
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  onInput={e => setConfirmPassword((e.target as HTMLInputElement).value)}
+                />
+              </label>
+              <Button type="submit" disabled={saving}>
+                <Save size={16} />{saving ? '保存中...' : '修改密码'}
+              </Button>
+            </Flex>
+          </form>
         </Card>
       )}
 
