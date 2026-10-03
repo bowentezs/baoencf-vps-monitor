@@ -397,21 +397,23 @@ export default function SettingsSite() {
         >
           {/* 背景图层 */}
           {(() => {
-            const isCustom = Boolean(settings.theme_bg_desktop);
-            const bgUrl = previewDark
-              ? (safeBackgroundUrl(settings.theme_bg_desktop) || '/images/gloria/dark-bg.webp')
-              : (isCustom ? safeBackgroundUrl(settings.theme_bg_desktop) : '/images/gloria/light-bg.png');
+            const rawBg = safeBackgroundUrl(settings.theme_bg_desktop) || safeBackgroundUrl(settings.theme_bg_mobile) || '';
+            const hasCustomBg = Boolean(rawBg);
+            const bgUrl = hasCustomBg
+              ? (!previewDark && rawBg === '/images/gloria/dark-bg.webp' ? '/images/gloria/light-bg.png' : rawBg)
+              : '';
             return (
               <div
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  backgroundImage: `url(${JSON.stringify(bgUrl)})`,
+                  backgroundColor: previewDark ? '#0b0f19' : '#f1f5f9',
+                  backgroundImage: bgUrl ? `url(${JSON.stringify(bgUrl)})` : 'none',
                   backgroundPosition: 'center center',
                   backgroundSize: 'cover',
                   backgroundRepeat: 'no-repeat',
                   filter: previewDark ? 'brightness(0.95)' : 'brightness(1.05)',
-                  transition: 'background-image 0.25s ease',
+                  transition: 'background-image 0.25s ease, background-color 0.25s ease',
                 }}
               />
             );
@@ -436,6 +438,11 @@ export default function SettingsSite() {
               <span style={{ fontSize: 11, color: '#94a3b8', background: 'rgba(255,255,255,0.12)', padding: '1px 6px', borderRadius: 4 }}>
                 {previewDark ? '深色模式' : '浅色模式'}
               </span>
+              {!safeBackgroundUrl(settings.theme_bg_desktop) && !safeBackgroundUrl(settings.theme_bg_mobile) && (
+                <span style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.18)', border: '1px solid rgba(245,158,11,0.3)', padding: '1px 6px', borderRadius: 4 }}>
+                  无背景图（前台展示系统纯色）
+                </span>
+              )}
             </Flex>
             <Button
               size="1"
@@ -451,6 +458,8 @@ export default function SettingsSite() {
           {/* 沙盒卡片展示区 */}
           <div style={{ position: 'relative', zIndex: 1, padding: '20px 16px' }}>
             {(() => {
+              const rawBg = safeBackgroundUrl(settings.theme_bg_desktop) || safeBackgroundUrl(settings.theme_bg_mobile) || '';
+              const hasCustomBg = Boolean(rawBg);
               const cardOpacityNum = Math.min(100, Math.max(10, Number(settings.theme_card_opacity || 70))) / 100;
               const cardBlurNum = Math.min(60, Math.max(0, Number(settings.theme_card_blur ?? 16)));
               const blurProgress = cardBlurNum / 60;
@@ -462,25 +471,31 @@ export default function SettingsSite() {
                     position: 'relative',
                     borderRadius: 16,
                     overflow: 'hidden',
-                    backdropFilter: `blur(${cardBlurNum}px) saturate(${glassSaturate}%) contrast(${glassContrast}%)`,
-                    WebkitBackdropFilter: `blur(${cardBlurNum}px) saturate(${glassSaturate}%) contrast(${glassContrast}%)`,
-                    backgroundColor: previewDark ? `rgba(12, 16, 28, ${cardOpacityNum})` : `rgba(255, 255, 255, ${cardOpacityNum})`,
-                    backgroundImage: previewDark
-                      ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), radial-gradient(circle at 10% 10%, rgba(139, 92, 246, 0.22), transparent 45%), radial-gradient(circle at 90% 90%, rgba(56, 189, 248, 0.18), transparent 45%)'
-                      : 'linear-gradient(135deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.03) 100%), radial-gradient(circle at 15% 15%, rgba(224, 242, 254, 0.35), transparent 50%), radial-gradient(circle at 85% 85%, rgba(250, 232, 255, 0.30), transparent 50%)',
-                    border: previewDark
-                      ? '1.5px solid rgba(255, 255, 255, 0.32)'
-                      : '1.5px solid rgba(255, 255, 255, 0.85)',
-                    boxShadow: previewDark
-                      ? '0 0 0 1px rgba(0, 0, 0, 0.40), inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.90), inset 1px 0 2px 0 rgba(56, 189, 248, 0.32), inset -1px -1.5px 2.5px 0 rgba(192, 132, 252, 0.26), inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 20px 48px -6px rgba(0, 0, 0, 0.65)'
-                      : '0 0 0 1px rgba(255, 255, 255, 0.80), inset 0 1.5px 2px 0 #ffffff, inset 1px 0 2px 0 rgba(56, 189, 248, 0.25), inset -1px -1.5px 2px 0 rgba(236, 72, 153, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.40), 0 12px 32px -4px rgba(100, 116, 139, 0.10)',
+                    backdropFilter: hasCustomBg ? `blur(${cardBlurNum}px) saturate(${glassSaturate}%) contrast(${glassContrast}%)` : 'none',
+                    WebkitBackdropFilter: hasCustomBg ? `blur(${cardBlurNum}px) saturate(${glassSaturate}%) contrast(${glassContrast}%)` : 'none',
+                    backgroundColor: hasCustomBg
+                      ? (previewDark ? `rgba(12, 16, 28, ${cardOpacityNum})` : `rgba(255, 255, 255, ${cardOpacityNum})`)
+                      : (previewDark ? '#111827' : '#ffffff'),
+                    backgroundImage: hasCustomBg
+                      ? (previewDark
+                          ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), radial-gradient(circle at 10% 10%, rgba(139, 92, 246, 0.22), transparent 45%), radial-gradient(circle at 90% 90%, rgba(56, 189, 248, 0.18), transparent 45%)'
+                          : 'linear-gradient(135deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.03) 100%), radial-gradient(circle at 15% 15%, rgba(224, 242, 254, 0.35), transparent 50%), radial-gradient(circle at 85% 85%, rgba(250, 232, 255, 0.30), transparent 50%)')
+                      : 'none',
+                    border: hasCustomBg
+                      ? (previewDark ? '1.5px solid rgba(255, 255, 255, 0.32)' : '1.5px solid rgba(255, 255, 255, 0.85)')
+                      : (previewDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.08)'),
+                    boxShadow: hasCustomBg
+                      ? (previewDark
+                          ? '0 0 0 1px rgba(0, 0, 0, 0.40), inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.90), inset 1px 0 2px 0 rgba(56, 189, 248, 0.32), inset -1px -1.5px 2.5px 0 rgba(192, 132, 252, 0.26), inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 20px 48px -6px rgba(0, 0, 0, 0.65)'
+                          : '0 0 0 1px rgba(255, 255, 255, 0.80), inset 0 1.5px 2px 0 #ffffff, inset 1px 0 2px 0 rgba(56, 189, 248, 0.25), inset -1px -1.5px 2px 0 rgba(236, 72, 153, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.40), 0 12px 32px -4px rgba(100, 116, 139, 0.10)')
+                      : (previewDark ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 4px 20px rgba(0, 0, 0, 0.06)'),
                     color: previewDark ? '#f8fafc' : '#0f172a',
                     padding: '16px 18px',
                     transition: 'backdrop-filter 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease',
                   }}
                 >
-                  {/* 顶沿流光彩虹条 */}
-                  {settings.theme_card_glow !== 'false' && (
+                  {/* 顶沿流光彩虹条 (仅在启用背景壁纸时展示) */}
+                  {hasCustomBg && settings.theme_card_glow !== 'false' && (
                     <div
                       style={{
                         position: 'absolute',
@@ -563,8 +578,17 @@ export default function SettingsSite() {
 
                   {/* 实时正交解耦状态提示 */}
                   <Flex justify="between" align="center" style={{ fontSize: 10, opacity: 0.7, marginTop: 8, paddingTop: 6, borderTop: previewDark ? '1px dashed rgba(255,255,255,0.12)' : '1px dashed rgba(0,0,0,0.1)' }}>
-                    <span>底色浓度: {Math.round(cardOpacityNum * 100)}% ({cardOpacityNum >= 0.85 ? '实心遮挡' : cardOpacityNum <= 0.25 ? '极薄透水膜' : '微晶半透'})</span>
-                    <span>背景模糊: {cardBlurNum}px ({cardBlurNum === 0 ? '原图高清' : cardBlurNum >= 28 ? '重度雾化' : '柔和磨砂'})</span>
+                    {hasCustomBg ? (
+                      <>
+                        <span>底色浓度: {Math.round(cardOpacityNum * 100)}% ({cardOpacityNum >= 0.85 ? '实心遮挡' : cardOpacityNum <= 0.25 ? '极薄透水膜' : '微晶半透'})</span>
+                        <span>背景虚化: {cardBlurNum}px ({cardBlurNum === 0 ? '原图高清' : cardBlurNum >= 28 ? '重度雾化' : '柔和磨砂'})</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>当前状态: 系统纯色默认卡片</span>
+                        <span>壁纸状态: 留空（未启用背景图层）</span>
+                      </>
+                    )}
                   </Flex>
                 </div>
               );
