@@ -343,7 +343,7 @@ export function sanitizeCustomCss(css: string): string {
   if (!css) return '';
   return css
     .replace(/@import\s+[^;]+;?/gi, '')
-    .replace(/url\s*\(\s*['"]?\s*(?:javascript|vbscript|data\s*:\s*text\/html):[^)]*\)/gi, '')
+    .replace(/url\s*\(\s*(['"]?)\s*(?:javascript|vbscript|data\s*:\s*text\/html):.*?\1\s*\)/gi, '')
     .replace(/expression\s*\([^)]*\)/gi, '')
     .replace(/behavior\s*:[^;]+;?/gi, '');
 }
