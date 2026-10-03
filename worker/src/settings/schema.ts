@@ -331,6 +331,25 @@ export const SETTING_SCHEMA = {
     min: 60,
     max: 100,
   },
+  theme_card_opacity: {
+    type: 'integer',
+    defaultValue: '70',
+    public: true,
+    min: 20,
+    max: 100,
+  },
+  theme_card_blur: {
+    type: 'integer',
+    defaultValue: '16',
+    public: true,
+    min: 0,
+    max: 40,
+  },
+  theme_card_glow: {
+    type: 'boolean',
+    defaultValue: 'true',
+    public: true,
+  },
   active_theme: {
     type: 'string',
     defaultValue: 'monitor',
@@ -621,6 +640,9 @@ export type PublicThemeSettings = {
   backgroundImageUrlDesktop: string;
   backgroundImageUrlMobile: string;
   mainContentWidth: number;
+  cardOpacity: number;
+  cardBlur: number;
+  cardGlow: boolean;
 };
 
 export type PublicSettings = Record<string, string | PublicThemeSettings> & {
@@ -640,6 +662,9 @@ export function buildPublicSettings(stored: Record<string, string>): PublicSetti
     backgroundImageUrlDesktop: adminSettings.theme_bg_desktop,
     backgroundImageUrlMobile: adminSettings.theme_bg_mobile,
     mainContentWidth: Number(adminSettings.theme_content_width),
+    cardOpacity: Number(adminSettings.theme_card_opacity),
+    cardBlur: Number(adminSettings.theme_card_blur),
+    cardGlow: adminSettings.theme_card_glow !== 'false',
   };
 
   return publicSettings as PublicSettings;

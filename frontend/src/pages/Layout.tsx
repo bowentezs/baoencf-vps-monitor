@@ -51,6 +51,9 @@ export default function Layout() {
   const [bgUrlDesktop, setBgUrlDesktop] = useState("");
   const [bgUrlMobile, setBgUrlMobile] = useState("");
   const [mainContentWidth, setMainContentWidth] = useState(100);
+  const [cardOpacity, setCardOpacity] = useState(70);
+  const [cardBlur, setCardBlur] = useState(16);
+  const [cardGlow, setCardGlow] = useState(true);
 
   useEffect(() => {
     const applyPublicSettings = () => {
@@ -71,6 +74,12 @@ export default function Layout() {
           setBgUrlMobile(safeBackgroundUrl(data.theme_settings.backgroundImageUrlMobile));
         if (data.theme_settings?.mainContentWidth)
           setMainContentWidth(data.theme_settings.mainContentWidth);
+        if (typeof data.theme_settings?.cardOpacity === "number")
+          setCardOpacity(data.theme_settings.cardOpacity);
+        if (typeof data.theme_settings?.cardBlur === "number")
+          setCardBlur(data.theme_settings.cardBlur);
+        if (typeof data.theme_settings?.cardGlow === "boolean")
+          setCardGlow(data.theme_settings.cardGlow);
         if (!hasLocalDisplayThemePreference()) {
           setDisplayThemeFromSettings(normalizeDisplayTheme(data.active_theme));
         }
@@ -121,6 +130,9 @@ export default function Layout() {
     backgroundColor: hasCustomBg ? "#050816" : "var(--accent-1)",
     ...(bgUrlDesktop ? { "--bg-desktop": `url(${JSON.stringify(bgUrlDesktop)})` } : {}),
     ...(bgUrlMobile ? { "--bg-mobile": `url(${JSON.stringify(bgUrlMobile)})` } : {}),
+    "--glass-opacity": (cardOpacity / 100).toFixed(2),
+    "--glass-blur": `${cardBlur}px`,
+    "--glass-glow-display": cardGlow ? "block" : "none",
   };
 
   return (

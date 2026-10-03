@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Box, Button, Flex, Text } from '@radix-ui/themes';
+import { Box, Button, Flex, Slider, Text } from '@radix-ui/themes';
 import { Download, RotateCcw, Save, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import Loading from '../../components/Loading';
 import { useApi } from '../../contexts/AuthContext';
-import { SettingCard, SettingInput } from '../../components/admin/SettingCard';
+import { SettingCard, SettingInput, SettingToggle } from '../../components/admin/SettingCard';
 import { getChangedSettings, type SettingsMap } from '../../utils/settingsDiff';
 import { requestPassword } from '../../utils/reauth';
 import { notifyPublicDataUpdated } from '../../utils/publicDataEvents';
@@ -307,6 +307,56 @@ export default function SettingsSite() {
           onChange={(value) => updateSetting('theme_content_width', value)}
           placeholder="100"
         />
+
+        <div style={{ marginBottom: 16 }}>
+          <Flex justify="between" align="center" style={{ marginBottom: 6, maxWidth: 420 }}>
+            <Text size="2" weight="medium">卡片透明度 ({settings.theme_card_opacity || '70'}%)</Text>
+            <Text size="1" color="gray">
+              {Number(settings.theme_card_opacity || 70) <= 30 ? '极高透光' : Number(settings.theme_card_opacity || 70) >= 85 ? '深邃高对比' : '标准极光'}
+            </Text>
+          </Flex>
+          <Slider
+            style={{ maxWidth: 420 }}
+            value={[Number(settings.theme_card_opacity || 70)]}
+            min={20}
+            max={100}
+            step={5}
+            onValueChange={(vals) => updateSetting('theme_card_opacity', String(vals[0]))}
+          />
+          <Text size="1" color="gray" style={{ display: 'block', marginTop: 4 }}>
+            范围 20% ~ 100%。数值越小越透光凸显背景，数值越大文字对比度越高
+          </Text>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <Flex justify="between" align="center" style={{ marginBottom: 6, maxWidth: 420 }}>
+            <Text size="2" weight="medium">毛玻璃磨砂度 ({settings.theme_card_blur || '16'}px)</Text>
+            <Text size="1" color="gray">
+              {Number(settings.theme_card_blur || 16) === 0 ? '纯透无模糊' : Number(settings.theme_card_blur || 16) >= 24 ? '重度磨砂' : '柔和磨砂'}
+            </Text>
+          </Flex>
+          <Slider
+            style={{ maxWidth: 420 }}
+            value={[Number(settings.theme_card_blur || 16)]}
+            min={0}
+            max={40}
+            step={2}
+            onValueChange={(vals) => updateSetting('theme_card_blur', String(vals[0]))}
+          />
+          <Text size="1" color="gray" style={{ display: 'block', marginTop: 4 }}>
+            范围 0px ~ 40px。0px 为晶莹纯透明，数值越大毛玻璃弥散磨砂感越强
+          </Text>
+        </div>
+
+        <div style={{ maxWidth: 420, marginBottom: 16 }}>
+          <SettingToggle
+            label="卡片顶沿流光彩虹条"
+            description="开启后在卡片顶部呈现 2px 极光流光霓虹线；关闭则为纯净极简边框"
+            checked={settings.theme_card_glow !== 'false'}
+            onCheckedChange={(checked) => updateSetting('theme_card_glow', String(checked))}
+          />
+        </div>
+
         <Flex gap="2" wrap="wrap" mt="1">
           <Button
             size="2"
@@ -315,7 +365,11 @@ export default function SettingsSite() {
             onClick={() => {
               updateSetting('theme_bg_desktop', '/images/gloria/dark-bg.webp');
               updateSetting('theme_bg_mobile', '/images/gloria/dark-bg.webp');
-              toast.success('已填入 Gloria 极光星空壁纸预设，点击右上角保存即可生效');
+              updateSetting('theme_content_width', '92');
+              updateSetting('theme_card_opacity', '70');
+              updateSetting('theme_card_blur', '16');
+              updateSetting('theme_card_glow', 'true');
+              toast.success('已填入 Gloria 极光星空与最佳毛玻璃预设，点击右上角保存即可生效');
             }}
           >
             一键填入 Gloria 极光星空预设
@@ -328,7 +382,11 @@ export default function SettingsSite() {
             onClick={() => {
               updateSetting('theme_bg_desktop', '');
               updateSetting('theme_bg_mobile', '');
-              toast.info('已清空背景图配置，保存后将恢复默认');
+              updateSetting('theme_content_width', '100');
+              updateSetting('theme_card_opacity', '70');
+              updateSetting('theme_card_blur', '16');
+              updateSetting('theme_card_glow', 'true');
+              toast.info('已恢复默认外观设置');
             }}
           >
             清空背景图

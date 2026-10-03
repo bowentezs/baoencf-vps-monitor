@@ -126,6 +126,9 @@ const SETTINGS_SCOPE_KEYS = {
     'theme_bg_desktop',
     'theme_bg_mobile',
     'theme_content_width',
+    'theme_card_opacity',
+    'theme_card_blur',
+    'theme_card_glow',
   ],
   general: [
     'record_enabled',

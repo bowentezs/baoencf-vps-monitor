@@ -6,6 +6,9 @@ export interface PublicThemeSettings {
   backgroundImageUrlDesktop: string;
   backgroundImageUrlMobile: string;
   mainContentWidth: number;
+  cardOpacity: number;
+  cardBlur: number;
+  cardGlow: boolean;
 }
 
 export interface PublicSettings {
@@ -39,6 +42,9 @@ const DEFAULT_PUBLIC_SETTINGS: PublicSettings = {
     backgroundImageUrlDesktop: '',
     backgroundImageUrlMobile: '',
     mainContentWidth: 100,
+    cardOpacity: 70,
+    cardBlur: 16,
+    cardGlow: true,
   },
 };
 
@@ -101,6 +107,9 @@ export function normalizePublicSettings(payload: unknown): PublicSettings | null
         1024,
       ),
       mainContentWidth: integerSetting(theme?.mainContentWidth, 100, 60, 100),
+      cardOpacity: integerSetting(theme?.cardOpacity, 70, 20, 100),
+      cardBlur: integerSetting(theme?.cardBlur, 16, 0, 40),
+      cardGlow: theme?.cardGlow !== false,
     },
   };
 }
