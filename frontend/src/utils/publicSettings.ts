@@ -107,7 +107,7 @@ export function normalizePublicSettings(payload: unknown): PublicSettings | null
         1024,
       ),
       mainContentWidth: integerSetting(theme?.mainContentWidth, 100, 60, 100),
-      cardOpacity: integerSetting(theme?.cardOpacity, 70, 20, 100),
+      cardOpacity: integerSetting(theme?.cardOpacity, 70, 10, 100),
       cardBlur: integerSetting(theme?.cardBlur, 16, 0, 60),
       cardGlow: theme?.cardGlow !== false,
     },

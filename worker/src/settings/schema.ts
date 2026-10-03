@@ -335,7 +335,7 @@ export const SETTING_SCHEMA = {
     type: 'integer',
     defaultValue: '70',
     public: true,
-    min: 20,
+    min: 10,
     max: 100,
   },
   theme_card_blur: {

@@ -6226,7 +6226,7 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .nav-bar {
   transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease !important;
 }
 
-/* 🍎 彻底打通卡片内部子容器的毛玻璃透光通道 (深色模式：彻底镂空，100% 释放背景) */
+/* 🍎 彻底打通卡片内部子容器的毛玻璃透光通道 (深色模式) */
 .dark .layout.has-custom-bg .node-card-system-line,
 .dark .layout.has-custom-bg .node-metric-tile,
 .dark .layout.has-custom-bg .node-network-panel,
@@ -6237,23 +6237,23 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-metric-tile,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .node-network-panel,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .monitor-stat-tile,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-tile {
-  background: rgba(255, 255, 255, 0.03) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 }
 
-/* 🍎 彻底打通卡片内部子容器的毛玻璃透光通道 (浅色模式：彻底镂空微晶，绝不遮挡磨砂背景) */
+/* 🍎 彻底打通卡片内部子容器的毛玻璃透光通道 (浅色模式：半透明微晶，绝不遮挡底层磨砂) */
 :root:not(.dark) .layout.has-custom-bg .node-card-system-line,
 :root:not(.dark) .layout.has-custom-bg .node-metric-tile,
 :root:not(.dark) .layout.has-custom-bg .node-network-panel,
 :root:not(.dark) .layout.has-custom-bg .monitor-stat-tile,
 :root:not(.dark) .layout.has-custom-bg .website-monitor-tile {
-  background: rgba(255, 255, 255, 0.08) !important;
-  border: 1px solid rgba(255, 255, 255, 0.45) !important;
-  box-shadow: inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.7), 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+  background: rgba(255, 255, 255, 0.35) !important;
+  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  box-shadow: inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.8), 0 2px 8px rgba(0, 0, 0, 0.03) !important;
 }
 
-/* 🍎 苹果级深色液态晶体边框 (高反差外轮廓环 + 物理切角反光 + 悬浮深影) */
+/* 🍎 苹果级深色液态晶体边框 (透明度纯粹掌控底色浓淡，磨砂度纯粹掌控背景虚化) */
 .dark .layout.has-custom-bg .node-card,
 .dark .layout.has-custom-bg .monitor-stat-card,
 .dark .layout.has-custom-bg .monitor-overview,
@@ -6264,11 +6264,11 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .monitor-stat-card,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .monitor-overview,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-card,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel {
-  background: 
+  background-color: rgba(12, 16, 28, var(--glass-opacity, 0.70)) !important;
+  background-image: 
     linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%),
-    radial-gradient(circle at 8% 8%, rgba(139, 92, 246, 0.22), transparent 40%),
-    radial-gradient(circle at 92% 92%, rgba(56, 189, 248, 0.16), transparent 40%),
-    rgba(12, 16, 28, calc(var(--glass-opacity, 0.70) * (0.35 + var(--glass-sheen, 0.4) * 0.45))) !important;
+    radial-gradient(circle at 8% 8%, rgba(139, 92, 246, 0.20), transparent 40%),
+    radial-gradient(circle at 92% 92%, rgba(56, 189, 248, 0.15), transparent 40%) !important;
   border: 1.5px solid rgba(255, 255, 255, 0.30) !important;
   box-shadow: 
     0 0 0 1px rgba(0, 0, 0, 0.35),
@@ -6277,20 +6277,16 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel {
     0 20px 48px -6px rgba(0, 0, 0, 0.65) !important;
 }
 
-/* 🍎 苹果级浅色通透晶体边框 (白底浓度与磨砂度物理联动：0px 极致纯透，高 blur 温润漫射，磨砂效果一眼即辨) */
+/* 🍎 苹果级浅色通透晶体边框 (透明度纯粹掌控底色浓淡，磨砂度纯粹掌控背景虚化) */
 :root:not(.dark) .layout.has-custom-bg .node-card,
 :root:not(.dark) .layout.has-custom-bg .monitor-stat-card,
 :root:not(.dark) .layout.has-custom-bg .monitor-overview,
 :root:not(.dark) .layout.has-custom-bg .website-monitor-card,
 :root:not(.dark) .layout.has-custom-bg .node-filter-panel {
-  background: 
-    linear-gradient(135deg, 
-      rgba(255, 255, 255, calc(0.06 + var(--glass-sheen, 0.3) * 0.24)) 0%, 
-      rgba(255, 255, 255, calc(0.02 + var(--glass-sheen, 0.3) * 0.08)) 100%
-    ),
-    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, calc(var(--glass-sheen, 0.3) * 0.40)), transparent 75%),
-    rgba(255, 255, 255, calc(var(--glass-opacity, 0.70) * (0.12 + var(--glass-sheen, 0.3) * 0.30))) !important;
-  border: 1.5px solid rgba(255, 255, 255, calc(0.50 + var(--glass-sheen, 0.3) * 0.45)) !important;
+  background-color: rgba(255, 255, 255, var(--glass-opacity, 0.70)) !important;
+  background-image: 
+    linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.02) 100%) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.80) !important;
   box-shadow: 
     0 0 0 1px rgba(255, 255, 255, 0.75),
     inset 0 1.5px 2px 0 #ffffff,
