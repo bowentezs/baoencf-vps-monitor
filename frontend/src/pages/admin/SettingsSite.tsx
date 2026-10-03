@@ -431,22 +431,22 @@ export default function SettingsSite() {
             <div
               style={{
                 position: 'relative',
-                borderRadius: 14,
+                borderRadius: 16,
                 overflow: 'hidden',
-                backdropFilter: `blur(${Math.min(40, Math.max(0, Number(settings.theme_card_blur ?? 16)))}px) saturate(150%)`,
-                WebkitBackdropFilter: `blur(${Math.min(40, Math.max(0, Number(settings.theme_card_blur ?? 16)))}px) saturate(150%)`,
+                backdropFilter: `blur(${Math.min(40, Math.max(0, Number(settings.theme_card_blur ?? 16)))}px) saturate(190%) contrast(105%)`,
+                WebkitBackdropFilter: `blur(${Math.min(40, Math.max(0, Number(settings.theme_card_blur ?? 16)))}px) saturate(190%) contrast(105%)`,
                 background: previewDark
-                  ? `rgba(13, 14, 28, ${Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100})`
-                  : `rgba(255, 255, 255, ${Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100})`,
+                  ? `linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(12, 16, 28, ${(Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100) * 0.75 + 0.05})`
+                  : `linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.50) 100%), rgba(255, 255, 255, ${Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100})`,
                 border: previewDark
-                  ? '1px solid rgba(255, 255, 255, 0.16)'
-                  : '1px solid rgba(255, 255, 255, 0.85)',
+                  ? '1px solid rgba(255, 255, 255, 0.22)'
+                  : '1px solid rgba(255, 255, 255, 0.90)',
                 boxShadow: previewDark
-                  ? '0 12px 36px rgba(0,0,0,0.55)'
-                  : '0 10px 30px rgba(91, 33, 182, 0.08)',
+                  ? 'inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.10), 0 20px 48px -8px rgba(0, 0, 0, 0.65)'
+                  : 'inset 0 1.5px 1.5px 0 #ffffff, inset 0 0 0 1px rgba(255, 255, 255, 0.45), 0 16px 36px -6px rgba(91, 33, 182, 0.12)',
                 color: previewDark ? '#f8fafc' : '#0f172a',
-                padding: '14px 16px',
-                transition: 'backdrop-filter 0.12s ease, background 0.12s ease, border-color 0.12s ease',
+                padding: '16px 18px',
+                transition: 'backdrop-filter 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease',
               }}
             >
               {/* 顶沿流光彩虹条 */}
@@ -458,8 +458,9 @@ export default function SettingsSite() {
                     left: 0,
                     right: 0,
                     height: 2,
-                    background: 'linear-gradient(90deg, transparent, #38bdf8, #8b5cf6, #f59e0b, transparent)',
-                    opacity: 0.9,
+                    background: 'linear-gradient(90deg, transparent, #38bdf8, #8b5cf6, #ec4899, #f59e0b, transparent)',
+                    opacity: 0.95,
+                    boxShadow: '0 0 12px rgba(139, 92, 246, 0.85), 0 0 4px #38bdf8',
                   }}
                 />
               )}
@@ -475,10 +476,16 @@ export default function SettingsSite() {
                 </span>
               </Flex>
 
-              {/* 仿真指标进度条 */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
-                <div>
-                  <Flex justify="between" style={{ fontSize: 11, marginBottom: 4, opacity: 0.85 }}>
+              {/* 仿真指标进度条 (微晶体透光面板) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div style={{
+                  background: previewDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.5)',
+                  border: previewDark ? '1px solid rgba(255, 255, 255, 0.09)' : '1px solid rgba(255, 255, 255, 0.7)',
+                  borderRadius: 8,
+                  padding: '7px 9px',
+                  boxShadow: previewDark ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08)' : 'inset 0 1px 0 rgba(255, 255, 255, 0.9)',
+                }}>
+                  <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
                     <span>CPU 负载</span>
                     <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>18%</span>
                   </Flex>
@@ -486,8 +493,14 @@ export default function SettingsSite() {
                     <div style={{ width: '18%', height: '100%', background: '#38bdf8', boxShadow: '0 0 8px #38bdf8' }} />
                   </div>
                 </div>
-                <div>
-                  <Flex justify="between" style={{ fontSize: 11, marginBottom: 4, opacity: 0.85 }}>
+                <div style={{
+                  background: previewDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.5)',
+                  border: previewDark ? '1px solid rgba(255, 255, 255, 0.09)' : '1px solid rgba(255, 255, 255, 0.7)',
+                  borderRadius: 8,
+                  padding: '7px 9px',
+                  boxShadow: previewDark ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08)' : 'inset 0 1px 0 rgba(255, 255, 255, 0.9)',
+                }}>
+                  <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
                     <span>内存占用</span>
                     <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>42%</span>
                   </Flex>
