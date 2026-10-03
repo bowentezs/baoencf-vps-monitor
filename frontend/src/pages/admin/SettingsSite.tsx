@@ -328,19 +328,23 @@ export default function SettingsSite() {
           <Flex justify="between" align="center" style={{ marginBottom: 6, maxWidth: 420 }}>
             <Text size="2" weight="medium">卡片透明度 ({settings.theme_card_opacity || '70'}%)</Text>
             <Text size="1" color="gray">
-              {Number(settings.theme_card_opacity || 70) <= 30 ? '极高透光' : Number(settings.theme_card_opacity || 70) >= 85 ? '深邃高对比' : '标准极光'}
+              {Number(settings.theme_card_opacity || 70) <= 25
+                ? '极透水膜（底色极薄穿透）'
+                : Number(settings.theme_card_opacity || 70) >= 85
+                  ? '实心面板（遮挡背景高对比）'
+                  : '微晶半透（通透与阅读平衡）'}
             </Text>
           </Flex>
           <Slider
             style={{ maxWidth: 420 }}
             value={[Number(settings.theme_card_opacity || 70)]}
-            min={20}
+            min={10}
             max={100}
             step={5}
             onValueChange={(vals) => updateSetting('theme_card_opacity', String(vals[0]))}
           />
           <Text size="1" color="gray" style={{ display: 'block', marginTop: 4 }}>
-            范围 20% ~ 100%。数值越小越透光凸显背景，数值越大文字对比度越高
+            纯粹控制卡片底色颜料薄厚。10% 极透穿透背景，100% 纯实心面板完全遮挡背景，绝不影响模糊散焦。
           </Text>
         </div>
 
@@ -349,10 +353,10 @@ export default function SettingsSite() {
             <Text size="2" weight="medium">毛玻璃磨砂度 ({settings.theme_card_blur || '16'}px)</Text>
             <Text size="1" color="gray">
               {Number(settings.theme_card_blur || 16) === 0
-                ? '纯透水晶（原色无折射）'
+                ? '纯透水晶（背景原图100%清晰）'
                 : Number(settings.theme_card_blur || 16) >= 28
-                  ? '重度微晶（高饱和折射磨砂）'
-                  : '微晶磨砂（苹果液态折射）'}
+                  ? '重度雾化（背景化为梦幻极光）'
+                  : '微晶磨砂（苹果液态温润散焦）'}
             </Text>
           </Flex>
           <Slider
@@ -364,7 +368,7 @@ export default function SettingsSite() {
             onValueChange={(vals) => updateSetting('theme_card_blur', String(vals[0]))}
           />
           <Text size="1" color="gray" style={{ display: 'block', marginTop: 4 }}>
-            范围 0px ~ 60px。0px 为晶莹纯透水晶，数值越大色彩折射与饱和度越浓郁，呈现高级微晶磨砂
+            纯粹控制背景散焦模糊程度。0px 原图高清无虚化，60px 深度雾化散焦，绝不影响卡片底色深浅。
           </Text>
         </div>
 
@@ -392,18 +396,26 @@ export default function SettingsSite() {
           }}
         >
           {/* 背景图层 */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage: `url(${JSON.stringify(safeBackgroundUrl(settings.theme_bg_desktop) || '/images/gloria/dark-bg.webp')})`,
-              backgroundPosition: 'center center',
-              backgroundSize: 'cover',
-              backgroundRepeat: 'no-repeat',
-              filter: previewDark ? 'brightness(0.95)' : 'brightness(1.05)',
-              transition: 'background-image 0.25s ease',
-            }}
-          />
+          {(() => {
+            const isCustom = Boolean(settings.theme_bg_desktop);
+            const bgUrl = previewDark
+              ? (safeBackgroundUrl(settings.theme_bg_desktop) || '/images/gloria/dark-bg.webp')
+              : (isCustom ? safeBackgroundUrl(settings.theme_bg_desktop) : '/images/gloria/light-bg.png');
+            return (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: `url(${JSON.stringify(bgUrl)})`,
+                  backgroundPosition: 'center center',
+                  backgroundSize: 'cover',
+                  backgroundRepeat: 'no-repeat',
+                  filter: previewDark ? 'brightness(0.95)' : 'brightness(1.05)',
+                  transition: 'background-image 0.25s ease',
+                }}
+              />
+            );
+          })()}
 
           {/* 顶部工具栏 */}
           <Flex
@@ -439,7 +451,7 @@ export default function SettingsSite() {
           {/* 沙盒卡片展示区 */}
           <div style={{ position: 'relative', zIndex: 1, padding: '20px 16px' }}>
             {(() => {
-              const cardOpacityNum = Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100;
+              const cardOpacityNum = Math.min(100, Math.max(10, Number(settings.theme_card_opacity || 70))) / 100;
               const cardBlurNum = Math.min(60, Math.max(0, Number(settings.theme_card_blur ?? 16)));
               const blurProgress = cardBlurNum / 60;
               const glassSaturate = Math.round(110 + blurProgress * 110);
@@ -452,12 +464,13 @@ export default function SettingsSite() {
                     overflow: 'hidden',
                     backdropFilter: `blur(${cardBlurNum}px) saturate(${glassSaturate}%) contrast(${glassContrast}%)`,
                     WebkitBackdropFilter: `blur(${cardBlurNum}px) saturate(${glassSaturate}%) contrast(${glassContrast}%)`,
-                    background: previewDark
-                      ? `linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), radial-gradient(circle at 8% 8%, rgba(139, 92, 246, 0.22), transparent 40%), radial-gradient(circle at 92% 92%, rgba(56, 189, 248, 0.16), transparent 40%), rgba(12, 16, 28, ${cardOpacityNum * (0.35 + blurProgress * 0.45)})`
-                      : `linear-gradient(135deg, rgba(255, 255, 255, ${0.06 + blurProgress * 0.24}) 0%, rgba(255, 255, 255, ${0.02 + blurProgress * 0.08}) 100%), radial-gradient(circle at 50% 0%, rgba(255, 255, 255, ${blurProgress * 0.40}), transparent 75%), rgba(255, 255, 255, ${cardOpacityNum * (0.12 + blurProgress * 0.30)})`,
+                    backgroundColor: previewDark ? `rgba(12, 16, 28, ${cardOpacityNum})` : `rgba(255, 255, 255, ${cardOpacityNum})`,
+                    backgroundImage: previewDark
+                      ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), radial-gradient(circle at 8% 8%, rgba(139, 92, 246, 0.20), transparent 40%), radial-gradient(circle at 92% 92%, rgba(56, 189, 248, 0.15), transparent 40%)'
+                      : 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.02) 100%)',
                     border: previewDark
                       ? '1.5px solid rgba(255, 255, 255, 0.30)'
-                      : `1.5px solid rgba(255, 255, 255, ${0.50 + blurProgress * 0.45})`,
+                      : '1.5px solid rgba(255, 255, 255, 0.80)',
                     boxShadow: previewDark
                       ? '0 0 0 1px rgba(0, 0, 0, 0.35), inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 20px 48px -6px rgba(0, 0, 0, 0.65)'
                       : '0 0 0 1px rgba(255, 255, 255, 0.75), inset 0 1.5px 2px 0 #ffffff, inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 10px 30px -4px rgba(100, 116, 139, 0.08)',
@@ -477,7 +490,7 @@ export default function SettingsSite() {
                         height: 2.5,
                         background: 'linear-gradient(90deg, transparent, #38bdf8, #8b5cf6, #ec4899, #f59e0b, transparent)',
                         opacity: 1,
-                        boxShadow: `0 0 ${10 + blurProgress * 14}px rgba(139, 92, 246, 0.9), 0 0 5px #38bdf8`,
+                        boxShadow: '0 0 14px rgba(139, 92, 246, 0.9), 0 0 5px #38bdf8',
                         zIndex: 2,
                       }}
                     />
@@ -494,20 +507,20 @@ export default function SettingsSite() {
                     </span>
                   </Flex>
 
-                  {/* 仿真指标进度条 (微晶体透光面板：彻底镂空，100% 释放磨砂折射) */}
+                  {/* 仿真指标进度条 (微晶体透光面板) */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                     <div style={{
                       background: previewDark
-                        ? 'rgba(255, 255, 255, 0.03)'
-                        : 'rgba(255, 255, 255, 0.08)',
+                        ? 'rgba(255, 255, 255, 0.05)'
+                        : 'rgba(255, 255, 255, 0.35)',
                       border: previewDark
                         ? '1px solid rgba(255, 255, 255, 0.12)'
-                        : '1px solid rgba(255, 255, 255, 0.45)',
+                        : '1px solid rgba(255, 255, 255, 0.65)',
                       borderRadius: 8,
                       padding: '7px 9px',
                       boxShadow: previewDark
                         ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08)'
-                        : 'inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.7), 0 2px 8px rgba(0, 0, 0, 0.03)',
+                        : 'inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.8), 0 2px 8px rgba(0, 0, 0, 0.03)',
                     }}>
                       <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
                         <span>CPU 负载</span>
@@ -519,16 +532,16 @@ export default function SettingsSite() {
                     </div>
                     <div style={{
                       background: previewDark
-                        ? 'rgba(255, 255, 255, 0.03)'
-                        : 'rgba(255, 255, 255, 0.08)',
+                        ? 'rgba(255, 255, 255, 0.05)'
+                        : 'rgba(255, 255, 255, 0.35)',
                       border: previewDark
                         ? '1px solid rgba(255, 255, 255, 0.12)'
-                        : '1px solid rgba(255, 255, 255, 0.45)',
+                        : '1px solid rgba(255, 255, 255, 0.65)',
                       borderRadius: 8,
                       padding: '7px 9px',
                       boxShadow: previewDark
                         ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08)'
-                        : 'inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.7), 0 2px 8px rgba(0, 0, 0, 0.03)',
+                        : 'inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.8), 0 2px 8px rgba(0, 0, 0, 0.03)',
                     }}>
                       <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
                         <span>内存占用</span>
@@ -544,6 +557,12 @@ export default function SettingsSite() {
                   <Flex justify="between" style={{ fontSize: 11, opacity: 0.75, paddingTop: 6, borderTop: previewDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)' }}>
                     <span>↓ 18.4 MB/s · ↑ 4.2 MB/s</span>
                     <span>月流量: 1.2 / 5.0 TB</span>
+                  </Flex>
+
+                  {/* 实时正交解耦状态提示 */}
+                  <Flex justify="between" align="center" style={{ fontSize: 10, opacity: 0.7, marginTop: 8, paddingTop: 6, borderTop: previewDark ? '1px dashed rgba(255,255,255,0.12)' : '1px dashed rgba(0,0,0,0.1)' }}>
+                    <span>底色浓度: {Math.round(cardOpacityNum * 100)}% ({cardOpacityNum >= 0.85 ? '实心遮挡' : cardOpacityNum <= 0.25 ? '极薄透水膜' : '微晶半透'})</span>
+                    <span>背景模糊: {cardBlurNum}px ({cardBlurNum === 0 ? '原图高清' : cardBlurNum >= 28 ? '重度雾化' : '柔和磨砂'})</span>
                   </Flex>
                 </div>
               );

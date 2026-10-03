@@ -127,13 +127,15 @@ export default function Layout() {
   };
 
   const isDark = theme === "dark" || (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const activeBgDesktop = !isDark && bgUrlDesktop === "/images/gloria/dark-bg.webp" ? "/images/gloria/light-bg.png" : bgUrlDesktop;
+  const activeBgMobile = !isDark && bgUrlMobile === "/images/gloria/dark-bg.webp" ? "/images/gloria/light-bg.png" : bgUrlMobile;
   const blurProgress = Math.min(1, Math.max(0, cardBlur / 60));
   const glassSaturate = Math.round(110 + blurProgress * 110);
   const glassContrast = Math.round(100 + blurProgress * 15);
   const layoutStyle: React.CSSProperties & Record<string, string | undefined> = {
     backgroundColor: hasCustomBg ? (isDark ? "#050816" : "#f8fafc") : "var(--accent-1)",
-    ...(bgUrlDesktop ? { "--bg-desktop": `url(${JSON.stringify(bgUrlDesktop)})` } : {}),
-    ...(bgUrlMobile ? { "--bg-mobile": `url(${JSON.stringify(bgUrlMobile)})` } : {}),
+    ...(activeBgDesktop ? { "--bg-desktop": `url(${JSON.stringify(activeBgDesktop)})` } : {}),
+    ...(activeBgMobile ? { "--bg-mobile": `url(${JSON.stringify(activeBgMobile)})` } : {}),
     "--glass-opacity": (cardOpacity / 100).toFixed(2),
     "--glass-blur": `${cardBlur}px`,
     "--glass-saturate": `${glassSaturate}%`,
