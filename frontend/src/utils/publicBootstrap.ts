@@ -179,18 +179,29 @@ function applyStoredClientPatch(payload: PublicBootstrapPayload): PublicBootstra
 
 function savePublicBootstrap(payload: PublicBootstrapPayload): PublicBootstrapPayload {
   bootstrapCache = payload;
-  setLocalStorageItem(PUBLIC_BOOTSTRAP_STORAGE_KEY, JSON.stringify({ saved_at: Date.now(), payload }));
+  if (Array.isArray(payload.clients) && payload.clients.length > 0) {
+    setLocalStorageItem(PUBLIC_BOOTSTRAP_STORAGE_KEY, JSON.stringify({ saved_at: Date.now(), payload }));
+  } else {
+    removeLocalStorageItem(PUBLIC_BOOTSTRAP_STORAGE_KEY);
+  }
   return payload;
 }
 
 export function getCachedPublicBootstrap(): PublicBootstrapPayload | null {
-  if (bootstrapCache) return bootstrapCache;
+  if (bootstrapCache && Array.isArray(bootstrapCache.clients) && bootstrapCache.clients.length > 0) {
+    return bootstrapCache;
+  }
   try {
     const raw = getLocalStorageItem(PUBLIC_BOOTSTRAP_STORAGE_KEY);
     if (!raw) return null;
     const stored = JSON.parse(raw) as { saved_at?: number; payload?: unknown };
     if (!stored.saved_at || Date.now() - stored.saved_at > PUBLIC_BOOTSTRAP_STORAGE_MAX_AGE_MS) return null;
-    bootstrapCache = normalizePublicBootstrap(stored.payload);
+    const normalized = normalizePublicBootstrap(stored.payload);
+    if (!normalized.clients || normalized.clients.length === 0) {
+      removeLocalStorageItem(PUBLIC_BOOTSTRAP_STORAGE_KEY);
+      return null;
+    }
+    bootstrapCache = normalized;
     return bootstrapCache;
   } catch {
     return null;

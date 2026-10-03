@@ -6,7 +6,7 @@ const ADMIN_CSRF_COOKIE = 'cf_monitor_csrf';
 const MFA_STEP_UP_COOKIE = 'cf_monitor_mfa_stepup';
 const ADMIN_SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 const ADMIN_CSRF_MAX_AGE_SECONDS = ADMIN_SESSION_MAX_AGE_SECONDS;
-const MFA_STEP_UP_MAX_AGE_SECONDS = 5 * 60;
+const MFA_STEP_UP_MAX_AGE_SECONDS = 30 * 60;
 
 function isHttpsRequest(c: Context): boolean {
   return new URL(c.req.url).protocol === 'https:';

@@ -71,7 +71,7 @@ export default function MfaStepUpDialog() {
           <Flex align="center" gap="2"><ShieldCheck size={20} />确认敏感操作</Flex>
         </Dialog.Title>
         <Dialog.Description size="2" color="gray" mb="4">
-          本次验证通过后，5 分钟内执行敏感操作无需重复输入。
+          本次验证通过后，30 分钟内执行敏感操作无需重复输入。
         </Dialog.Description>
 
         <Flex direction="column" gap="3">

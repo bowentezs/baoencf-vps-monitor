@@ -1,5 +1,5 @@
 const PASSWORD_ALGORITHM = 'pbkdf2_sha256';
-const PBKDF2_ITERATIONS = 600000;
+const PBKDF2_ITERATIONS = 100000;
 // 接受旧版低迭代 hash 以便存量账号登录后自动升级；新 hash 一律使用 PBKDF2_ITERATIONS。
 const MIN_ACCEPTED_PBKDF2_ITERATIONS = 10000;
 const SALT_BYTES = 16;

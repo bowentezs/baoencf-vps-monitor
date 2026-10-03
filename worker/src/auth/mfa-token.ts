@@ -1,7 +1,7 @@
 import { sign, verify } from 'hono/jwt';
 import { requireJwtSecret } from './jwt.ts';
 
-const MFA_TOKEN_TTL_SECONDS = 5 * 60;
+const MFA_TOKEN_TTL_SECONDS = 30 * 60;
 
 type MfaEnv = { JWT_SECRET?: string };
 export type MfaTokenPurpose = 'mfa-login' | 'mfa-step-up';

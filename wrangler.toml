@@ -5,6 +5,10 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 preview_urls = true
 
+routes = [
+  { pattern = "vpsmonitor.95049504.xyz", custom_domain = true }
+]
+
 [observability]
 enabled = true
 head_sampling_rate = 1
