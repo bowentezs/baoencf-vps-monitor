@@ -466,14 +466,14 @@ export default function SettingsSite() {
                     WebkitBackdropFilter: `blur(${cardBlurNum}px) saturate(${glassSaturate}%) contrast(${glassContrast}%)`,
                     backgroundColor: previewDark ? `rgba(12, 16, 28, ${cardOpacityNum})` : `rgba(255, 255, 255, ${cardOpacityNum})`,
                     backgroundImage: previewDark
-                      ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), radial-gradient(circle at 8% 8%, rgba(139, 92, 246, 0.20), transparent 40%), radial-gradient(circle at 92% 92%, rgba(56, 189, 248, 0.15), transparent 40%)'
-                      : 'linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.02) 100%)',
+                      ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), radial-gradient(circle at 10% 10%, rgba(139, 92, 246, 0.22), transparent 45%), radial-gradient(circle at 90% 90%, rgba(56, 189, 248, 0.18), transparent 45%)'
+                      : 'linear-gradient(135deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.03) 100%), radial-gradient(circle at 15% 15%, rgba(224, 242, 254, 0.35), transparent 50%), radial-gradient(circle at 85% 85%, rgba(250, 232, 255, 0.30), transparent 50%)',
                     border: previewDark
-                      ? '1.5px solid rgba(255, 255, 255, 0.30)'
-                      : '1.5px solid rgba(255, 255, 255, 0.80)',
+                      ? '1.5px solid rgba(255, 255, 255, 0.32)'
+                      : '1.5px solid rgba(255, 255, 255, 0.85)',
                     boxShadow: previewDark
-                      ? '0 0 0 1px rgba(0, 0, 0, 0.35), inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 20px 48px -6px rgba(0, 0, 0, 0.65)'
-                      : '0 0 0 1px rgba(255, 255, 255, 0.75), inset 0 1.5px 2px 0 #ffffff, inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 10px 30px -4px rgba(100, 116, 139, 0.08)',
+                      ? '0 0 0 1px rgba(0, 0, 0, 0.40), inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.90), inset 1px 0 2px 0 rgba(56, 189, 248, 0.32), inset -1px -1.5px 2.5px 0 rgba(192, 132, 252, 0.26), inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 20px 48px -6px rgba(0, 0, 0, 0.65)'
+                      : '0 0 0 1px rgba(255, 255, 255, 0.80), inset 0 1.5px 2px 0 #ffffff, inset 1px 0 2px 0 rgba(56, 189, 248, 0.25), inset -1px -1.5px 2px 0 rgba(236, 72, 153, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.40), 0 12px 32px -4px rgba(100, 116, 139, 0.10)',
                     color: previewDark ? '#f8fafc' : '#0f172a',
                     padding: '16px 18px',
                     transition: 'backdrop-filter 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease',
@@ -488,7 +488,9 @@ export default function SettingsSite() {
                         left: 0,
                         right: 0,
                         height: 2.5,
-                        background: 'linear-gradient(90deg, transparent, #38bdf8, #8b5cf6, #ec4899, #f59e0b, transparent)',
+                        background: 'linear-gradient(90deg, transparent, #38bdf8 25%, #8b5cf6 50%, #ec4899 75%, transparent)',
+                        backgroundSize: '200% 100%',
+                        animation: 'liquidGlassGlowFlow 8s ease-in-out infinite alternate',
                         opacity: 1,
                         boxShadow: '0 0 14px rgba(139, 92, 246, 0.9), 0 0 5px #38bdf8',
                         zIndex: 2,
