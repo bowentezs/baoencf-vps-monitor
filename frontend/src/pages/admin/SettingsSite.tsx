@@ -20,6 +20,15 @@ function backupEncryptPasswordError(password: string): string | null {
   return null;
 }
 
+function safeBackgroundUrl(url?: string): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (/[\r\n\0"'\\]/.test(trimmed)) return '';
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return trimmed;
+  if (/^https:\/\/[^\s"']+/i.test(trimmed)) return trimmed;
+  return '';
+}
+
 export default function SettingsSite() {
   const apiFetch = useApi();
   const { setAction, settingsCache, loadSettingsScope, setSettingsScope } = useOutletContext<SettingsLayoutOutletContext>();
@@ -28,6 +37,7 @@ export default function SettingsSite() {
   const [loading, setLoading] = useState(!settingsCache.site);
   const [saving, setSaving] = useState(false);
   const [logoSaving, setLogoSaving] = useState(false);
+  const [previewDark, setPreviewDark] = useState(true);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -356,6 +366,145 @@ export default function SettingsSite() {
             onCheckedChange={(checked) => updateSetting('theme_card_glow', String(checked))}
           />
         </div>
+
+        {/* 🎨 实时所见即所得效果预览沙盒 */}
+        <Box
+          style={{
+            marginTop: 8,
+            marginBottom: 20,
+            borderRadius: 14,
+            overflow: 'hidden',
+            border: '1px solid var(--gray-a6)',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+            position: 'relative',
+            maxWidth: 520,
+            background: '#050816',
+          }}
+        >
+          {/* 背景图层 */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${JSON.stringify(safeBackgroundUrl(settings.theme_bg_desktop) || '/images/gloria/dark-bg.webp')})`,
+              backgroundPosition: 'center center',
+              backgroundSize: 'cover',
+              backgroundRepeat: 'no-repeat',
+              filter: previewDark ? 'brightness(0.95)' : 'brightness(1.05)',
+              transition: 'background-image 0.25s ease',
+            }}
+          />
+
+          {/* 顶部工具栏 */}
+          <Flex
+            justify="between"
+            align="center"
+            style={{
+              position: 'relative',
+              zIndex: 2,
+              padding: '10px 14px',
+              background: 'rgba(0,0,0,0.45)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              borderBottom: '1px solid rgba(255,255,255,0.12)',
+            }}
+          >
+            <Flex align="center" gap="2">
+              <span style={{ fontSize: 13, color: '#f1f5f9', fontWeight: 600 }}>🎨 实时所见即所得效果预览</span>
+              <span style={{ fontSize: 11, color: '#94a3b8', background: 'rgba(255,255,255,0.12)', padding: '1px 6px', borderRadius: 4 }}>
+                {previewDark ? '深色模式' : '浅色模式'}
+              </span>
+            </Flex>
+            <Button
+              size="1"
+              variant="soft"
+              type="button"
+              style={{ cursor: 'pointer', background: 'rgba(255,255,255,0.18)', color: '#fff' }}
+              onClick={() => setPreviewDark(!previewDark)}
+            >
+              切至{previewDark ? '浅色' : '深色'}预览
+            </Button>
+          </Flex>
+
+          {/* 沙盒卡片展示区 */}
+          <div style={{ position: 'relative', zIndex: 1, padding: '20px 16px' }}>
+            <div
+              style={{
+                position: 'relative',
+                borderRadius: 14,
+                overflow: 'hidden',
+                backdropFilter: `blur(${Math.min(40, Math.max(0, Number(settings.theme_card_blur ?? 16)))}px) saturate(150%)`,
+                WebkitBackdropFilter: `blur(${Math.min(40, Math.max(0, Number(settings.theme_card_blur ?? 16)))}px) saturate(150%)`,
+                background: previewDark
+                  ? `rgba(13, 14, 28, ${Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100})`
+                  : `rgba(255, 255, 255, ${Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100})`,
+                border: previewDark
+                  ? '1px solid rgba(255, 255, 255, 0.16)'
+                  : '1px solid rgba(255, 255, 255, 0.85)',
+                boxShadow: previewDark
+                  ? '0 12px 36px rgba(0,0,0,0.55)'
+                  : '0 10px 30px rgba(91, 33, 182, 0.08)',
+                color: previewDark ? '#f8fafc' : '#0f172a',
+                padding: '14px 16px',
+                transition: 'backdrop-filter 0.12s ease, background 0.12s ease, border-color 0.12s ease',
+              }}
+            >
+              {/* 顶沿流光彩虹条 */}
+              {settings.theme_card_glow !== 'false' && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 2,
+                    background: 'linear-gradient(90deg, transparent, #38bdf8, #8b5cf6, #f59e0b, transparent)',
+                    opacity: 0.9,
+                  }}
+                />
+              )}
+
+              {/* 仿真节点标题栏 */}
+              <Flex justify="between" align="center" style={{ marginBottom: 12 }}>
+                <Flex align="center" gap="2">
+                  <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e' }} />
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>US-LAX · 洛杉矶 BGP 高防</span>
+                </Flex>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: previewDark ? 'rgba(34,197,94,0.18)' : 'rgba(34,197,94,0.22)', color: '#22c55e', fontWeight: 600 }}>
+                  在线 99.98%
+                </span>
+              </Flex>
+
+              {/* 仿真指标进度条 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
+                <div>
+                  <Flex justify="between" style={{ fontSize: 11, marginBottom: 4, opacity: 0.85 }}>
+                    <span>CPU 负载</span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>18%</span>
+                  </Flex>
+                  <div style={{ height: 5, borderRadius: 999, background: previewDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                    <div style={{ width: '18%', height: '100%', background: '#38bdf8', boxShadow: '0 0 8px #38bdf8' }} />
+                  </div>
+                </div>
+                <div>
+                  <Flex justify="between" style={{ fontSize: 11, marginBottom: 4, opacity: 0.85 }}>
+                    <span>内存占用</span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>42%</span>
+                  </Flex>
+                  <div style={{ height: 5, borderRadius: 999, background: previewDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                    <div style={{ width: '42%', height: '100%', background: '#a855f7', boxShadow: '0 0 8px #a855f7' }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* 底部网络速率 */}
+              <Flex justify="between" style={{ fontSize: 11, opacity: 0.75, paddingTop: 6, borderTop: previewDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)' }}>
+                <span>↓ 18.4 MB/s · ↑ 4.2 MB/s</span>
+                <span>月流量: 1.2 / 5.0 TB</span>
+              </Flex>
+            </div>
+          </div>
+        </Box>
 
         <Flex gap="2" wrap="wrap" mt="1">
           <Button
