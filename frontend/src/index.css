@@ -6208,27 +6208,49 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .nav-bar {
   transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease !important;
 }
 
-/* 🍎 彻底打通卡片内部子容器的毛玻璃透光通道 */
-.layout.has-custom-bg .node-card-system-line,
-.layout.has-custom-bg .node-metric-tile,
-.layout.has-custom-bg .node-network-panel,
-.layout.has-custom-bg .monitor-stat-tile,
-.layout.has-custom-bg .website-monitor-tile {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
-  backdrop-filter: blur(6px) !important;
-  -webkit-backdrop-filter: blur(6px) !important;
+/* 🍎 节点卡片、概览卡片与筛选工具栏毛玻璃拟态 (苹果液态晶体架构) */
+.layout.has-custom-bg .node-card,
+.layout.has-custom-bg .monitor-stat-card,
+.layout.has-custom-bg .monitor-overview,
+.layout.has-custom-bg .website-monitor-card,
+.layout.has-custom-bg .node-filter-panel {
+  position: relative !important;
+  border-radius: 16px !important;
+  backdrop-filter: blur(var(--glass-blur, 16px)) saturate(190%) contrast(105%) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(190%) contrast(105%) !important;
+  overflow: hidden !important;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease !important;
 }
 
+/* 🍎 彻底打通卡片内部子容器的毛玻璃透光通道 (深色模式) */
+.dark .layout.has-custom-bg .node-card-system-line,
+.dark .layout.has-custom-bg .node-metric-tile,
+.dark .layout.has-custom-bg .node-network-panel,
+.dark .layout.has-custom-bg .monitor-stat-tile,
+.dark .layout.has-custom-bg .website-monitor-tile,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-card-system-line,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-metric-tile,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-network-panel,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .monitor-stat-tile,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-tile {
+  background: rgba(255, 255, 255, calc(var(--glass-opacity, 0.70) * 0.05 + 0.02)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+  backdrop-filter: blur(calc(var(--glass-blur, 16px) * 0.4)) !important;
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur, 16px) * 0.4)) !important;
+}
+
+/* 🍎 彻底打通卡片内部子容器的毛玻璃透光通道 (浅色模式：动态透光微晶体，绝不死白遮挡) */
 :root:not(.dark) .layout.has-custom-bg .node-card-system-line,
 :root:not(.dark) .layout.has-custom-bg .node-metric-tile,
 :root:not(.dark) .layout.has-custom-bg .node-network-panel,
 :root:not(.dark) .layout.has-custom-bg .monitor-stat-tile,
 :root:not(.dark) .layout.has-custom-bg .website-monitor-tile {
-  background: rgba(255, 255, 255, 0.55) !important;
-  border: 1px solid rgba(255, 255, 255, 0.75) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  background: rgba(255, 255, 255, calc(var(--glass-opacity, 0.65) * 0.30 + 0.06)) !important;
+  border: 1px solid rgba(255, 255, 255, calc(var(--glass-opacity, 0.65) * 0.35 + 0.25)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  backdrop-filter: blur(calc(var(--glass-blur, 16px) * 0.4)) !important;
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur, 16px) * 0.4)) !important;
 }
 
 /* 🍎 苹果级深色液态晶体边框 (高反差外轮廓环 + 物理切角反光 + 悬浮深影) */
@@ -6236,15 +6258,17 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .nav-bar {
 .dark .layout.has-custom-bg .monitor-stat-card,
 .dark .layout.has-custom-bg .monitor-overview,
 .dark .layout.has-custom-bg .website-monitor-card,
+.dark .layout.has-custom-bg .node-filter-panel,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .node-card,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .monitor-stat-card,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .monitor-overview,
-html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-card {
+html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-card,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel {
   background: 
     linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 100%),
     radial-gradient(circle at 8% 8%, rgba(139, 92, 246, 0.18), transparent 35%),
     radial-gradient(circle at 92% 92%, rgba(56, 189, 248, 0.14), transparent 35%),
-    rgba(12, 16, 28, calc(var(--glass-opacity, 0.70) * 0.75 + 0.05)) !important;
+    rgba(12, 16, 28, calc(var(--glass-opacity, 0.70) * 0.85)) !important;
   border: 1.5px solid rgba(255, 255, 255, 0.30) !important;
   box-shadow: 
     0 0 0 1px rgba(0, 0, 0, 0.35),
@@ -6253,19 +6277,23 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-card {
     0 20px 48px -6px rgba(0, 0, 0, 0.65) !important;
 }
 
-/* 🍎 苹果级浅色通透晶体边框 */
+/* 🍎 苹果级浅色通透晶体边框 (真实跟随 --glass-opacity，彻底告别 90% 厚白涂料) */
 :root:not(.dark) .layout.has-custom-bg .node-card,
 :root:not(.dark) .layout.has-custom-bg .monitor-stat-card,
 :root:not(.dark) .layout.has-custom-bg .monitor-overview,
-:root:not(.dark) .layout.has-custom-bg .website-monitor-card {
+:root:not(.dark) .layout.has-custom-bg .website-monitor-card,
+:root:not(.dark) .layout.has-custom-bg .node-filter-panel {
   background: 
-    linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.60) 100%),
+    linear-gradient(135deg, 
+      rgba(255, 255, 255, calc(var(--glass-opacity, 0.65) * 0.40 + 0.04)) 0%, 
+      rgba(255, 255, 255, calc(var(--glass-opacity, 0.65) * 0.10)) 100%
+    ),
     rgba(255, 255, 255, var(--glass-opacity, 0.65)) !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.95) !important;
+  border: 1.5px solid rgba(255, 255, 255, calc(var(--glass-opacity, 0.65) * 0.45 + 0.35)) !important;
   box-shadow: 
-    0 0 0 1px rgba(0, 0, 0, 0.12),
-    inset 0 2px 2px 0 #ffffff,
-    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.14),
+    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.85),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.30),
     0 16px 36px -6px rgba(0, 0, 0, 0.15) !important;
 }
 

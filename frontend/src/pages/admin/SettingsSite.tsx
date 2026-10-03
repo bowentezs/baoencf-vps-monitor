@@ -37,7 +37,13 @@ export default function SettingsSite() {
   const [loading, setLoading] = useState(!settingsCache.site);
   const [saving, setSaving] = useState(false);
   const [logoSaving, setLogoSaving] = useState(false);
-  const [previewDark, setPreviewDark] = useState(true);
+  const [previewDark, setPreviewDark] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark') ||
+        document.documentElement.getAttribute('data-theme-appearance') === 'dark';
+    }
+    return false;
+  });
   const logoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -428,94 +434,117 @@ export default function SettingsSite() {
 
           {/* 沙盒卡片展示区 */}
           <div style={{ position: 'relative', zIndex: 1, padding: '20px 16px' }}>
-            <div
-              style={{
-                position: 'relative',
-                borderRadius: 16,
-                overflow: 'hidden',
-                backdropFilter: `blur(${Math.min(40, Math.max(0, Number(settings.theme_card_blur ?? 16)))}px) saturate(190%) contrast(105%)`,
-                WebkitBackdropFilter: `blur(${Math.min(40, Math.max(0, Number(settings.theme_card_blur ?? 16)))}px) saturate(190%) contrast(105%)`,
-                background: previewDark
-                  ? `linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(12, 16, 28, ${(Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100) * 0.75 + 0.05})`
-                  : `linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.50) 100%), rgba(255, 255, 255, ${Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100})`,
-                border: previewDark
-                  ? '1.5px solid rgba(255, 255, 255, 0.30)'
-                  : '1.5px solid rgba(255, 255, 255, 0.95)',
-                boxShadow: previewDark
-                  ? '0 0 0 1px rgba(0, 0, 0, 0.35), inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 20px 48px -6px rgba(0, 0, 0, 0.65)'
-                  : '0 0 0 1px rgba(0, 0, 0, 0.12), inset 0 2px 2px 0 #ffffff, inset 0 0 0 1px rgba(255, 255, 255, 0.55), 0 16px 36px -6px rgba(0, 0, 0, 0.15)',
-                color: previewDark ? '#f8fafc' : '#0f172a',
-                padding: '16px 18px',
-                transition: 'backdrop-filter 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease',
-              }}
-            >
-              {/* 顶沿流光彩虹条 */}
-              {settings.theme_card_glow !== 'false' && (
+            {(() => {
+              const cardOpacityNum = Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100;
+              const cardBlurNum = Math.min(40, Math.max(0, Number(settings.theme_card_blur ?? 16)));
+              return (
                 <div
                   style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: 2,
-                    background: 'linear-gradient(90deg, transparent, #38bdf8, #8b5cf6, #ec4899, #f59e0b, transparent)',
-                    opacity: 0.95,
-                    boxShadow: '0 0 12px rgba(139, 92, 246, 0.85), 0 0 4px #38bdf8',
+                    position: 'relative',
+                    borderRadius: 16,
+                    overflow: 'hidden',
+                    backdropFilter: `blur(${cardBlurNum}px) saturate(190%) contrast(105%)`,
+                    WebkitBackdropFilter: `blur(${cardBlurNum}px) saturate(190%) contrast(105%)`,
+                    background: previewDark
+                      ? `linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(12, 16, 28, ${cardOpacityNum * 0.85})`
+                      : `linear-gradient(135deg, rgba(255, 255, 255, ${cardOpacityNum * 0.40 + 0.04}) 0%, rgba(255, 255, 255, ${cardOpacityNum * 0.10}) 100%), rgba(255, 255, 255, ${cardOpacityNum})`,
+                    border: previewDark
+                      ? '1.5px solid rgba(255, 255, 255, 0.30)'
+                      : `1.5px solid rgba(255, 255, 255, ${cardOpacityNum * 0.45 + 0.35})`,
+                    boxShadow: previewDark
+                      ? '0 0 0 1px rgba(0, 0, 0, 0.35), inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 20px 48px -6px rgba(0, 0, 0, 0.65)'
+                      : '0 0 0 1px rgba(0, 0, 0, 0.14), inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.30), 0 16px 36px -6px rgba(0, 0, 0, 0.15)',
+                    color: previewDark ? '#f8fafc' : '#0f172a',
+                    padding: '16px 18px',
+                    transition: 'backdrop-filter 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease',
                   }}
-                />
-              )}
+                >
+                  {/* 顶沿流光彩虹条 */}
+                  {settings.theme_card_glow !== 'false' && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: 2.5,
+                        background: 'linear-gradient(90deg, transparent, #38bdf8, #8b5cf6, #ec4899, #f59e0b, transparent)',
+                        opacity: 1,
+                        boxShadow: '0 0 14px rgba(139, 92, 246, 0.9), 0 0 5px #38bdf8',
+                        zIndex: 2,
+                      }}
+                    />
+                  )}
 
-              {/* 仿真节点标题栏 */}
-              <Flex justify="between" align="center" style={{ marginBottom: 12 }}>
-                <Flex align="center" gap="2">
-                  <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e' }} />
-                  <span style={{ fontSize: 13, fontWeight: 700 }}>US-LAX · 洛杉矶 BGP 高防</span>
-                </Flex>
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: previewDark ? 'rgba(34,197,94,0.18)' : 'rgba(34,197,94,0.22)', color: '#22c55e', fontWeight: 600 }}>
-                  在线 99.98%
-                </span>
-              </Flex>
-
-              {/* 仿真指标进度条 (微晶体透光面板) */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                <div style={{
-                  background: previewDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.5)',
-                  border: previewDark ? '1px solid rgba(255, 255, 255, 0.09)' : '1px solid rgba(255, 255, 255, 0.7)',
-                  borderRadius: 8,
-                  padding: '7px 9px',
-                  boxShadow: previewDark ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08)' : 'inset 0 1px 0 rgba(255, 255, 255, 0.9)',
-                }}>
-                  <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
-                    <span>CPU 负载</span>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>18%</span>
+                  {/* 仿真节点标题栏 */}
+                  <Flex justify="between" align="center" style={{ marginBottom: 12 }}>
+                    <Flex align="center" gap="2">
+                      <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e' }} />
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>US-LAX · 洛杉矶 BGP 高防</span>
+                    </Flex>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: previewDark ? 'rgba(34,197,94,0.18)' : 'rgba(34,197,94,0.22)', color: '#22c55e', fontWeight: 600 }}>
+                      在线 99.98%
+                    </span>
                   </Flex>
-                  <div style={{ height: 5, borderRadius: 999, background: previewDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-                    <div style={{ width: '18%', height: '100%', background: '#38bdf8', boxShadow: '0 0 8px #38bdf8' }} />
-                  </div>
-                </div>
-                <div style={{
-                  background: previewDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.5)',
-                  border: previewDark ? '1px solid rgba(255, 255, 255, 0.09)' : '1px solid rgba(255, 255, 255, 0.7)',
-                  borderRadius: 8,
-                  padding: '7px 9px',
-                  boxShadow: previewDark ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08)' : 'inset 0 1px 0 rgba(255, 255, 255, 0.9)',
-                }}>
-                  <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
-                    <span>内存占用</span>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>42%</span>
-                  </Flex>
-                  <div style={{ height: 5, borderRadius: 999, background: previewDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-                    <div style={{ width: '42%', height: '100%', background: '#a855f7', boxShadow: '0 0 8px #a855f7' }} />
-                  </div>
-                </div>
-              </div>
 
-              {/* 底部网络速率 */}
-              <Flex justify="between" style={{ fontSize: 11, opacity: 0.75, paddingTop: 6, borderTop: previewDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)' }}>
-                <span>↓ 18.4 MB/s · ↑ 4.2 MB/s</span>
-                <span>月流量: 1.2 / 5.0 TB</span>
-              </Flex>
-            </div>
+                  {/* 仿真指标进度条 (微晶体透光面板) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                    <div style={{
+                      background: previewDark
+                        ? `rgba(255, 255, 255, ${cardOpacityNum * 0.05 + 0.02})`
+                        : `rgba(255, 255, 255, ${cardOpacityNum * 0.30 + 0.06})`,
+                      border: previewDark
+                        ? '1px solid rgba(255, 255, 255, 0.12)'
+                        : `1px solid rgba(255, 255, 255, ${cardOpacityNum * 0.35 + 0.25})`,
+                      borderRadius: 8,
+                      padding: '7px 9px',
+                      boxShadow: previewDark
+                        ? 'inset 0 1px 0 rgba(255, 255, 255, 0.10)'
+                        : 'inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(0, 0, 0, 0.04)',
+                      backdropFilter: `blur(${cardBlurNum * 0.4}px)`,
+                      WebkitBackdropFilter: `blur(${cardBlurNum * 0.4}px)`,
+                    }}>
+                      <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
+                        <span>CPU 负载</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>18%</span>
+                      </Flex>
+                      <div style={{ height: 5, borderRadius: 999, background: previewDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                        <div style={{ width: '18%', height: '100%', background: '#38bdf8', boxShadow: '0 0 8px #38bdf8' }} />
+                      </div>
+                    </div>
+                    <div style={{
+                      background: previewDark
+                        ? `rgba(255, 255, 255, ${cardOpacityNum * 0.05 + 0.02})`
+                        : `rgba(255, 255, 255, ${cardOpacityNum * 0.30 + 0.06})`,
+                      border: previewDark
+                        ? '1px solid rgba(255, 255, 255, 0.12)'
+                        : `1px solid rgba(255, 255, 255, ${cardOpacityNum * 0.35 + 0.25})`,
+                      borderRadius: 8,
+                      padding: '7px 9px',
+                      boxShadow: previewDark
+                        ? 'inset 0 1px 0 rgba(255, 255, 255, 0.10)'
+                        : 'inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(0, 0, 0, 0.04)',
+                      backdropFilter: `blur(${cardBlurNum * 0.4}px)`,
+                      WebkitBackdropFilter: `blur(${cardBlurNum * 0.4}px)`,
+                    }}>
+                      <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
+                        <span>内存占用</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>42%</span>
+                      </Flex>
+                      <div style={{ height: 5, borderRadius: 999, background: previewDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                        <div style={{ width: '42%', height: '100%', background: '#a855f7', boxShadow: '0 0 8px #a855f7' }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 底部网络速率 */}
+                  <Flex justify="between" style={{ fontSize: 11, opacity: 0.75, paddingTop: 6, borderTop: previewDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)' }}>
+                    <span>↓ 18.4 MB/s · ↑ 4.2 MB/s</span>
+                    <span>月流量: 1.2 / 5.0 TB</span>
+                  </Flex>
+                </div>
+              );
+            })()}
           </div>
         </Box>
 
