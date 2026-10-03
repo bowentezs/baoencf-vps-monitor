@@ -450,10 +450,10 @@ export default function SettingsSite() {
                       : `linear-gradient(135deg, rgba(255, 255, 255, ${cardOpacityNum * 0.40 + 0.04}) 0%, rgba(255, 255, 255, ${cardOpacityNum * 0.10}) 100%), rgba(255, 255, 255, ${cardOpacityNum})`,
                     border: previewDark
                       ? '1.5px solid rgba(255, 255, 255, 0.30)'
-                      : `1.5px solid rgba(255, 255, 255, ${cardOpacityNum * 0.45 + 0.35})`,
+                      : `1.5px solid rgba(255, 255, 255, ${cardOpacityNum * 0.45 + 0.45})`,
                     boxShadow: previewDark
                       ? '0 0 0 1px rgba(0, 0, 0, 0.35), inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 20px 48px -6px rgba(0, 0, 0, 0.65)'
-                      : '0 0 0 1px rgba(0, 0, 0, 0.14), inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.30), 0 16px 36px -6px rgba(0, 0, 0, 0.15)',
+                      : '0 0 0 1px rgba(255, 255, 255, 0.70), inset 0 1.5px 2px 0 #ffffff, inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 10px 28px -4px rgba(100, 116, 139, 0.08)',
                     color: previewDark ? '#f8fafc' : '#0f172a',
                     padding: '16px 18px',
                     transition: 'backdrop-filter 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease',

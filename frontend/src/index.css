@@ -6150,17 +6150,30 @@ html[data-monitor-theme='next'] .node-network-value strong {
   background-repeat: no-repeat;
   background-size: cover;
   background-attachment: fixed;
+}
+
+:root:not(.dark) .layout.has-custom-bg {
+  background-color: #f8fafc !important;
+}
+
+.dark .layout.has-custom-bg,
+html[data-theme-appearance='dark'] .layout.has-custom-bg {
   background-color: #050816 !important;
 }
 
-/* 🍎 防眩光环境暗角层：确保高光/浅白壁纸下毛玻璃与卡片轮廓依然刀削般清晰 */
-.layout.has-custom-bg::before {
+/* 🍎 防眩光暗角层：仅在深色模式下启用暗夜沉浸遮罩；浅色模式彻底剥除黑纱，呈现壁纸原本的通透纯净 */
+.dark .layout.has-custom-bg::before,
+html[data-theme-appearance='dark'] .layout.has-custom-bg::before {
   content: "" !important;
   position: fixed !important;
   inset: 0 !important;
   background: radial-gradient(circle at 50% 30%, rgba(5, 8, 22, 0.22), rgba(5, 8, 22, 0.50)) !important;
   pointer-events: none !important;
   z-index: 0 !important;
+}
+
+:root:not(.dark) .layout.has-custom-bg::before {
+  display: none !important;
 }
 
 .layout.has-custom-bg > * {
@@ -6183,9 +6196,9 @@ html[data-monitor-theme='next'] .node-network-value strong {
 }
 
 :root:not(.dark) .layout.has-custom-bg .nav-bar {
-  background: linear-gradient(105deg, rgba(255, 255, 255, 0.82), rgba(238, 250, 255, 0.76) 42%, rgba(251, 235, 255, 0.78)) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.6) !important;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12) !important;
+  background: linear-gradient(105deg, rgba(255, 255, 255, 0.85), rgba(240, 249, 255, 0.80) 42%, rgba(253, 242, 255, 0.82)) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 4px 20px rgba(100, 116, 139, 0.06) !important;
 }
 
 .dark .layout.has-custom-bg .nav-bar,
@@ -6277,7 +6290,7 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel {
     0 20px 48px -6px rgba(0, 0, 0, 0.65) !important;
 }
 
-/* 🍎 苹果级浅色通透晶体边框 (真实跟随 --glass-opacity，彻底告别 90% 厚白涂料) */
+/* 🍎 苹果级浅色通透晶体边框 (纯净白晶，剔除脏黑阴影与黑边线) */
 :root:not(.dark) .layout.has-custom-bg .node-card,
 :root:not(.dark) .layout.has-custom-bg .monitor-stat-card,
 :root:not(.dark) .layout.has-custom-bg .monitor-overview,
@@ -6289,12 +6302,12 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel {
       rgba(255, 255, 255, calc(var(--glass-opacity, 0.65) * 0.10)) 100%
     ),
     rgba(255, 255, 255, var(--glass-opacity, 0.65)) !important;
-  border: 1.5px solid rgba(255, 255, 255, calc(var(--glass-opacity, 0.65) * 0.45 + 0.35)) !important;
+  border: 1.5px solid rgba(255, 255, 255, calc(var(--glass-opacity, 0.65) * 0.45 + 0.45)) !important;
   box-shadow: 
-    0 0 0 1px rgba(0, 0, 0, 0.14),
-    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.85),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.30),
-    0 16px 36px -6px rgba(0, 0, 0, 0.15) !important;
+    0 0 0 1px rgba(255, 255, 255, 0.70),
+    inset 0 1.5px 2px 0 #ffffff,
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 10px 28px -4px rgba(100, 116, 139, 0.08) !important;
 }
 
 /* 卡片顶沿霓虹流光彩虹条 */
@@ -6336,10 +6349,10 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-card:hover {
 :root:not(.dark) .layout.has-custom-bg .node-card:hover {
   border-color: #fff !important;
   box-shadow: 
-    0 0 0 1px rgba(0, 0, 0, 0.16),
+    0 0 0 1px rgba(255, 255, 255, 0.9),
     inset 0 2.5px 2px 0 #fff,
     inset 0 0 0 1px rgba(255, 255, 255, 0.8),
-    0 24px 50px -6px rgba(109, 53, 199, 0.22) !important;
+    0 16px 36px -4px rgba(100, 116, 139, 0.12) !important;
 }
 
 /* 进度条与指标霓虹发光 */
