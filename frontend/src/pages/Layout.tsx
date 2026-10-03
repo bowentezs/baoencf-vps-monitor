@@ -126,8 +126,9 @@ export default function Layout() {
     navigate({ pathname: "/", search: params.toString() ? `?${params}` : "" });
   };
 
+  const isDark = theme === "dark" || (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   const layoutStyle: React.CSSProperties & Record<string, string | undefined> = {
-    backgroundColor: hasCustomBg ? "#050816" : "var(--accent-1)",
+    backgroundColor: hasCustomBg ? (isDark ? "#050816" : "#f8fafc") : "var(--accent-1)",
     ...(bgUrlDesktop ? { "--bg-desktop": `url(${JSON.stringify(bgUrlDesktop)})` } : {}),
     ...(bgUrlMobile ? { "--bg-mobile": `url(${JSON.stringify(bgUrlMobile)})` } : {}),
     "--glass-opacity": (cardOpacity / 100).toFixed(2),
