@@ -6212,16 +6212,7 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .nav-bar {
 .layout.has-custom-bg .node-card,
 .layout.has-custom-bg .monitor-stat-card,
 .layout.has-custom-bg .monitor-overview,
-.layout.has-custom-bg .website-monitor-card {
-  position: relative !important;
-  border-radius: 16px !important;
-  backdrop-filter: blur(var(--glass-blur, 20px)) saturate(190%) contrast(105%) !important;
-  -webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(190%) contrast(105%) !important;
-  overflow: hidden !important;
-  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease !important;
-}
-
-/* 🍎 节点卡片、概览卡片与筛选工具栏毛玻璃拟态 (苹果液态晶体架构) */
+/* 🍎 节点卡片、概览卡片与筛选工具栏毛玻璃拟态 (苹果液态晶体架构：支持微晶饱和度与对比度动态物理加成) */
 .layout.has-custom-bg .node-card,
 .layout.has-custom-bg .monitor-stat-card,
 .layout.has-custom-bg .monitor-overview,
@@ -6229,8 +6220,8 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .nav-bar {
 .layout.has-custom-bg .node-filter-panel {
   position: relative !important;
   border-radius: 16px !important;
-  backdrop-filter: blur(var(--glass-blur, 16px)) saturate(190%) contrast(105%) !important;
-  -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(190%) contrast(105%) !important;
+  backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-saturate, 180%)) contrast(var(--glass-contrast, 108%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-saturate, 180%)) contrast(var(--glass-contrast, 108%)) !important;
   overflow: hidden !important;
   transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease !important;
 }
@@ -6249,8 +6240,8 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-tile {
   background: rgba(255, 255, 255, calc(var(--glass-opacity, 0.70) * 0.05 + 0.02)) !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
-  backdrop-filter: blur(calc(var(--glass-blur, 16px) * 0.4)) !important;
-  -webkit-backdrop-filter: blur(calc(var(--glass-blur, 16px) * 0.4)) !important;
+  backdrop-filter: blur(calc(var(--glass-blur, 16px) * 0.4)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur, 16px) * 0.4)) saturate(var(--glass-saturate, 180%)) !important;
 }
 
 /* 🍎 彻底打通卡片内部子容器的毛玻璃透光通道 (浅色模式：动态透光微晶体，绝不死白遮挡) */
@@ -6262,8 +6253,8 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-tile {
   background: rgba(255, 255, 255, calc(var(--glass-opacity, 0.65) * 0.30 + 0.06)) !important;
   border: 1px solid rgba(255, 255, 255, calc(var(--glass-opacity, 0.65) * 0.35 + 0.25)) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(0, 0, 0, 0.04) !important;
-  backdrop-filter: blur(calc(var(--glass-blur, 16px) * 0.4)) !important;
-  -webkit-backdrop-filter: blur(calc(var(--glass-blur, 16px) * 0.4)) !important;
+  backdrop-filter: blur(calc(var(--glass-blur, 16px) * 0.4)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur, 16px) * 0.4)) saturate(var(--glass-saturate, 180%)) !important;
 }
 
 /* 🍎 苹果级深色液态晶体边框 (高反差外轮廓环 + 物理切角反光 + 悬浮深影) */

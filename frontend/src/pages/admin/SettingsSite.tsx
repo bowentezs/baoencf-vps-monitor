@@ -348,7 +348,11 @@ export default function SettingsSite() {
           <Flex justify="between" align="center" style={{ marginBottom: 6, maxWidth: 420 }}>
             <Text size="2" weight="medium">毛玻璃磨砂度 ({settings.theme_card_blur || '16'}px)</Text>
             <Text size="1" color="gray">
-              {Number(settings.theme_card_blur || 16) === 0 ? '纯透无模糊' : Number(settings.theme_card_blur || 16) >= 24 ? '重度磨砂' : '柔和磨砂'}
+              {Number(settings.theme_card_blur || 16) === 0
+                ? '纯透水晶（原色无折射）'
+                : Number(settings.theme_card_blur || 16) >= 28
+                  ? '重度微晶（高饱和折射磨砂）'
+                  : '微晶磨砂（苹果液态折射）'}
             </Text>
           </Flex>
           <Slider
@@ -360,7 +364,7 @@ export default function SettingsSite() {
             onValueChange={(vals) => updateSetting('theme_card_blur', String(vals[0]))}
           />
           <Text size="1" color="gray" style={{ display: 'block', marginTop: 4 }}>
-            范围 0px ~ 40px。0px 为晶莹纯透明，数值越大毛玻璃弥散磨砂感越强
+            范围 0px ~ 40px。0px 为晶莹纯透水晶，数值越大色彩折射与饱和度越浓郁，呈现高级微晶磨砂
           </Text>
         </div>
 
@@ -437,14 +441,17 @@ export default function SettingsSite() {
             {(() => {
               const cardOpacityNum = Math.min(100, Math.max(20, Number(settings.theme_card_opacity || 70))) / 100;
               const cardBlurNum = Math.min(40, Math.max(0, Number(settings.theme_card_blur ?? 16)));
+              const blurProgress = cardBlurNum / 40;
+              const glassSaturate = Math.round(110 + blurProgress * 110);
+              const glassContrast = Math.round(100 + blurProgress * 15);
               return (
                 <div
                   style={{
                     position: 'relative',
                     borderRadius: 16,
                     overflow: 'hidden',
-                    backdropFilter: `blur(${cardBlurNum}px) saturate(190%) contrast(105%)`,
-                    WebkitBackdropFilter: `blur(${cardBlurNum}px) saturate(190%) contrast(105%)`,
+                    backdropFilter: `blur(${cardBlurNum}px) saturate(${glassSaturate}%) contrast(${glassContrast}%)`,
+                    WebkitBackdropFilter: `blur(${cardBlurNum}px) saturate(${glassSaturate}%) contrast(${glassContrast}%)`,
                     background: previewDark
                       ? `linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(12, 16, 28, ${cardOpacityNum * 0.85})`
                       : `linear-gradient(135deg, rgba(255, 255, 255, ${cardOpacityNum * 0.40 + 0.04}) 0%, rgba(255, 255, 255, ${cardOpacityNum * 0.10}) 100%), rgba(255, 255, 255, ${cardOpacityNum})`,
@@ -501,8 +508,8 @@ export default function SettingsSite() {
                       boxShadow: previewDark
                         ? 'inset 0 1px 0 rgba(255, 255, 255, 0.10)'
                         : 'inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(0, 0, 0, 0.04)',
-                      backdropFilter: `blur(${cardBlurNum * 0.4}px)`,
-                      WebkitBackdropFilter: `blur(${cardBlurNum * 0.4}px)`,
+                      backdropFilter: `blur(${cardBlurNum * 0.4}px) saturate(${glassSaturate}%)`,
+                      WebkitBackdropFilter: `blur(${cardBlurNum * 0.4}px) saturate(${glassSaturate}%)`,
                     }}>
                       <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
                         <span>CPU 负载</span>
@@ -524,8 +531,8 @@ export default function SettingsSite() {
                       boxShadow: previewDark
                         ? 'inset 0 1px 0 rgba(255, 255, 255, 0.10)'
                         : 'inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(0, 0, 0, 0.04)',
-                      backdropFilter: `blur(${cardBlurNum * 0.4}px)`,
-                      WebkitBackdropFilter: `blur(${cardBlurNum * 0.4}px)`,
+                      backdropFilter: `blur(${cardBlurNum * 0.4}px) saturate(${glassSaturate}%)`,
+                      WebkitBackdropFilter: `blur(${cardBlurNum * 0.4}px) saturate(${glassSaturate}%)`,
                     }}>
                       <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
                         <span>内存占用</span>
