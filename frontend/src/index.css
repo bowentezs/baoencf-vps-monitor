@@ -6497,6 +6497,31 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-metric-bar {
 .layout.has-custom-bg .node-card:hover .node-metric-bar > span {
   box-shadow: 0 0 12px currentColor, 0 0 4px #fff !important;
 }
+/* 🍎 节点卡片内指标小方块 (CPU/内存/磁盘) 副标题文字清晰度与对比度加固 */
+:root:not(.dark) .layout.has-custom-bg .node-metric-detail {
+  color: #475569 !important;
+  font-weight: 550 !important;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.7) !important;
+}
+:root:not(.dark) .layout.has-custom-bg .node-metric-label {
+  color: #334155 !important;
+  font-weight: 700 !important;
+}
+
+/* 🍎 节点卡片地理位置与二级标题微抗眩光衬底 */
+:root:not(.dark) .layout.has-custom-bg .node-card-header .rt-Text[color='gray'] {
+  color: #475569 !important;
+  font-weight: 500 !important;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8) !important;
+}
+
+/* 🍎 网络速率与流量数字严格等宽对齐，杜绝跳动 */
+.layout.has-custom-bg .node-network-value,
+.layout.has-custom-bg .node-network-value strong,
+.layout.has-custom-bg .node-uptime-nowrap {
+  font-variant-numeric: tabular-nums !important;
+  letter-spacing: -0.2px !important;
+}
 /* 进度条与指标霓虹发光 */
 .layout.has-custom-bg .usage-bar-fill,
 .layout.has-custom-bg .node-metric-bar > span {
