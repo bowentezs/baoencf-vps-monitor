@@ -6223,6 +6223,8 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .nav-bar {
   backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-saturate, 180%)) contrast(var(--glass-contrast, 108%)) !important;
   -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-saturate, 180%)) contrast(var(--glass-contrast, 108%)) !important;
   overflow: hidden !important;
+  contain: paint;
+  transform: translateZ(0);
   transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease !important;
 }
 
@@ -6266,9 +6268,9 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-card,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel {
   background-color: rgba(12, 16, 28, var(--glass-opacity, 0.70)) !important;
   background-image: 
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%),
-    radial-gradient(circle at 10% 10%, rgba(139, 92, 246, 0.22), transparent 45%),
-    radial-gradient(circle at 90% 90%, rgba(56, 189, 248, 0.18), transparent 45%) !important;
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.00) 100%),
+    radial-gradient(circle at 10% 10%, rgba(139, 92, 246, 0.09), transparent 45%),
+    radial-gradient(circle at 90% 90%, rgba(56, 189, 248, 0.07), transparent 45%) !important;
   border: 1.5px solid rgba(255, 255, 255, 0.32) !important;
   box-shadow: 
     0 0 0 1px rgba(0, 0, 0, 0.40),
@@ -6289,9 +6291,9 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel {
 :root:not(.dark) .layout.has-custom-bg .node-filter-panel {
   background-color: rgba(255, 255, 255, var(--glass-opacity, 0.70)) !important;
   background-image: 
-    linear-gradient(135deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.03) 100%),
-    radial-gradient(circle at 15% 15%, rgba(224, 242, 254, 0.35), transparent 50%),
-    radial-gradient(circle at 85% 85%, rgba(250, 232, 255, 0.30), transparent 50%) !important;
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.00) 100%),
+    radial-gradient(circle at 15% 15%, rgba(224, 242, 254, 0.12), transparent 50%),
+    radial-gradient(circle at 85% 85%, rgba(250, 232, 255, 0.10), transparent 50%) !important;
   border: 1.5px solid rgba(255, 255, 255, 0.85) !important;
   box-shadow: 
     0 0 0 1px rgba(255, 255, 255, 0.80),
@@ -6321,7 +6323,9 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel {
 
 .layout.has-custom-bg .node-card::before,
 .layout.has-custom-bg .monitor-stat-card::before,
-.layout.has-custom-bg .website-monitor-card::before {
+.layout.has-custom-bg .monitor-overview::before,
+.layout.has-custom-bg .website-monitor-card::before,
+.layout.has-custom-bg .node-filter-panel::before {
   display: var(--glass-glow-display, block) !important;
   content: "" !important;
   position: absolute !important;
@@ -6336,6 +6340,20 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel {
   box-shadow: 0 0 14px rgba(139, 92, 246, 0.9), 0 0 5px #38bdf8 !important;
   z-index: 2 !important;
   pointer-events: none !important;
+}
+
+/* 🍎 极光流光错峰波动相位 (赋予自然的波浪呼吸感) */
+.layout.has-custom-bg .node-card:nth-of-type(2n)::before {
+  animation-delay: -2s !important;
+}
+.layout.has-custom-bg .node-card:nth-of-type(3n)::before {
+  animation-delay: -4.5s !important;
+}
+.layout.has-custom-bg .node-card:nth-of-type(4n)::before {
+  animation-delay: -6.2s !important;
+}
+.layout.has-custom-bg .node-card:hover::before {
+  filter: brightness(1.3) saturate(220%) !important;
 }
 
 /* 🍎 卡片悬停微浮动与透镜激发高光爆发 */
