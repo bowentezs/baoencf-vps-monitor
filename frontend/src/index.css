@@ -6245,6 +6245,35 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-tile {
 }
 
 /* 🍎 彻底打通卡片内部子容器的毛玻璃透光通道 (浅色模式：半透明微晶，绝不遮挡底层磨砂) */
+/* 🍎 顶部概览胶囊卡片文字对比度锐化与清晰度增强 */
+:root:not(.dark) .layout.has-custom-bg .monitor-stat-card .monitor-stat-title {
+  color: #334155 !important;
+  font-weight: 650 !important;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8) !important;
+}
+:root:not(.dark) .layout.has-custom-bg .monitor-stat-card .monitor-stat-value,
+:root:not(.dark) .layout.has-custom-bg .monitor-stat-card .monitor-stat-inline-values {
+  color: #0f172a !important;
+  font-weight: 750 !important;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.9) !important;
+}
+
+/* 🍎 卡片内部网络指标与在线时长透光小胶囊微晶统一 */
+.layout.has-custom-bg .node-network-value {
+  background: transparent !important;
+}
+:root:not(.dark) .layout.has-custom-bg .node-network-value {
+  background: rgba(255, 255, 255, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.75) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+}
+.dark .layout.has-custom-bg .node-network-value,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-network-value {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
 :root:not(.dark) .layout.has-custom-bg .node-card-system-line,
 :root:not(.dark) .layout.has-custom-bg .node-metric-tile,
 :root:not(.dark) .layout.has-custom-bg .node-network-panel,
