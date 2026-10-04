@@ -6417,6 +6417,86 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-card:hover {
     0 0 24px rgba(56, 189, 248, 0.25) !important;
 }
 
+/* 🍎 第二排标签组 (Ubuntu, 价格, 剩余天数, IP) 微晶半透药丸拟态 */
+.layout.has-custom-bg .node-card-system-line .rt-Badge {
+  background: rgba(255, 255, 255, 0.40) !important;
+  border: 1px solid rgba(255, 255, 255, 0.70) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8), 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  transition: all 0.2s ease !important;
+}
+.dark .layout.has-custom-bg .node-card-system-line .rt-Badge,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-card-system-line .rt-Badge {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+}
+
+/* 🍎 右上角快捷操作图标 (历史图表/详情) 晶体透镜按钮化 */
+.layout.has-custom-bg .node-card .node-card-action-btn,
+.layout.has-custom-bg .node-card .rt-IconButton {
+  background: rgba(255, 255, 255, 0.35) !important;
+  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8), 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+  border-radius: 8px !important;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease !important;
+}
+.layout.has-custom-bg .node-card .node-card-action-btn:hover,
+.layout.has-custom-bg .node-card .rt-IconButton:hover {
+  background: rgba(255, 255, 255, 0.75) !important;
+  transform: translateY(-1.5px) scale(1.05) !important;
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25), inset 0 1px 1px #fff !important;
+}
+.dark .layout.has-custom-bg .node-card .node-card-action-btn,
+.dark .layout.has-custom-bg .node-card .rt-IconButton,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-card .node-card-action-btn,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-card .rt-IconButton {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+}
+.dark .layout.has-custom-bg .node-card .node-card-action-btn:hover,
+.dark .layout.has-custom-bg .node-card .rt-IconButton:hover,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-card .node-card-action-btn:hover,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-card .rt-IconButton:hover {
+  background: rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+/* 🍎 搜索与筛选工具栏内控件微晶凹槽质感 (Glass Inset) */
+.layout.has-custom-bg .node-filter-panel .rt-TextFieldRoot,
+.layout.has-custom-bg .node-filter-panel .rt-SegmentedControlRoot,
+.layout.has-custom-bg .node-filter-panel .rt-SelectTrigger {
+  background: rgba(255, 255, 255, 0.40) !important;
+  border: 1px solid rgba(255, 255, 255, 0.70) !important;
+  box-shadow: inset 0 1.5px 2px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.dark .layout.has-custom-bg .node-filter-panel .rt-TextFieldRoot,
+.dark .layout.has-custom-bg .node-filter-panel .rt-SegmentedControlRoot,
+.dark .layout.has-custom-bg .node-filter-panel .rt-SelectTrigger,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel .rt-TextFieldRoot,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel .rt-SegmentedControlRoot,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-filter-panel .rt-SelectTrigger {
+  background: rgba(12, 16, 28, 0.55) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: inset 0 1.5px 3px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* 🍎 进度条极光微光增强与悬停光晕外扩 */
+.layout.has-custom-bg .node-metric-bar {
+  background: rgba(0, 0, 0, 0.06) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+}
+.dark .layout.has-custom-bg .node-metric-bar,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .node-metric-bar {
+  background: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5) !important;
+}
+.layout.has-custom-bg .node-card:hover .node-metric-bar > span {
+  box-shadow: 0 0 12px currentColor, 0 0 4px #fff !important;
+}
 /* 进度条与指标霓虹发光 */
 .layout.has-custom-bg .usage-bar-fill,
 .layout.has-custom-bg .node-metric-bar > span {
