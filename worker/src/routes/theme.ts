@@ -27,26 +27,14 @@ const BUILTIN_THEMES = [
   {
     short: 'monitor',
     name: 'Monitor',
-    description: '经典环形仪表盘主题',
+    description: '项目内置Monitor主题',
     previewUrl: '/theme-previews/monitor.svg',
   },
   {
     short: 'next',
     name: 'Next',
-    description: '工整水平条卡片主题',
+    description: '项目内置 Next 主题',
     previewUrl: '/theme-previews/next.svg',
-  },
-  {
-    short: 'luminaplus',
-    name: 'LuminaPlus 水晶',
-    description: '极客通透纯净晶体流光主题 (Havoooc 风格)',
-    previewUrl: '/theme-previews/luminaplus.svg',
-  },
-  {
-    short: 'sakura',
-    name: 'Hotaru 樱花微光',
-    description: '梦幻粉樱二次元透光主题 (萌系唯美)',
-    previewUrl: '/theme-previews/sakura.svg',
   },
 ] as const;
 
