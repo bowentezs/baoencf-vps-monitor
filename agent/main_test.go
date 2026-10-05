@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -1105,3 +1106,74 @@ func TestRunPingTasksConcurrent(t *testing.T) {
 		t.Fatalf("runPingTasks() took %v, want concurrent execution (<2s)", elapsed)
 	}
 }
+
+func TestParsePingRTT(t *testing.T) {
+	tests := []struct {
+		name    string
+		output  string
+		wantRTT float64
+		wantOK  bool
+	}{
+		{
+			name:    "linux summary",
+			output:  "rtt min/avg/max/mdev = 12.345/14.567/16.789/1.234 ms",
+			wantRTT: 14.567,
+			wantOK:  true,
+		},
+		{
+			name:    "linux packet",
+			output:  "64 bytes from 8.8.8.8: icmp_seq=1 ttl=117 time=15.4 ms",
+			wantRTT: 15.4,
+			wantOK:  true,
+		},
+		{
+			name:    "bsd round-trip",
+			output:  "round-trip min/avg/max/stddev = 10.120/12.340/15.670/1.890 ms",
+			wantRTT: 12.340,
+			wantOK:  true,
+		},
+		{
+			name:    "windows english reply",
+			output:  "Reply from 8.8.8.8: bytes=32 time=23ms TTL=117",
+			wantRTT: 23,
+			wantOK:  true,
+		},
+		{
+			name:    "windows english less than 1ms",
+			output:  "Reply from 127.0.0.1: bytes=32 time<1ms TTL=128",
+			wantRTT: 1,
+			wantOK:  true,
+		},
+		{
+			name:    "windows chinese reply",
+			output:  "来自 8.8.8.8 的回复: 字节=32 时间=28ms TTL=117",
+			wantRTT: 28,
+			wantOK:  true,
+		},
+		{
+			name:    "windows chinese average",
+			output:  "最短 = 10ms，最长 = 20ms，平均 = 15ms",
+			wantRTT: 15,
+			wantOK:  true,
+		},
+		{
+			name:    "invalid output",
+			output:  "Destination Host Unreachable",
+			wantRTT: 0,
+			wantOK:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRTT, gotOK := parsePingRTT(tt.output)
+			if gotOK != tt.wantOK {
+				t.Fatalf("parsePingRTT() gotOK = %v, want %v", gotOK, tt.wantOK)
+			}
+			if tt.wantOK && math.Abs(gotRTT-tt.wantRTT) > 0.001 {
+				t.Fatalf("parsePingRTT() gotRTT = %v, want %v", gotRTT, tt.wantRTT)
+			}
+		})
+	}
+}
+
