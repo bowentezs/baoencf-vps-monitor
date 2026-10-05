@@ -656,6 +656,11 @@ body {
 }
 
 .node-card-status-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
   align-self: flex-start;
   min-height: 26px;
   padding-top: 0;
@@ -663,7 +668,13 @@ body {
   top: -2px;
   right: 0;
   z-index: 2;
+  white-space: nowrap !important;
 }
+
+.node-card-status-row > * {
+  flex-shrink: 0 !important;
+}
+
 
 .node-card-title-row {
   width: 100%;
@@ -808,15 +819,24 @@ body {
 .node-card-action {
   width: 26px !important;
   min-width: 26px !important;
+  max-width: 26px !important;
   height: 26px !important;
+  min-height: 26px !important;
+  max-height: 26px !important;
   padding: 0 !important;
+  margin: 0 !important;
   border-radius: 7px !important;
   border: 1px solid var(--monitor-border) !important;
   background: var(--monitor-panel-strong) !important;
   cursor: pointer !important;
   color: var(--monitor-accent) !important;
-  position: relative;
+  position: relative !important;
   isolation: isolate;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 26px !important;
+  flex-shrink: 0 !important;
   transition:
     background-color 160ms ease,
     border-color 160ms ease,

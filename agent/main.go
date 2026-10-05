@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -1003,6 +1004,30 @@ func dialResolvedTCP(ctx context.Context, network string, ips []net.IP, port str
 	return nil, fmt.Errorf("no dialable IP addresses")
 }
 
+var pingRTTRegexes = []*regexp.Regexp{
+	// Linux / macOS / BSD summary: "rtt min/avg/max/mdev = 12.345/14.567/16.789/1.234 ms"
+	regexp.MustCompile(`(?:rtt|round-trip)\s+(?:min/avg/max/(?:mdev|stddev))\s*=\s*[0-9.]+/([0-9.]+)/`),
+	// Linux / BSD per-packet: "time=14.2 ms" or "time=14 ms"
+	regexp.MustCompile(`[=\s]time=([0-9.]+)\s*ms`),
+	// Windows English: "time=14ms" or "time<1ms"
+	regexp.MustCompile(`(?i)time[=<]([0-9.]+)\s*ms`),
+	// Windows Chinese: "时间=14ms" or "时间<1ms"
+	regexp.MustCompile(`时间[=<]([0-9.]+)\s*ms`),
+	// Windows summary: "Average = 14ms" or "平均 = 14ms"
+	regexp.MustCompile(`(?i)(?:average|平均)\s*=\s*([0-9.]+)\s*ms`),
+}
+
+func parsePingRTT(output string) (float64, bool) {
+	for _, re := range pingRTTRegexes {
+		if matches := re.FindStringSubmatch(output); len(matches) > 1 {
+			if val, err := strconv.ParseFloat(matches[1], 64); err == nil && val >= 0 {
+				return val, true
+			}
+		}
+	}
+	return 0, false
+}
+
 func executeICMPPing(target string) float64 {
 	ips, err := resolvePublicIPs(context.Background(), target)
 	if err != nil {
@@ -1032,6 +1057,9 @@ func executeICMPPing(target string) float64 {
 			log.Printf("ICMP ping failed for %q (%s): %v", target, pingTarget, err)
 		}
 		return -1
+	}
+	if rtt, ok := parsePingRTT(string(output)); ok {
+		return rtt
 	}
 	return float64(elapsed)
 }

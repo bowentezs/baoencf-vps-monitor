@@ -50,3 +50,67 @@ export function normalizeGitSha(value: string | undefined): string {
 export function shortGitSha(value: string | undefined): string {
   return normalizeGitSha(value).slice(0, 7);
 }
+
+export function decodeXmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec)));
+}
+
+export function parseGitSmartHttpRefs(text: string, branch: string): string | null {
+  const target = `refs/heads/${branch}`;
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    const match = line.match(/([0-9a-fA-F]{40})\s+(\S+)/);
+    if (match && match[2] === target) {
+      return match[1].toLowerCase();
+    }
+  }
+  return null;
+}
+
+export type ParsedAtomCommit = {
+  sha: string;
+  html_url: string;
+  title: string;
+  body: string;
+  published_at: string;
+};
+
+export function parseGitHubCommitsAtom(xmlText: string): ParsedAtomCommit | null {
+  const entryMatch = xmlText.match(/<entry>([\s\S]*?)<\/entry>/);
+  if (!entryMatch) return null;
+  const entryContent = entryMatch[1];
+
+  const shaMatch =
+    entryContent.match(/<id>[^<]*Grit::Commit\/([0-9a-fA-F]{40})<\/id>/i) ||
+    entryContent.match(/\/commit\/([0-9a-fA-F]{40})/i);
+  if (!shaMatch) return null;
+  const sha = shaMatch[1].toLowerCase();
+
+  const linkMatch = entryContent.match(/<link\s+[^>]*href="([^"]+)"/i);
+  const html_url = linkMatch ? linkMatch[1] : '';
+
+  const dateMatch = entryContent.match(/<updated>([^<]+)<\/updated>/i);
+  const published_at = dateMatch ? dateMatch[1].trim() : '';
+
+  const titleMatch = entryContent.match(/<title>([\s\S]*?)<\/title>/i);
+  const rawTitle = titleMatch ? decodeXmlEntities(titleMatch[1].trim()) : '';
+
+  const preMatch = entryContent.match(/(?:<pre[^>]*>|&lt;pre[\s\S]*?&gt;)([\s\S]*?)(?:<\/pre>|&lt;\/pre&gt;)/i);
+  const rawBody = preMatch ? decodeXmlEntities(decodeXmlEntities(preMatch[1].trim())) : rawTitle;
+
+  return {
+    sha,
+    html_url,
+    title: rawTitle,
+    body: rawBody,
+    published_at,
+  };
+}
+

@@ -10,7 +10,8 @@
     "build": "node ../scripts/generate-migrations.mjs && wrangler types --check && tsc --noEmit",
     "build:frontend": "npm --prefix ../frontend run build",
     "predeploy": "npm run build:frontend && npm run build",
-    "deploy": "node ../scripts/deploy-cloudflare.mjs"
+    "deploy": "node ../scripts/deploy-cloudflare.mjs",
+    "test": "node --test"
   },
   "dependencies": {
     "fflate": "^0.8.3",
