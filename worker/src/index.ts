@@ -316,10 +316,8 @@ function agentSourceAssetUrl(asset: string, commit: string): string {
 
 function redirectToAgentSourceAsset(c: AppContext, asset: string): Response {
   const commit = String(c.env.CURRENT_GIT_COMMIT || '').trim().toLowerCase();
-  if (!/^[a-f0-9]{40}$/.test(commit)) {
-    return c.json({ error: 'Agent installer is unavailable until a deployment commit is configured.' }, 503);
-  }
-  return c.redirect(agentSourceAssetUrl(asset, commit), 302);
+  const ref = /^[a-f0-9]{40}$/.test(commit) ? commit : 'main';
+  return c.redirect(agentSourceAssetUrl(asset, ref), 302);
 }
 
 app.get('/agent/install.sh', (c) => redirectToAgentSourceAsset(c, 'install.sh'));

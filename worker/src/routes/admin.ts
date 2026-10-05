@@ -44,6 +44,8 @@ import {
   repositoryUrlFromRepositoryUrl,
   normalizeGitSha,
   shortGitSha,
+  parseGitHubCommitsAtom,
+  parseGitSmartHttpRefs,
   type UpdateCheckResult,
 } from '../utils/update-check';
 import {
@@ -1316,8 +1318,61 @@ async function fetchGitHubJson<T>(path: string): Promise<T> {
   return await response.json();
 }
 
-function fetchLatestCommit(repository: string): Promise<GitHubCommitInfo> {
-  return fetchGitHubJson<GitHubCommitInfo>(`repos/${repository}/commits/${OFFICIAL_UPDATE_BRANCH}`);
+async function fetchLatestCommit(repository: string): Promise<GitHubCommitInfo> {
+  // 1. 优先尝试 GitHub REST API
+  try {
+    return await fetchGitHubJson<GitHubCommitInfo>(`repos/${repository}/commits/${OFFICIAL_UPDATE_BRANCH}`);
+  } catch (apiError) {
+    console.warn('[update-check] GitHub REST API failed, falling back to Atom feed / Smart HTTP:', apiError);
+  }
+
+  // 2. 降级方案 A：GitHub Atom Feed（不受 REST API 频控，带 commit 标题与时间）
+  try {
+    const atomRes = await fetch(`https://github.com/${repository}/commits/${OFFICIAL_UPDATE_BRANCH}.atom`, {
+      headers: { 'User-Agent': 'cf-vps-monitor-update-check' },
+    });
+    if (atomRes.ok) {
+      const xml = await atomRes.text();
+      const parsed = parseGitHubCommitsAtom(xml);
+      if (parsed) {
+        return {
+          sha: parsed.sha,
+          html_url: parsed.html_url || `https://github.com/${repository}/commit/${parsed.sha}`,
+          commit: {
+            message: parsed.body || parsed.title,
+            committer: { date: parsed.published_at },
+            author: { date: parsed.published_at },
+          },
+        };
+      }
+    }
+  } catch (atomError) {
+    console.warn('[update-check] Atom feed fallback failed:', atomError);
+  }
+
+  // 3. 降级方案 B：Git Smart HTTP info/refs（底层协议永不限流，保证最新 Commit Hash 能拿到）
+  try {
+    const gitRes = await fetch(`https://github.com/${repository}.git/info/refs?service=git-upload-pack`, {
+      headers: { 'User-Agent': 'cf-vps-monitor-update-check' },
+    });
+    if (gitRes.ok) {
+      const refsText = await gitRes.text();
+      const sha = parseGitSmartHttpRefs(refsText, OFFICIAL_UPDATE_BRANCH);
+      if (sha) {
+        return {
+          sha,
+          html_url: `https://github.com/${repository}/commit/${sha}`,
+          commit: {
+            message: `Commit ${sha.slice(0, 7)}`,
+          },
+        };
+      }
+    }
+  } catch (gitError) {
+    console.warn('[update-check] Git Smart HTTP fallback failed:', gitError);
+  }
+
+  throw new Error('All update check providers failed (GitHub API rate limit or network error)');
 }
 
 async function fetchLatestWorkerVersion(repository: string, commitSha: string): Promise<string> {
