@@ -38,9 +38,8 @@ jobs:
       - name: Build (frontend + worker)
         run: npm run build
 
-      - name: Worker unit tests
-        working-directory: worker
-        run: node --test
+      - name: Unit tests (frontend, worker, scripts)
+        run: npm run test:node
 
       - name: Agent unit tests
-        run: npm test
+        run: npm run test:agent

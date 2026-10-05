@@ -5,9 +5,10 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 preview_urls = true
 
-routes = [
-  { pattern = "vpsmonitor.95049504.xyz", custom_domain = true }
-]
+# 如需绑定自定义域名，可取消注释并修改为你自己的域名：
+# routes = [
+#   { pattern = "monitor.example.com", custom_domain = true }
+# ]
 
 [observability]
 enabled = true
@@ -21,7 +22,7 @@ head_sampling_rate = 1
 mode = "smart"
 
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["*/2 * * * *"]
 
 [[durable_objects.bindings]]
 name = "LIVE_DATA"
@@ -40,7 +41,7 @@ tag = "v2"
 new_sqlite_classes = ["RateLimitDO"]
 
 [vars]
-SUPABASE_URL = "https://sb.baoen.de5.net"
+SUPABASE_URL = "https://PROJECT_REF.supabase.co"
 
 [assets]
 directory = "frontend/dist"
