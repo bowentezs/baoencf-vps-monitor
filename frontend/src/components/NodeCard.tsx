@@ -338,29 +338,31 @@ export default function NodeCard({ client, live, online, statusKnown = true, tod
                   title={d.message}
                 >!</Box>
               )}
-              <MiniPingChartFloat
-                uuid={client.uuid}
-                chartWidth={460}
-                chartHeight={260}
-                limit={360}
-                rangeHours={1}
-                includeHidden={includeHidden}
-                trigger={
-                  <IconButton className="node-card-action" data-node-card-action="true" variant="ghost" size="2" aria-label="查看 Ping 延迟" title="查看 Ping 延迟走势">
-                    <TrendingUp size={16} />
-                  </IconButton>
-                }
-              />
-              <DailyTrafficChartFloat
-                uuid={client.uuid}
-                clientName={client.name}
-                includeHidden={includeHidden}
-                trigger={
-                  <IconButton className="node-card-action" data-node-card-action="true" variant="ghost" size="2" aria-label="查看每日流量" title="查看每日流量趋势">
-                    <BarChart3 size={16} />
-                  </IconButton>
-                }
-              />
+              <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
+                <MiniPingChartFloat
+                  uuid={client.uuid}
+                  chartWidth={460}
+                  chartHeight={260}
+                  limit={360}
+                  rangeHours={1}
+                  includeHidden={includeHidden}
+                  trigger={
+                    <IconButton className="node-card-action" data-node-card-action="true" variant="ghost" size="2" aria-label="查看 Ping 延迟" title="查看 Ping 延迟走势">
+                      <TrendingUp size={16} />
+                    </IconButton>
+                  }
+                />
+                <DailyTrafficChartFloat
+                  uuid={client.uuid}
+                  clientName={client.name}
+                  includeHidden={includeHidden}
+                  trigger={
+                    <IconButton className="node-card-action" data-node-card-action="true" variant="ghost" size="2" aria-label="查看每日流量" title="查看每日流量趋势">
+                      <BarChart3 size={16} />
+                    </IconButton>
+                  }
+                />
+              </Flex>
               <Badge color={!statusKnown ? 'gray' : online ? 'green' : 'red'} variant="solid" radius="full">
                 {!statusKnown ? '状态未知' : online ? '在线' : '离线'}
               </Badge>
