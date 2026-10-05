@@ -326,7 +326,7 @@ export default function NodeTable({ nodes, liveData, dailyTraffic = {}, includeH
             <SortHeader column="disk" style={{ width: 118 }}>硬盘</SortHeader>
             <SortHeader column="network" style={{ width: 142 }}>网络</SortHeader>
             <SortHeader column="price" style={{ width: 108 }}>价格</SortHeader>
-            <SortHeader column="traffic" style={{ width: 166 }}>今日流量</SortHeader>
+            <SortHeader column="traffic" style={{ width: 176 }}>流量统计</SortHeader>
           </Table.Row>
         </Table.Header>
 
@@ -429,13 +429,16 @@ export default function NodeTable({ nodes, liveData, dailyTraffic = {}, includeH
                     )}
                   </Table.Cell>
                   <Table.Cell>
-                    {todayTraffic ? (
-                      <Text size="2" style={{ whiteSpace: 'nowrap' }}>
-                        ↑ {formatBytes(todayTraffic.up)} ↓ {formatBytes(todayTraffic.down)}
+                    <Flex direction="column" gap="0">
+                      <Text size="2" weight="medium" style={{ whiteSpace: 'nowrap' }}>
+                        {node.traffic_limit && node.traffic_limit > 0
+                          ? `${formatBytes((live?.net_total_up || 0) + (live?.net_total_down || 0))} / ${formatBytes(node.traffic_limit)}`
+                          : `总: ${formatBytes((live?.net_total_up || 0) + (live?.net_total_down || 0))}`}
                       </Text>
-                    ) : (
-                      <Text size="2" color="gray">-</Text>
-                    )}
+                      <Text size="1" color="gray" style={{ whiteSpace: 'nowrap' }}>
+                        今: {todayTraffic ? `↑${formatBytes(todayTraffic.up)} ↓${formatBytes(todayTraffic.down)}` : '-'}
+                      </Text>
+                    </Flex>
                   </Table.Cell>
                 </Table.Row>
 

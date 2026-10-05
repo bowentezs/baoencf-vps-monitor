@@ -277,8 +277,8 @@ export default function NodeCard({ client, live, online, statusKnown = true, tod
   const cpuDetail = formatCpuCardLabel(client.cpu_name, client.cpu_cores);
   const cpuTitle = formatCpuSpec(client.cpu_name, client.cpu_cores);
 
-  const trafficUsed = (() => {
-    if (!client.traffic_limit || client.traffic_limit <= 0) return 0;
+  const hasTrafficLimit = Boolean(client.traffic_limit && client.traffic_limit > 0);
+  const actualTrafficUsed = (() => {
     const type = parseTrafficLimitType(client.traffic_limit_type);
     switch (type) {
       case 'max': return Math.max(totalUp, totalDown);
@@ -289,7 +289,8 @@ export default function NodeCard({ client, live, online, statusKnown = true, tod
       default: return totalUp + totalDown;
     }
   })();
-  const trafficPct = client.traffic_limit > 0 ? Math.min(100, (trafficUsed / client.traffic_limit) * 100) : undefined;
+  const trafficUsed = actualTrafficUsed;
+  const trafficPct = hasTrafficLimit ? Math.min(100, (trafficUsed / client.traffic_limit) * 100) : undefined;
   const hasBillingInfo = (client.price !== undefined && client.price !== 0) || Boolean(getExpiryInfo(client.expired_at).label);
   const handleCardLinkClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     const target = event.target as HTMLElement | null;
@@ -415,10 +416,11 @@ export default function NodeCard({ client, live, online, statusKnown = true, tod
                 <CompactMetric label="内存" value={formatPercent(memPct)} detail={memDetail} percent={memPct} />
                 <CompactMetric label="磁盘" value={formatPercent(diskPct)} detail={diskDetail} percent={diskPct} />
                 <CompactMetric
-                  label="月度"
-                  value={trafficLimitLabel ? `${trafficPct?.toFixed(0) || 0}%` : '-'}
-                  detail={trafficLimitLabel || '未设置'}
-                  percent={trafficLimitLabel ? trafficPct : undefined}
+                  label={hasTrafficLimit ? '月度' : '已用流量'}
+                  value={hasTrafficLimit ? `${trafficPct?.toFixed(0) || 0}%` : formatBytes(actualTrafficUsed)}
+                  detail={hasTrafficLimit ? `${formatBytes(actualTrafficUsed)} / ${formatBytes(client.traffic_limit)}` : `↑ ${formatBytes(totalUp)} · ↓ ${formatBytes(totalDown)}`}
+                  percent={hasTrafficLimit ? trafficPct : undefined}
+                  title={trafficLimitLabel || undefined}
                 />
               </div>
               <NetworkSummary
