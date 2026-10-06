@@ -53,12 +53,16 @@ function resolveSupabaseUrl({ allowDryRunFallback = false } = {}) {
 
 function writeDeployConfig() {
   const source = readFileSync(sourceConfig, 'utf8');
-  const supabaseUrl = resolveSupabaseUrl({ allowDryRunFallback: isDryRun });
+  const supabaseUrl = resolveSupabaseUrl({ allowDryRunFallback: isDryRun || keepsExistingVars });
   const commit = currentGitCommit();
   let generated = source.replace(/SUPABASE_URL\s*=\s*"[^"]*"/, `SUPABASE_URL = "${supabaseUrl}"`);
   generated = /\nCURRENT_GIT_COMMIT\s*=/.test(generated)
     ? generated.replace(/CURRENT_GIT_COMMIT\s*=\s*"[^"]*"/, `CURRENT_GIT_COMMIT = "${commit}"`)
     : generated.replace(/(\[vars\]\s*)/, `$1\nCURRENT_GIT_COMMIT = "${commit}"\n`);
+  if (keepsExistingVars) {
+    // 保护线上既有环境变量：彻底移除 [vars] 块，防止任何占位值推向 Cloudflare
+    generated = generated.replace(/\[vars\][\s\S]*?(?=\n\[|$)/, '');
+  }
   generated = generated
     .replace('main = "worker/src/index.ts"', 'main = "../src/index.ts"')
     .replace('directory = "frontend/dist"', 'directory = "../../frontend/dist"');
