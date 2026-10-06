@@ -350,7 +350,8 @@ export function LiveDataProvider({ children, enabled = true, viewer = true }: Li
       return;
     }
     try {
-      const res = await fetch(`/api/live/clients${includeHidden ? '?include_hidden=1' : ''}`, { cache: 'no-store' });
+      const currentPath = typeof window !== 'undefined' ? (window.location.pathname || '/') : '/';
+      const res = await fetch(`/api/live/clients?path=${encodeURIComponent(currentPath)}${includeHidden ? '&include_hidden=1' : ''}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = normalizeLiveDataResponse(await res.json());
       if (!data) throw new Error('Invalid live data response');
@@ -486,7 +487,8 @@ export function LiveDataProvider({ children, enabled = true, viewer = true }: Li
           applyLiveSnapshot(live);
           setLoading(false);
         }
-        const tokenResponse = await fetch('/api/ws/live-token');
+        const currentPath = typeof window !== 'undefined' ? (window.location.pathname || '/') : '/';
+        const tokenResponse = await fetch(`/api/ws/live-token?path=${encodeURIComponent(currentPath)}`);
         if (!tokenResponse.ok) throw new Error(`HTTP ${tokenResponse.status}`);
         const tokenData = normalizeViewerTokenResponse(await tokenResponse.json());
         if (!tokenData) throw new Error('Invalid live token response');

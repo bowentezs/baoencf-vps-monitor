@@ -96,6 +96,39 @@ export default function Layout() {
     };
   }, [setDisplayThemeFromSettings]);
 
+  // 前台探针路由切换安全自动上报
+  useEffect(() => {
+    const currentPath = location.pathname || '/';
+    if (currentPath.startsWith('/admin') || currentPath.startsWith('/login') || currentPath.startsWith('/db-init')) {
+      return;
+    }
+    const cacheKey = 'last_reported_visit_' + currentPath;
+    const lastReport = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(cacheKey) : null;
+    const now = Date.now();
+    if (lastReport && now - Number(lastReport) < 300_000) {
+      return;
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(cacheKey, String(now));
+    }
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        const blob = new Blob([JSON.stringify({ path: currentPath })], { type: 'application/json' });
+        navigator.sendBeacon('/api/visit', blob);
+      } else {
+        fetch('/api/visit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: currentPath }),
+          keepalive: true,
+        }).catch(() => {});
+      }
+    } catch {
+      // 静默处理
+    }
+  }, [location.pathname]);
+
   const cycleTheme = () => {
     const themes: Array<"light" | "dark" | "system"> = ["light", "dark", "system"];
     const idx = themes.indexOf(theme);

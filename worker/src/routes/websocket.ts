@@ -335,7 +335,7 @@ wsRoutes.get('/clients/report', async (c) => {
 });
 
 wsRoutes.get('/ws/live-token', async (c) => {
-  recordVisitorSafely(c, '/');
+  recordVisitorSafely(c, c.req.query('path') || '/');
   const secret = jwtSecret(c);
   if (new TextEncoder().encode(secret).byteLength < 32) {
     return c.json({ error: 'Server authentication is not configured' }, 500);
@@ -398,7 +398,7 @@ wsRoutes.get('/ws/live', async (c) => {
 });
 
 wsRoutes.get('/live/clients', async (c) => {
-  recordVisitorSafely(c, '/');
+  recordVisitorSafely(c, c.req.query('path') || '/');
   const limited = await enforceLiveClientsRateLimit(c, requestIp(c));
   if (limited) return limited;
   const includeHidden = c.req.query('include_hidden') === '1' && await hasAdminSession(c);
