@@ -173,6 +173,7 @@ function canServeWithoutDatabaseStartup(pathname: string): boolean {
     pathname.startsWith('/api/theme/manifest/') ||
     pathname === '/api/live' ||
     pathname === '/api/live/clients' ||
+    pathname === '/api/visit' ||
     pathname === '/api/ws/live' ||
     pathname === '/api/ws/live-token' ||
     pathname === '/api/admin' ||

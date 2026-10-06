@@ -32,6 +32,7 @@ import { readJsonWithLimit } from '../utils/request-body';
 import { base64ToBytes } from '../utils/theme-package';
 import { buildDailyTrafficResponse, normalizeDailyTrafficSnapshot } from '../utils/daily-traffic';
 import { dailyTrafficPublicCacheIdentity, parseDailyTrafficQuery } from '../utils/daily-traffic-query';
+import { recordVisitorSafely } from '../utils/visitor-logger';
 
 const publicRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 type PublicContext = Context<{ Bindings: Bindings; Variables: Variables }>;
@@ -1780,6 +1781,25 @@ publicRoutes.get('/live', async (c) => {
     : withPublicCacheHeader(c, await stub.fetch(forwardRequest), PUBLIC_LIVE_CACHE_SECONDS, 'miss');
   if (!includeHidden) putPublicEdgeCache(c, response);
   return response;
+});
+
+// 前台 SPA 页面路由浏览安全上报端点
+publicRoutes.all('/visit', async (c) => {
+  let targetPath = '/';
+  if (c.req.method === 'POST') {
+    try {
+      const body = await c.req.json() as { path?: string };
+      if (body && typeof body.path === 'string') {
+        targetPath = body.path.trim();
+      }
+    } catch {
+      targetPath = c.req.query('path') || '/';
+    }
+  } else {
+    targetPath = c.req.query('path') || '/';
+  }
+  recordVisitorSafely(c, targetPath);
+  return c.json({ ok: true });
 });
 
 export { publicRoutes, generateToken, hashPassword, verifyPassword };
