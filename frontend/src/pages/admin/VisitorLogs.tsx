@@ -25,6 +25,83 @@ export interface VisitorLogEntry {
   user_agent: string;
 }
 
+export interface FormattedPathInfo {
+  label: string;
+  subtext?: string;
+  badgeColor: 'blue' | 'purple' | 'green' | 'amber' | 'gray';
+  fullTitle: string;
+}
+
+// 格式化并中文化页面访问路径
+function parsePathDisplay(
+  rawPath: string,
+  clientNames: Record<string, string> = {}
+): FormattedPathInfo {
+  const path = (rawPath || '/').trim();
+
+  // 1. 首页 / 前台大盘
+  if (!path || path === '/' || path === '/index.html') {
+    return {
+      label: '前台大盘首页',
+      badgeColor: 'blue',
+      fullTitle: path,
+    };
+  }
+
+  // 2. 节点详情页 /instance/:id
+  const instanceMatch = path.match(/^\/instance\/([a-zA-Z0-9_-]+)/i);
+  if (instanceMatch) {
+    const id = instanceMatch[1];
+    const serverName = clientNames[id];
+    const shortId = id.length > 8 ? id.substring(0, 8) : id;
+
+    if (serverName) {
+      return {
+        label: `节点: ${serverName}`,
+        subtext: shortId,
+        badgeColor: 'purple',
+        fullTitle: `${serverName} (${id})`,
+      };
+    }
+    return {
+      label: '节点详情',
+      subtext: shortId,
+      badgeColor: 'purple',
+      fullTitle: `节点: ${id}`,
+    };
+  }
+
+  // 3. 登录页
+  if (path === '/login' || path.startsWith('/login/')) {
+    return {
+      label: '管理员登录',
+      badgeColor: 'amber',
+      fullTitle: path,
+    };
+  }
+
+  // 4. 管理后台
+  if (path === '/admin' || path.startsWith('/admin/')) {
+    let sub = '';
+    if (path.includes('/visitor-logs')) sub = '访客日志';
+    else if (path.includes('/clients')) sub = '节点管理';
+    else if (path.includes('/settings')) sub = '系统设置';
+    else if (path.includes('/notifications')) sub = '告警通知';
+    return {
+      label: sub ? `后台: ${sub}` : '管理后台',
+      badgeColor: 'gray',
+      fullTitle: path,
+    };
+  }
+
+  // 5. 其他常规路径兜底
+  return {
+    label: path.length > 24 ? `${path.substring(0, 24)}...` : path,
+    badgeColor: 'gray',
+    fullTitle: path,
+  };
+}
+
 // 简易解析 User-Agent 呈现友好标签
 function parseUserAgent(ua: string): { browser: string; os: string } {
   if (!ua) return { browser: '未知浏览器', os: '未知系统' };
@@ -75,6 +152,23 @@ export default function VisitorLogs() {
   const [pageSize, setPageSize] = useState('50');
   const [selectedLog, setSelectedLog] = useState<VisitorLogEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [clientNames, setClientNames] = useState<Record<string, string>>({});
+
+  // 异步获取探针节点名称对照表，供路径中文化呈现
+  useEffect(() => {
+    apiFetch('/admin/clients')
+      .then(res => {
+        const items = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+        const map: Record<string, string> = {};
+        for (const item of items) {
+          if (item?.uuid && item?.name) {
+            map[item.uuid] = item.name;
+          }
+        }
+        setClientNames(map);
+      })
+      .catch(() => {});
+  }, [apiFetch]);
 
   // 搜索防抖
   useEffect(() => {
@@ -250,9 +344,21 @@ export default function VisitorLogs() {
                         </Flex>
                       </Table.Cell>
                       <Table.Cell>
-                        <Badge variant="outline" color="blue">
-                          {item.path || '/'}
-                        </Badge>
+                        {(() => {
+                          const info = parsePathDisplay(item.path, clientNames);
+                          return (
+                            <Flex align="center" gap="1" wrap="wrap">
+                              <Badge variant="soft" color={info.badgeColor} title={info.fullTitle}>
+                                {info.label}
+                              </Badge>
+                              {info.subtext && (
+                                <Text size="1" color="gray" style={{ fontFamily: 'monospace' }}>
+                                  ({info.subtext})
+                                </Text>
+                              )}
+                            </Flex>
+                          );
+                        })()}
                       </Table.Cell>
                       <Table.Cell>
                         <Flex align="center" gap="1">
@@ -324,10 +430,21 @@ export default function VisitorLogs() {
                   <Text size="2" color="gray">国家/地区：</Text>
                   <Text size="2">{selectedLog.country || '未知'} {selectedLog.city}</Text>
                 </Flex>
-                <Flex justify="between">
-                  <Text size="2" color="gray">请求路径：</Text>
-                  <Text size="2">{selectedLog.path || '/'}</Text>
-                </Flex>
+                {(() => {
+                  const info = parsePathDisplay(selectedLog.path, clientNames);
+                  return (
+                    <>
+                      <Flex justify="between">
+                        <Text size="2" color="gray">访问页面：</Text>
+                        <Badge variant="soft" color={info.badgeColor}>{info.label}</Badge>
+                      </Flex>
+                      <Flex justify="between">
+                        <Text size="2" color="gray">原始 URL 路径：</Text>
+                        <Text size="2" style={{ fontFamily: 'monospace' }}>{selectedLog.path || '/'}</Text>
+                      </Flex>
+                    </>
+                  );
+                })()}
                 <Flex direction="column" gap="1">
                   <Text size="2" color="gray">完整 User-Agent：</Text>
                   <Card style={{ background: 'var(--gray-2)', wordBreak: 'break-all' }}>
