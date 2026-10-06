@@ -415,3 +415,18 @@ export interface BoundedTableRowCounts {
   capped: Partial<Record<keyof TableRowCounts, boolean>>;
   limit: number;
 }
+
+export interface VisitorLog {
+  id: number;
+  time: string;
+  ip: string;
+  country: string;
+  city: string;
+  path: string;
+  user_agent: string;
+}
+
+export interface VisitorLogsPagedResult {
+  items: VisitorLog[];
+  total: number;
+}

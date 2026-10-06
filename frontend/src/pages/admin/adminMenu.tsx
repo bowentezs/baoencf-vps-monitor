@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Unplug,
   User,
+  Users,
 } from 'lucide-react';
 
 export interface AdminMenuItem {
@@ -51,6 +52,7 @@ export const adminMenuItems: AdminMenuItem[] = [
   { path: '/admin/ping', label: '延迟监测', icon: <Activity size={18} /> },
   { path: '/admin/themes', label: '主题管理', icon: <Palette size={18} /> },
   { path: '/admin/logs', label: '审计日志', icon: <ScrollText size={18} /> },
+  { path: '/admin/visitors', label: '访客记录', icon: <Users size={18} /> },
   { path: '/admin/account', label: '账户', icon: <User size={18} /> },
   { path: '/admin/about', label: '关于', icon: <AtSign size={18} /> },
 ];
@@ -132,6 +134,7 @@ export function getAdminSectionTitle(pathname: string) {
   if (pathname.startsWith('/admin/ping')) return '延迟监测';
   if (pathname.startsWith('/admin/themes')) return '主题管理';
   if (pathname.startsWith('/admin/websites')) return '网站';
+  if (pathname.startsWith('/admin/visitors')) return '访客记录';
   if (pathname.startsWith('/admin/logs')) return '审计日志';
   if (pathname.startsWith('/admin/account')) return '账户设置';
   if (pathname.startsWith('/admin/about')) return '关于';

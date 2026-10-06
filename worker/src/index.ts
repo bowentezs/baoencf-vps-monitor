@@ -446,6 +446,7 @@ const SCHEDULED_SETTING_KEYS = [
   'record_preserve_time',
   'ping_record_preserve_time',
   'audit_log_preserve_time',
+  'visitor_log_preserve_days',
   'offline_notify_never_reported',
   RECORD_CLEANUP_LAST_RUN_KEY,
 ];
@@ -553,20 +554,24 @@ async function runRecordCleanup(context: ScheduledRunContext, now: Date): Promis
   const recordHours = Math.min(72, Math.max(1, Number(settings['record_preserve_time'] || 72)));
   const pingHours = Math.min(72, Math.max(1, Number(settings['ping_record_preserve_time'] || recordHours)));
   const auditHours = Math.max(24, Number(settings['audit_log_preserve_time'] || 2160));
+  const visitorDays = Math.max(1, Math.min(365, Number(settings['visitor_log_preserve_days'] || 14)));
 
   const recordBefore = new Date(now.getTime() - recordHours * 60 * 60 * 1000).toISOString();
   const pingBefore = new Date(now.getTime() - pingHours * 60 * 60 * 1000).toISOString();
   const auditBefore = new Date(now.getTime() - auditHours * 60 * 60 * 1000).toISOString();
+  const visitorBefore = new Date(now.getTime() - visitorDays * 24 * 60 * 60 * 1000).toISOString();
 
   const recordDeleted = await db.deleteOldRecords(context.database, recordBefore);
   const websiteDeleted = await db.deleteOldWebsiteChecks(context.database, recordBefore);
   const pingDeleted = await db.deleteOldPingRecords(context.database, pingBefore);
   const auditDeleted = await db.deleteOldAuditLogs(context.database, auditBefore);
+  const visitorDeleted = await db.deleteOldVisitorLogs(context.database, visitorBefore);
   const deleted = {
     ...recordDeleted,
     ...websiteDeleted,
     ...pingDeleted,
     ...auditDeleted,
+    ...visitorDeleted,
   };
   await db.setSetting(context.database, RECORD_CLEANUP_LAST_RUN_KEY, now.toISOString());
   const deletedRows = Object.values(deleted).reduce((sum, value) => sum + Number(value || 0), 0);
@@ -578,6 +583,7 @@ async function runRecordCleanup(context: ScheduledRunContext, now: Date): Promis
       records: recordBefore,
       ping_records: pingBefore,
       audit_logs: auditBefore,
+      visitor_logs: visitorBefore,
     },
     deleted,
   })}`);
