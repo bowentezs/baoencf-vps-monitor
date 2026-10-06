@@ -429,4 +429,5 @@ export interface VisitorLog {
 export interface VisitorLogsPagedResult {
   items: VisitorLog[];
   total: number;
+  today_total?: number;
 }

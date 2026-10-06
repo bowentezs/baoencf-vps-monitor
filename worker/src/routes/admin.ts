@@ -2930,13 +2930,16 @@ adminRoutes.get('/logs', async (c) => {
 adminRoutes.get('/visitor-logs', async (c) => {
   const limit = Math.max(1, Math.min(parseInt(c.req.query('limit') || '50'), 100));
   const page = Math.max(1, parseInt(c.req.query('page') || '1'));
+  const search = (c.req.query('search') || '').trim().slice(0, 100);
   const database = getDatabase(c.env);
-  const result = await db.listVisitorLogsPaged(database, page, limit);
+  const result = await db.listVisitorLogsPaged(database, page, limit, search);
   return c.json({
     data: result.items,
     total: result.total,
+    today_total: result.today_total ?? 0,
     page,
     limit,
+    search,
     has_more: page * limit < result.total,
   });
 });

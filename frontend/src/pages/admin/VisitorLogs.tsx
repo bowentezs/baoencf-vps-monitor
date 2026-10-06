@@ -67,21 +67,36 @@ export default function VisitorLogs() {
   const apiFetch = useApi();
   const [logs, setLogs] = useState<VisitorLogEntry[]>([]);
   const [total, setTotal] = useState(0);
+  const [todayTotal, setTodayTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState('50');
   const [selectedLog, setSelectedLog] = useState<VisitorLogEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // 搜索防抖
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const fetchLogs = () => {
     setLoading(true);
     setError(null);
-    apiFetch(`/admin/visitor-logs?limit=${pageSize}&page=${page}`)
+    const searchParam = debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : '';
+    apiFetch(`/admin/visitor-logs?limit=${pageSize}&page=${page}${searchParam}`)
       .then(res => {
         const items = Array.isArray(res?.data) ? res.data : [];
         setLogs(items);
         setTotal(Number(res?.total || items.length));
+        if (res?.today_total !== undefined) {
+          setTodayTotal(Number(res.today_total));
+        }
       })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : '获取访客记录失败');
@@ -93,32 +108,13 @@ export default function VisitorLogs() {
 
   useEffect(() => {
     fetchLogs();
-  }, [page, pageSize]);
+  }, [page, pageSize, debouncedSearch]);
 
-  // 本地过滤
-  const filteredLogs = useMemo(() => {
-    if (!search.trim()) return logs;
-    const q = search.toLowerCase();
-    return logs.filter(item =>
-      item.ip.toLowerCase().includes(q) ||
-      item.country.toLowerCase().includes(q) ||
-      item.city.toLowerCase().includes(q) ||
-      item.path.toLowerCase().includes(q) ||
-      item.user_agent.toLowerCase().includes(q)
-    );
-  }, [logs, search]);
-
-  // 统计概览
+  // 统计概览（本页维度）
   const stats = useMemo(() => {
     const uniqueIps = new Set(logs.map(l => l.ip).filter(Boolean)).size;
     const uniqueCountries = new Set(logs.map(l => l.country).filter(Boolean)).size;
-    const now = new Date();
-    const todayCount = logs.filter(l => {
-      const d = new Date(l.time);
-      return d.toDateString() === now.toDateString();
-    }).length;
-
-    return { uniqueIps, uniqueCountries, todayCount };
+    return { uniqueIps, uniqueCountries };
   }, [logs]);
 
   const totalPages = Math.max(1, Math.ceil(total / Number(pageSize)));
@@ -145,7 +141,7 @@ export default function VisitorLogs() {
               <Clock3 size={16} />
             </span>
             <Text className="audit-summary-label" size="1" color="gray">今日访客</Text>
-            <Text className="audit-summary-value" size="3" weight="bold">{stats.todayCount}</Text>
+            <Text className="audit-summary-value" size="3" weight="bold">{todayTotal}</Text>
           </div>
           <div className="audit-summary-item">
             <span className="audit-summary-icon" style={{ color: 'var(--cyan-9)' }}>
@@ -200,7 +196,7 @@ export default function VisitorLogs() {
               </Select.Root>
 
               <Flex className="audit-filter-result-row" align="center" gap="2">
-                <Badge variant="soft" color="blue">当前展示 {filteredLogs.length} 条</Badge>
+                <Badge variant="soft" color="blue">当前展示 {logs.length} 条</Badge>
               </Flex>
             </div>
           </div>
@@ -209,10 +205,10 @@ export default function VisitorLogs() {
             <Flex justify="center" align="center" py="8">
               <Loading />
             </Flex>
-          ) : filteredLogs.length === 0 ? (
+          ) : logs.length === 0 ? (
             <Flex justify="center" align="center" py="8" direction="column" gap="2">
               <Users size={32} color="gray" />
-              <Text size="2" color="gray">暂无访客记录</Text>
+              <Text size="2" color="gray">{search.trim() ? '未检索到匹配的访客记录' : '暂无访客记录'}</Text>
             </Flex>
           ) : (
             <Table.Root variant="surface">
@@ -227,7 +223,7 @@ export default function VisitorLogs() {
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {filteredLogs.map(item => {
+                {logs.map(item => {
                   const uaInfo = parseUserAgent(item.user_agent);
                   return (
                     <Table.Row key={item.id}>
