@@ -717,6 +717,7 @@ export async function listVisitorLogsPaged(
   database: QueryDatabase,
   page = 1,
   limit = 50,
+  search = '',
 ): Promise<t.VisitorLogsPagedResult> {
-  return sba.listSupabaseVisitorLogsPaged(database.env, page, limit);
+  return sba.listSupabaseVisitorLogsPaged(database.env, page, limit, search);
 }

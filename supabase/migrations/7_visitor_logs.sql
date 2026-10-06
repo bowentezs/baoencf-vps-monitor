@@ -48,10 +48,13 @@ $$;
 revoke all on function public.cfm_insert_visitor_log(text, text, text, text, text) from public, anon, authenticated;
 grant execute on function public.cfm_insert_visitor_log(text, text, text, text, text) to service_role;
 
--- 分页查询访客记录
+-- 分页查询访客记录（支持关键字全局检索与今日访客总数统计）
+drop function if exists public.cfm_visitor_logs_paged(integer, integer);
+
 create or replace function public.cfm_visitor_logs_paged(
   input_page integer default 1,
-  input_limit integer default 50
+  input_limit integer default 50,
+  input_search text default ''
 )
 returns jsonb
 language plpgsql
@@ -59,25 +62,62 @@ stable
 set search_path = public
 as $$
 declare
-  page_offset integer := greatest(input_page - 1, 0) * least(greatest(input_limit, 1), 100);
-  page_limit integer := least(greatest(input_limit, 1), 100);
+  page_limit integer := least(greatest(coalesce(input_limit, 50), 1), 100);
+  page_offset integer := greatest(coalesce(input_page, 1) - 1, 0) * page_limit;
+  clean_search text := trim(coalesce(input_search, ''));
   total_count integer;
+  today_count integer;
   items jsonb;
+  today_start timestamptz := date_trunc('day', now() at time zone 'Asia/Shanghai') at time zone 'Asia/Shanghai';
 begin
-  select count(*)::integer into total_count from visitor_logs;
-  select coalesce(jsonb_agg(to_jsonb(r)), '[]'::jsonb) into items
-  from (
-    select id, time, ip, country, city, path, user_agent
+  -- 统计今日访客总数（基于东八区今日）
+  select count(*)::integer into today_count
+  from visitor_logs
+  where time >= today_start;
+
+  if clean_search <> '' then
+    select count(*)::integer into total_count
     from visitor_logs
-    order by time desc, id desc
-    limit page_limit offset page_offset
-  ) r;
-  return jsonb_build_object('items', items, 'total', total_count);
+    where ip ilike '%' || clean_search || '%'
+       or country ilike '%' || clean_search || '%'
+       or city ilike '%' || clean_search || '%'
+       or path ilike '%' || clean_search || '%'
+       or user_agent ilike '%' || clean_search || '%';
+
+    select coalesce(jsonb_agg(to_jsonb(r)), '[]'::jsonb) into items
+    from (
+      select id, time, ip, country, city, path, user_agent
+      from visitor_logs
+      where ip ilike '%' || clean_search || '%'
+         or country ilike '%' || clean_search || '%'
+         or city ilike '%' || clean_search || '%'
+         or path ilike '%' || clean_search || '%'
+         or user_agent ilike '%' || clean_search || '%'
+      order by time desc, id desc
+      limit page_limit offset page_offset
+    ) r;
+  else
+    select count(*)::integer into total_count from visitor_logs;
+
+    select coalesce(jsonb_agg(to_jsonb(r)), '[]'::jsonb) into items
+    from (
+      select id, time, ip, country, city, path, user_agent
+      from visitor_logs
+      order by time desc, id desc
+      limit page_limit offset page_offset
+    ) r;
+  end if;
+
+  return jsonb_build_object(
+    'items', items,
+    'total', total_count,
+    'today_total', today_count
+  );
 end;
 $$;
 
-revoke all on function public.cfm_visitor_logs_paged(integer, integer) from public, anon, authenticated;
-grant execute on function public.cfm_visitor_logs_paged(integer, integer) to service_role;
+revoke all on function public.cfm_visitor_logs_paged(integer, integer, text) from public, anon, authenticated;
+grant execute on function public.cfm_visitor_logs_paged(integer, integer, text) to service_role;
 
 -- 批次平滑清理过期访客记录（防止大事务锁表与 WAL 膨胀）
 create or replace function public.cfm_delete_old_visitor_logs(

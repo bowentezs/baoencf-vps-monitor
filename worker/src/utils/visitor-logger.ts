@@ -72,9 +72,30 @@ export function recordVisitorSafely(c: AppContext, targetPath = '/'): void {
 
   const cf = (c.req.raw as Request & { cf?: Record<string, unknown> }).cf || {};
   const country = String(cf.country || c.req.header('CF-IPCountry') || '').trim().slice(0, 8);
-  const city = String(cf.city || '').trim().slice(0, 64);
-  const path = (targetPath || new URL(c.req.url).pathname).slice(0, 64);
-  const userAgent = (c.req.header('user-agent') || '').trim().slice(0, 128);
+
+  let rawCity = String(cf.city || c.req.header('cf-ipcity') || '').trim();
+  try {
+    rawCity = decodeURIComponent(rawCity);
+  } catch {
+    // 忽略异常编码
+  }
+  const city = rawCity.slice(0, 64);
+
+  let resolvedPath = targetPath;
+  const referer = c.req.header('referer') || c.req.header('referrer');
+  if (referer) {
+    try {
+      const refUrl = new URL(referer);
+      const reqUrl = new URL(c.req.url);
+      if (refUrl.host === reqUrl.host && refUrl.pathname) {
+        resolvedPath = refUrl.pathname;
+      }
+    } catch {
+      // 忽略无效 Referer
+    }
+  }
+  const path = (resolvedPath || '/').slice(0, 128);
+  const userAgent = (c.req.header('user-agent') || '').trim().slice(0, 256);
 
   const task = (async () => {
     try {

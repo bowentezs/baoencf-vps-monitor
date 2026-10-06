@@ -1127,9 +1127,11 @@ export function listSupabaseVisitorLogsPaged(
   env: SupabaseApiEnv,
   page = 1,
   limit = 50,
+  search = '',
 ): Promise<VisitorLogsPagedResult> {
   return callSupabaseRpc<VisitorLogsPagedResult>(env, 'cfm_visitor_logs_paged', {
     input_page: page,
     input_limit: limit,
+    input_search: search,
   });
 }

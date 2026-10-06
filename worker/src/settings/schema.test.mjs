@@ -34,6 +34,11 @@ assert.equal(normalizeSettingValue('webhook_headers_json', '{"X-Test":1}').ok, f
 assert.equal(normalizeSettingValue('webhook_content_type', 'application/json; charset=utf-8').ok, true);
 assert.equal(normalizeSettingValue('webhook_content_type', 'application/json\r\nX-Bad: 1').ok, false);
 assert.deepEqual(normalizeSettingValue('update_mode', 'fork'), { ok: false, error: '未知设置: update_mode' });
+assert.deepEqual(normalizeSettingValue('visitor_log_preserve_days', '0'), { ok: true, value: '0' });
+assert.deepEqual(normalizeSettingValue('visitor_log_preserve_days', '14'), { ok: true, value: '14' });
+assert.deepEqual(normalizeSettingValue('visitor_log_preserve_days', '365'), { ok: true, value: '365' });
+assert.equal(normalizeSettingValue('visitor_log_preserve_days', '-1').ok, false);
+assert.equal(normalizeSettingValue('visitor_log_preserve_days', '366').ok, false);
 
 const publicSettings = buildPublicSettings({
   site_logo_url: '/api/site-logo?v=1',

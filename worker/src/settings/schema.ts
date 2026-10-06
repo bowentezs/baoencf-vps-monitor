@@ -136,7 +136,7 @@ export const SETTING_SCHEMA = {
     type: 'integer',
     defaultValue: '14',
     public: false,
-    min: 1,
+    min: 0,
     max: 365,
   },
   audit_log_preserve_time: {
