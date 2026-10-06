@@ -693,3 +693,30 @@ export async function insertAuditLog(
 ): Promise<void> {
   return sba.insertSupabaseAuditLog(database.env, user, action, redactDatabaseSecrets(detail), level);
 }
+
+export async function deleteOldVisitorLogs(
+  database: QueryDatabase,
+  beforeTime: string,
+  options: t.DeleteOldRowsOptions = {},
+): Promise<{ visitor_logs: number }> {
+  return sba.deleteSupabaseOldVisitorLogs(database.env, beforeTime, options);
+}
+
+export async function insertVisitorLog(
+  database: QueryDatabase,
+  ip: string,
+  country = '',
+  city = '',
+  path = '',
+  userAgent = '',
+): Promise<void> {
+  return sba.insertSupabaseVisitorLog(database.env, ip, country, city, path, userAgent);
+}
+
+export async function listVisitorLogsPaged(
+  database: QueryDatabase,
+  page = 1,
+  limit = 50,
+): Promise<t.VisitorLogsPagedResult> {
+  return sba.listSupabaseVisitorLogsPaged(database.env, page, limit);
+}

@@ -132,6 +132,13 @@ export const SETTING_SCHEMA = {
     min: 0,
     max: 1440,
   },
+  visitor_log_preserve_days: {
+    type: 'integer',
+    defaultValue: '14',
+    public: false,
+    min: 1,
+    max: 365,
+  },
   audit_log_preserve_time: {
     type: 'integer',
     defaultValue: '2160',

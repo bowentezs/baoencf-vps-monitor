@@ -653,6 +653,15 @@ export default function SettingsGeneral() {
                 width="100%"
               />
               <SettingInput
+                label="访客日志保留天数（天）"
+                description="单位为天，超出保留时长的访客记录将在后台定时维护时自动清理；默认 14 天"
+                value={getSettingValue(settings, 'visitor_log_preserve_days', '14')}
+                onChange={(value) => updateSetting('visitor_log_preserve_days', value)}
+                type="number"
+                placeholder="14"
+                width="100%"
+              />
+              <SettingInput
                 label="每日观看时间（分钟/天）"
                 description="用于配额估算，默认按每天实际打开前台查看 1 小时计算；不影响访客 10 分钟限时规则"
                 value={getSettingValue(settings, 'capacity_daily_view_minutes', String(DEFAULT_DAILY_VIEW_MINUTES))}

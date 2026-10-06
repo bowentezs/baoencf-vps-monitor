@@ -2925,6 +2925,22 @@ adminRoutes.get('/logs', async (c) => {
   });
 });
 
+// ============ 访客记录 ============
+
+adminRoutes.get('/visitor-logs', async (c) => {
+  const limit = Math.max(1, Math.min(parseInt(c.req.query('limit') || '50'), 100));
+  const page = Math.max(1, parseInt(c.req.query('page') || '1'));
+  const database = getDatabase(c.env);
+  const result = await db.listVisitorLogsPaged(database, page, limit);
+  return c.json({
+    data: result.items,
+    total: result.total,
+    page,
+    limit,
+    has_more: page * limit < result.total,
+  });
+});
+
 adminRoutes.get('/health', async (c) => {
   const deep = isQueryFlagEnabled(c.req.query('deep')) || isQueryFlagEnabled(c.req.query('refresh'));
   if (!deep && healthCheckCache && healthCheckCache.expiresAt > Date.now()) {

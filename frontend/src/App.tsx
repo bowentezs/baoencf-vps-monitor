@@ -39,6 +39,7 @@ const AdminPingTasks = lazy(() => import('./pages/admin/PingTasks'));
 const AdminNotifications = lazy(() => import('./pages/admin/Notifications'));
 const AdminThemes = lazy(() => import('./pages/admin/Themes'));
 const AdminLogs = lazy(() => import('./pages/admin/AuditLogs'));
+const AdminVisitorLogs = lazy(() => import('./pages/admin/VisitorLogs'));
 const AdminAccount = lazy(() => import('./pages/admin/Account'));
 const AdminAbout = lazy(() => import('./pages/admin/About'));
 
@@ -61,6 +62,7 @@ function preloadRouteChunks() {
   void import('./pages/admin/Notifications');
   void import('./pages/admin/Themes');
   void import('./pages/admin/AuditLogs');
+  void import('./pages/admin/VisitorLogs');
   void import('./pages/admin/Account');
   void import('./pages/admin/About');
 }
@@ -150,6 +152,7 @@ export default function App() {
                   <Route path="notification/:tab" element={<LegacyAdminNotificationRedirect />} />
                   <Route path="themes" element={<AdminThemes />} />
                   <Route path="logs" element={<AdminLogs />} />
+                  <Route path="visitors" element={<AdminVisitorLogs />} />
                   <Route path="account" element={<AdminAccount />} />
                   <Route path="about" element={<AdminAbout />} />
                 </Route>

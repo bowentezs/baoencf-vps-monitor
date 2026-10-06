@@ -1,4 +1,4 @@
-import type { AuditLogsPage, BoundedTableRowCounts, ClearAllRecordsResult, Client, ClientCapacityCounts, ClientIdentity, ClientReferenceCleanupResult, ClientTokenMeta, ClientVisibility, DailyTrafficSnapshot, DeleteClientsResult, DeleteOldRowsOptions, ExpiryNotification, ExpiryNotificationUpdate, GPUHistoryRecord, GPUInfo, HistoryTableRowCounts, LoadMetricWindowStats, LoadNotification, LoadNotificationInput, LoadNotificationMetric, LoginRateLimit, MonitorRecord, OfflineNotification, OfflineNotificationUpdate, OrphanClientDataCleanupResult, PingHistoryRecord, PingSnapshotInput, PingTask, PingTaskEstimateRow, PingTaskHistoryRequest, PublicClientRow, PublicWebsiteMonitor, ScheduledClientRow, TableRowCounts, Theme, ThemeAsset, ThemeAssetUpsertInput, ThemeUpsertInput, User, WebsiteCheck, WebsiteCheckInput, WebsiteMonitor, WebsiteMonitorInput } from '../types.ts';
+import type { AuditLogsPage, BoundedTableRowCounts, ClearAllRecordsResult, Client, ClientCapacityCounts, ClientIdentity, ClientReferenceCleanupResult, ClientTokenMeta, ClientVisibility, DailyTrafficSnapshot, DeleteClientsResult, DeleteOldRowsOptions, ExpiryNotification, ExpiryNotificationUpdate, GPUHistoryRecord, GPUInfo, HistoryTableRowCounts, LoadMetricWindowStats, LoadNotification, LoadNotificationInput, LoadNotificationMetric, LoginRateLimit, MonitorRecord, OfflineNotification, OfflineNotificationUpdate, OrphanClientDataCleanupResult, PingHistoryRecord, PingSnapshotInput, PingTask, PingTaskEstimateRow, PingTaskHistoryRequest, PublicClientRow, PublicWebsiteMonitor, ScheduledClientRow, TableRowCounts, Theme, ThemeAsset, ThemeAssetUpsertInput, ThemeUpsertInput, User, WebsiteCheck, WebsiteCheckInput, WebsiteMonitor, WebsiteMonitorInput, VisitorLogsPagedResult } from '../types.ts';
 import type { BackupData } from '../../utils/backup.ts';
 import { redactDatabaseSecrets } from '../../utils/setup-diagnostics.ts';
 import { generateAgentToken, hashAgentToken } from '../../utils/client.ts';
@@ -1092,5 +1092,44 @@ export function insertSupabaseAuditLog(
     input_action: action,
     input_detail: detail,
     input_level: level,
+  });
+}
+
+export function deleteSupabaseOldVisitorLogs(
+  env: SupabaseApiEnv,
+  beforeTime: string,
+  options: DeleteOldRowsOptions = {},
+): Promise<{ visitor_logs: number }> {
+  return callSupabaseRpc(env, 'cfm_delete_old_visitor_logs', {
+    input_before_time: beforeTime,
+    input_max_batches: options.maxBatches,
+  });
+}
+
+export function insertSupabaseVisitorLog(
+  env: SupabaseApiEnv,
+  ip: string,
+  country = '',
+  city = '',
+  path = '',
+  userAgent = '',
+): Promise<void> {
+  return callSupabaseRpc<void>(env, 'cfm_insert_visitor_log', {
+    input_ip: ip,
+    input_country: country,
+    input_city: city,
+    input_path: path,
+    input_user_agent: userAgent,
+  });
+}
+
+export function listSupabaseVisitorLogsPaged(
+  env: SupabaseApiEnv,
+  page = 1,
+  limit = 50,
+): Promise<VisitorLogsPagedResult> {
+  return callSupabaseRpc<VisitorLogsPagedResult>(env, 'cfm_visitor_logs_paged', {
+    input_page: page,
+    input_limit: limit,
   });
 }
