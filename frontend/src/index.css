@@ -3845,6 +3845,150 @@ html[data-monitor-theme='next'] .node-network-value strong {
 }
 
 /* ========== 现代化 Ping 监控仪表盘组件 ========== */
+.ping-heartbeat-box {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: var(--color-surface, rgba(255, 255, 255, 0.72));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--gray-a4);
+  border-radius: var(--radius-3);
+  transition: border-color 0.16s ease;
+}
+
+.ping-heartbeat-box:hover {
+  border-color: var(--gray-a6);
+}
+
+.ping-heartbeat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.ping-heartbeat-title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ping-heartbeat-indicator-dot {
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.ping-heartbeat-title {
+  font-weight: 650;
+  color: var(--gray-12);
+  letter-spacing: -0.01em;
+}
+
+.ping-heartbeat-subtitle {
+  font-weight: 400;
+  color: var(--gray-9);
+  font-size: 11.5px;
+}
+
+.ping-heartbeat-stats {
+  font-size: 11.5px;
+  color: var(--gray-10);
+  font-variant-numeric: tabular-nums;
+}
+
+.ping-heartbeat-bar {
+  display: grid;
+  grid-template-columns: repeat(var(--ping-segment-count, 50), minmax(2px, 1fr));
+  gap: 2.5px;
+  width: 100%;
+  height: 20px;
+  margin: 9px 0 7px 0;
+  align-items: stretch;
+}
+
+.ping-heartbeat-segment {
+  position: relative;
+  display: block;
+  min-width: 2px;
+  height: 100%;
+  border-radius: 2px;
+  cursor: pointer;
+  transform-origin: bottom center;
+  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+}
+
+.ping-heartbeat-segment.is-up {
+  background: #10b981;
+}
+
+.ping-heartbeat-segment.is-degraded {
+  background: #f59e0b;
+}
+
+.ping-heartbeat-segment.is-down {
+  background: #ef4444;
+}
+
+.ping-heartbeat-segment.is-empty {
+  background: var(--gray-4);
+  cursor: default;
+}
+
+.ping-heartbeat-segment:hover {
+  z-index: 5;
+  transform: scaleY(1.22);
+  filter: brightness(1.12);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4), 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.ping-heartbeat-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10.5px;
+  color: var(--gray-8);
+  font-variant-numeric: tabular-nums;
+}
+
+.ping-heartbeat-hint {
+  color: var(--gray-7);
+  font-size: 10px;
+}
+
+.ping-heartbeat-tooltip {
+  position: fixed;
+  z-index: 1000;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--gray-12) 95%, transparent);
+  color: var(--gray-1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.35;
+  pointer-events: none;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.ping-heartbeat-tooltip-arrow {
+  position: absolute;
+  left: var(--heartbeat-tooltip-arrow-left, 50%);
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  background: color-mix(in srgb, var(--gray-12) 95%, transparent);
+  transform: translateX(-50%) rotate(45deg);
+  transform-origin: center;
+}
+
 .instance-ping-date-group {
   margin-top: 16px;
   display: flex;
