@@ -135,6 +135,7 @@ export default function Instance() {
     window.scrollTo({ top: targetY, behavior: 'instant' });
     const frameId = requestAnimationFrame(() => {
       window.scrollTo({ top: targetY, behavior: 'instant' });
+      scrollPosRef.current = null;
     });
     return () => cancelAnimationFrame(frameId);
   }, [uuid]);
