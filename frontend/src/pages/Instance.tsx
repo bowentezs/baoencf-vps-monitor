@@ -13,6 +13,7 @@ import Loading from '../components/Loading';
 import DetailsGrid from '../components/DetailsGrid';
 import Flag from '../components/Flag';
 import PingYAxisTick from '../components/PingYAxisTick';
+import PingHeartbeatBar from '../components/PingHeartbeatBar';
 import { useLiveData } from '../contexts/LiveDataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { publicFetch } from '../utils/api';
@@ -811,6 +812,12 @@ export default function Instance() {
                 )}
               </Box>
 
+              <PingHeartbeatBar
+                series={pingSeriesWithRecords}
+                activeTaskId={activePingTaskId}
+                rangeHours={72}
+              />
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {dailyPingSummaries.slice().reverse().map((day) => {
                   const totalPackets = day.tasks.reduce((sum, t) => sum + t.totalPackets, 0);
@@ -979,6 +986,12 @@ export default function Instance() {
                 })}
               </LineChart>
             </ResponsiveContainer>
+
+            <PingHeartbeatBar
+              series={pingSeriesWithRecords}
+              activeTaskId={activePingTaskId}
+              rangeHours={pingTimeRangeHours[pingTimeRange]}
+            />
 
             <div className="instance-ping-series-grid">
               {pingSeriesWithRecords.map((item) => {
