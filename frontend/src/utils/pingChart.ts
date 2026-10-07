@@ -37,13 +37,19 @@ export type PingChartRow = {
   [key: string]: number | null;
 };
 
+export type PingLossLevel = 'good' | 'minor' | 'moderate' | 'severe';
+
 export interface PingSeriesQuality {
   avgLatency: number | null;
   minLatency: number | null;
   maxLatency: number | null;
+  medianLatency: number | null;
   totalPackets: number;
   lostPackets: number;
+  successPackets: number;
   packetLossPercent: number;
+  lossLevel: PingLossLevel;
+  lossBadgeLabel: string;
 }
 
 export interface DailyPingTaskStat {
@@ -56,7 +62,10 @@ export interface DailyPingTaskStat {
   avgLatency: number | null;
   minLatency: number | null;
   maxLatency: number | null;
+  medianLatency: number | null;
   packetLossPercent: number;
+  lossLevel: PingLossLevel;
+  lossBadgeLabel: string;
   totalPackets: number;
   lostPackets: number;
   successPackets: number;
@@ -406,12 +415,32 @@ export async function fetchPingTaskSeries(
   return limitPingSeriesToRecentRange(series, rangeHours);
 }
 
+export function getLossLevelInfo(lossPercent: number, totalPackets: number): {
+  level: PingLossLevel;
+  badgeLabel: string;
+} {
+  if (totalPackets === 0) {
+    return { level: 'good', badgeLabel: '无记录' };
+  }
+  if (lossPercent <= 0) {
+    return { level: 'good', badgeLabel: '优 0%' };
+  }
+  if (lossPercent <= 5) {
+    return { level: 'minor', badgeLabel: `轻微 ${lossPercent}%` };
+  }
+  if (lossPercent <= 20) {
+    return { level: 'moderate', badgeLabel: `中度 ${lossPercent}%` };
+  }
+  return { level: 'severe', badgeLabel: `严重 ${lossPercent}%` };
+}
+
 export function getPingSeriesQuality(records: PingRecord[]): PingSeriesQuality {
   let validSum = 0;
   let validCount = 0;
   let lostCount = 0;
   let min: number | null = null;
   let max: number | null = null;
+  const validLatencies: number[] = [];
 
   for (const record of records) {
     const val = Number(record.value);
@@ -421,6 +450,7 @@ export function getPingSeriesQuality(records: PingRecord[]): PingSeriesQuality {
     } else {
       validCount++;
       validSum += val;
+      validLatencies.push(val);
       if (min === null || val < min) min = val;
       if (max === null || val > max) max = val;
     }
@@ -430,13 +460,28 @@ export function getPingSeriesQuality(records: PingRecord[]): PingSeriesQuality {
   const packetLossPercent = totalPackets > 0 ? Number(((lostCount / totalPackets) * 100).toFixed(1)) : 0;
   const avgLatency = validCount > 0 ? Math.round(validSum / validCount) : null;
 
+  let medianLatency: number | null = null;
+  if (validLatencies.length > 0) {
+    validLatencies.sort((a, b) => a - b);
+    const mid = Math.floor(validLatencies.length / 2);
+    medianLatency = validLatencies.length % 2 !== 0
+      ? Math.round(validLatencies[mid])
+      : Math.round((validLatencies[mid - 1] + validLatencies[mid]) / 2);
+  }
+
+  const { level: lossLevel, badgeLabel: lossBadgeLabel } = getLossLevelInfo(packetLossPercent, totalPackets);
+
   return {
     avgLatency,
     minLatency: min !== null ? Math.round(min) : null,
     maxLatency: max !== null ? Math.round(max) : null,
+    medianLatency,
     totalPackets,
     lostPackets: lostCount,
+    successPackets: validCount,
     packetLossPercent,
+    lossLevel,
+    lossBadgeLabel,
   };
 }
 
@@ -501,10 +546,13 @@ export function buildDailyPingSummary(series: PingTaskSeries[]): DailyPingSummar
         avgLatency: quality.avgLatency,
         minLatency: quality.minLatency,
         maxLatency: quality.maxLatency,
+        medianLatency: quality.medianLatency,
         packetLossPercent: quality.packetLossPercent,
+        lossLevel: quality.lossLevel,
+        lossBadgeLabel: quality.lossBadgeLabel,
         totalPackets: quality.totalPackets,
         lostPackets: quality.lostPackets,
-        successPackets: quality.totalPackets - quality.lostPackets,
+        successPackets: quality.successPackets,
       });
     }
 
