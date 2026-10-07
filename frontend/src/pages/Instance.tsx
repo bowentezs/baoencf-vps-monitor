@@ -734,23 +734,40 @@ export default function Instance() {
                             <Text size="1" weight="medium" truncate style={{ color: taskStat.color }}>
                               {taskStat.taskLabel}
                             </Text>
-                            {taskStat.totalPackets > 0 && taskStat.packetLossPercent > 0 ? (
-                              <Badge size="1" color="red" variant="soft">
-                                丢包 {taskStat.packetLossPercent}% ({taskStat.lostPackets}包)
+                            {taskStat.totalPackets > 0 ? (
+                              <Badge
+                                size="1"
+                                color={
+                                  taskStat.lossLevel === 'good'
+                                    ? 'green'
+                                    : taskStat.lossLevel === 'minor'
+                                    ? 'yellow'
+                                    : taskStat.lossLevel === 'moderate'
+                                    ? 'orange'
+                                    : 'red'
+                                }
+                                variant={taskStat.lossLevel === 'severe' ? 'solid' : 'soft'}
+                              >
+                                {taskStat.lossBadgeLabel}
                               </Badge>
-                            ) : taskStat.totalPackets > 0 ? (
-                              <Badge size="1" color="green" variant="soft">0% 丢包</Badge>
                             ) : (
                               <Badge size="1" color="gray" variant="soft">无记录</Badge>
                             )}
                           </Flex>
-                          <Flex justify="between" align="center" gap="2" mt="1">
-                            <Text size="1" weight="bold">
-                              {taskStat.avgLatency !== null ? `${taskStat.avgLatency} ms` : '-'}
-                            </Text>
-                            <Text size="1" color="gray">
-                              {taskStat.minLatency !== null && taskStat.maxLatency !== null
-                                ? `区间 ${taskStat.minLatency}~${taskStat.maxLatency} ms · 共${taskStat.totalPackets}次`
+                          <Flex justify="between" align="baseline" gap="2" mt="1">
+                            <Box style={{ minWidth: 0 }}>
+                              <Text size="1" weight="bold">
+                                {taskStat.avgLatency !== null ? `${taskStat.avgLatency} ms` : '-'}
+                              </Text>
+                              {taskStat.medianLatency !== null && taskStat.medianLatency !== taskStat.avgLatency && (
+                                <Text size="1" color="gray" style={{ fontSize: '10.5px', display: 'block' }}>
+                                  基准 ~{taskStat.medianLatency}ms
+                                </Text>
+                              )}
+                            </Box>
+                            <Text size="1" color="gray" style={{ fontSize: '11px', whiteSpace: 'nowrap' }}>
+                              {taskStat.lostPackets > 0
+                                ? `丢 ${taskStat.lostPackets}/${taskStat.totalPackets} 次`
                                 : `共 ${taskStat.totalPackets} 次`}
                             </Text>
                           </Flex>
@@ -791,7 +808,7 @@ export default function Instance() {
                   labelFormatter={pingChartTimeFormatter}
                   formatter={(value: unknown, name) => [
                     value === null || value === undefined || Number(value) < 0
-                      ? '丢包 / 超时'
+                      ? '丢包 / 超时 🔴'
                       : formatPingMs(Number(value)),
                     name,
                   ]}
@@ -815,6 +832,14 @@ export default function Instance() {
             <div className="instance-ping-series-grid">
               {pingSeriesWithRecords.map((item) => {
                 const quality = getPingSeriesQuality(item.records);
+                const badgeColor =
+                  quality.lossLevel === 'good'
+                    ? 'green'
+                    : quality.lossLevel === 'minor'
+                    ? 'yellow'
+                    : quality.lossLevel === 'moderate'
+                    ? 'orange'
+                    : 'red';
                 return (
                   <div
                     key={item.task.key}
@@ -823,36 +848,44 @@ export default function Instance() {
                       borderColor: item.task.color,
                       background: `color-mix(in srgb, ${item.task.color} 9%, var(--color-panel-solid))`,
                     }}
-                    title={`${item.task.type} ${item.task.target}`}
+                    title={`${item.task.type} ${item.task.target}\n探测 ${quality.totalPackets} 次，丢包 ${quality.lostPackets} 次\n延迟区间: ${quality.minLatency ?? '-'} ~ ${quality.maxLatency ?? '-'} ms (基准中位: ${quality.medianLatency ?? '-'} ms)`}
                   >
-                    <Flex align="center" gap="2" style={{ minWidth: 0 }}>
-                      <span
-                        aria-hidden="true"
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 999,
-                          background: item.task.color,
-                          flexShrink: 0,
-                        }}
-                      />
-                      <Text size="1" weight="bold" truncate style={{ color: item.task.color }}>
-                        {item.task.label}
-                      </Text>
+                    <Flex justify="between" align="center" gap="2" style={{ minWidth: 0 }}>
+                      <Flex align="center" gap="2" style={{ minWidth: 0 }}>
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 999,
+                            background: item.task.color,
+                            flexShrink: 0,
+                          }}
+                        />
+                        <Text size="1" weight="bold" truncate style={{ color: item.task.color }}>
+                          {item.task.label}
+                        </Text>
+                      </Flex>
+                      {quality.totalPackets > 0 && (
+                        <Badge size="1" color={badgeColor} variant={quality.lossLevel === 'severe' ? 'solid' : 'soft'}>
+                          {quality.lossBadgeLabel}
+                        </Badge>
+                      )}
                     </Flex>
-                    <Flex justify="between" align="center" gap="1" mt="1">
-                      <Text size="1" color="gray" className="instance-ping-series-stat">
-                        {quality.avgLatency === null ? '全部超时' : `平均 ${formatPingMs(quality.avgLatency)}`}
+                    <Flex justify="between" align="baseline" gap="2" mt="2">
+                      <Box style={{ minWidth: 0 }}>
+                        <Text size="2" weight="bold" style={{ display: 'block' }}>
+                          {quality.avgLatency === null ? '全部超时' : `${quality.avgLatency} ms`}
+                        </Text>
+                        {quality.medianLatency !== null && quality.medianLatency !== quality.avgLatency && (
+                          <Text size="1" color="gray" style={{ fontSize: '10.5px' }}>
+                            基准 ~{quality.medianLatency}ms
+                          </Text>
+                        )}
+                      </Box>
+                      <Text size="1" color="gray" style={{ fontSize: '11px', whiteSpace: 'nowrap' }}>
+                        {quality.lostPackets > 0 ? `丢 ${quality.lostPackets}/${quality.totalPackets} 次` : `共 ${quality.totalPackets} 次`}
                       </Text>
-                      {quality.totalPackets > 0 && quality.packetLossPercent > 0 ? (
-                        <Badge size="1" color="red" variant="soft">
-                          丢包 {quality.packetLossPercent}%
-                        </Badge>
-                      ) : quality.totalPackets > 0 ? (
-                        <Badge size="1" color="green" variant="soft">
-                          0% 丢包
-                        </Badge>
-                      ) : null}
                     </Flex>
                   </div>
                 );
