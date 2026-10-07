@@ -166,6 +166,19 @@ export default function PingHeartbeatBar({
       };
     });
 
+    // 智能填补正常采样周期内的微小插槽空隙（防止因固定步长离散切片造成虚假灰色缺口）
+    for (let i = 1; i < slotList.length - 1; i++) {
+      if (slotList[i].state === 'empty' && slotList[i - 1].state !== 'empty' && slotList[i + 1].state !== 'empty') {
+        const gap = slotList[i + 1].slotStart - slotList[i - 1].slotEnd;
+        if (gap < 15 * 60 * 1000) {
+          slotList[i].state = slotList[i - 1].state;
+          slotList[i].avgLatency = slotList[i - 1].avgLatency;
+          const timeStr = formatTimeSlot(slotList[i].slotStart, slotList[i].slotEnd);
+          slotList[i].title = `${timeStr} · 持续畅通 · 均值 ~${slotList[i].avgLatency ?? '-'}ms`;
+        }
+      }
+    }
+
     const successRate = total > 0 ? (((total - lost) / total) * 100).toFixed(1) : null;
 
     return {
