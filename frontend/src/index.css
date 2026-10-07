@@ -1451,275 +1451,336 @@ html[data-monitor-theme='next'] .node-network-value strong {
   font-weight: 850;
 }
 
+/* =============================================================
+   MiniPing 延迟走势浮窗 - 苹果级高遮蔽精密仪表盘架构 (Anti-Bleed & High Precision)
+   ============================================================= */
+
 .mini-ping-popover-content {
   background: transparent !important;
   border: none !important;
+  box-shadow: none !important;
   overflow: visible !important;
+  padding: 0 !important;
 }
 
 .mini-ping-chart {
   position: relative;
-  background-color: rgba(255, 255, 255, var(--ping-glass-opacity, 0.94)) !important;
-  backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-saturate, 180%)) contrast(var(--glass-contrast, 108%)) !important;
-  -webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-saturate, 180%)) contrast(var(--glass-contrast, 108%)) !important;
+  box-sizing: border-box;
+  /* 🛡️ 实体舱高遮光设计：98.5% 实心遮蔽率，坚决杜绝底层任何文本/卡片穿透 */
+  background-color: rgba(255, 255, 255, 0.985) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
   border: 1px solid rgba(0, 0, 0, 0.08) !important;
-  border-radius: 14px !important;
+  border-top: 1.5px solid #ffffff !important;
+  border-radius: 16px !important;
+  padding: 14px 14px 12px 14px !important;
   box-shadow: 
-    0 0 0 1px rgba(255, 255, 255, 0.8),
+    0 0 0 1px rgba(0, 0, 0, 0.03),
     inset 0 1.5px 2px #ffffff,
-    0 20px 48px -6px rgba(0, 0, 0, 0.22),
-    0 36px 70px -12px rgba(0, 0, 0, 0.16) !important;
-  transition: backdrop-filter 0.28s ease, background-color 0.28s ease !important;
+    0 24px 60px -12px rgba(0, 0, 0, 0.22),
+    0 10px 24px -6px rgba(0, 0, 0, 0.08) !important;
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  color: #0f172a !important;
 }
 
+/* 深色模式下的黑曜石独立晶体舱 */
 .dark .mini-ping-chart,
 html[data-theme-appearance='dark'] .mini-ping-chart {
-  background-color: rgba(18, 24, 38, var(--ping-glass-opacity, 0.94)) !important;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
-  border-top: 1.5px solid rgba(255, 255, 255, 0.26) !important;
+  background-color: rgba(15, 20, 32, 0.985) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.28) !important;
   box-shadow: 
     0 0 0 1px rgba(0, 0, 0, 0.7),
-    inset 0 1.5px 2px rgba(255, 255, 255, 0.12),
-    0 24px 52px -6px rgba(0, 0, 0, 0.8),
-    0 40px 80px -12px rgba(0, 0, 0, 0.6) !important;
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.15),
+    0 28px 70px -12px rgba(0, 0, 0, 0.85),
+    0 12px 28px -6px rgba(0, 0, 0, 0.6) !important;
+  color: #f8fafc !important;
 }
 
-/* 💧 苹果液态玻璃模式 (Liquid Glass Material) 下的 MiniPing 浮窗水润增强 */
-html[data-card-material='liquid'] .mini-ping-chart {
-  border: 1px solid rgba(255, 255, 255, 0.75) !important;
-  border-top: 1.5px solid #ffffff !important;
+/* 嵌入式卡片 (如 NodeTable 展开行) 自动适配扁平极简布局 */
+.mini-ping-chart.is-embedded {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 8px 0 !important;
+}
+
+/* 🍎 苹果液态玻璃模式 (Liquid Glass Material) 下的水润高光倒角 */
+html[data-card-material='liquid'] .mini-ping-chart:not(.is-embedded) {
+  border: 1.5px solid rgba(255, 255, 255, 0.85) !important;
   box-shadow: 
-    0 0 0 1px rgba(255, 255, 255, 0.6),
-    inset 0 1.5px 3px rgba(255, 255, 255, 0.95),
-    inset 0 -1.5px 2px rgba(255, 255, 255, 0.35),
-    0 20px 48px -6px rgba(0, 0, 0, 0.22),
-    0 36px 70px -12px rgba(0, 0, 0, 0.16) !important;
+    0 0 0 1px rgba(255, 255, 255, 0.7),
+    inset 0 1.5px 3px #ffffff,
+    inset 1px 0 2px rgba(56, 189, 248, 0.25),
+    inset -1px -1.5px 2px rgba(236, 72, 153, 0.18),
+    0 26px 64px -10px rgba(0, 0, 0, 0.22),
+    0 12px 28px -6px rgba(0, 0, 0, 0.10) !important;
 }
 
-html[data-card-material='liquid'] .mini-ping-chart::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 42%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.02) 80%, transparent 100%);
-  border-radius: 14px 14px 45% 45% / 14px 14px 14px 14px;
-  pointer-events: none;
-  z-index: 0;
-}
-
-html[data-card-material='liquid'] .mini-ping-chart > * {
-  position: relative;
-  z-index: 1;
-}
-
-.dark html[data-card-material='liquid'] .mini-ping-chart,
-html[data-theme-appearance='dark'][data-card-material='liquid'] .mini-ping-chart {
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  border-top: 1.5px solid rgba(255, 255, 255, 0.45) !important;
+.dark html[data-card-material='liquid'] .mini-ping-chart:not(.is-embedded),
+html[data-theme-appearance='dark'][data-card-material='liquid'] .mini-ping-chart:not(.is-embedded) {
+  border: 1.5px solid rgba(255, 255, 255, 0.25) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.50) !important;
   box-shadow: 
     0 0 0 1px rgba(0, 0, 0, 0.7),
-    inset 0 1.5px 2px rgba(255, 255, 255, 0.25),
-    inset 0 -1.5px 2px rgba(255, 255, 255, 0.08),
-    0 24px 52px -6px rgba(0, 0, 0, 0.8),
-    0 40px 80px -12px rgba(0, 0, 0, 0.6) !important;
+    inset 0 1.5px 2.5px rgba(255, 255, 255, 0.30),
+    inset 1px 0 2px rgba(56, 189, 248, 0.30),
+    inset -1px -1.5px 2px rgba(192, 132, 252, 0.25),
+    0 30px 72px -12px rgba(0, 0, 0, 0.90),
+    0 14px 32px -6px rgba(0, 0, 0, 0.7) !important;
 }
 
-.dark html[data-card-material='liquid'] .mini-ping-chart::before,
-html[data-theme-appearance='dark'][data-card-material='liquid'] .mini-ping-chart::before {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.01) 80%, transparent 100%);
+/* 1. Header 栏视觉样式 */
+.mini-ping-header {
+  min-height: 24px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-/* 💧 苹果液态玻璃模式下的线路果冻胶囊增强 */
-html[data-card-material='liquid'] .mini-ping-chart-legend-item {
-  border-top: 1.5px solid color-mix(in srgb, var(--item-color) 40%, #ffffff) !important;
-  box-shadow: 
-    inset 0 1.5px 2px rgba(255, 255, 255, 0.9),
-    inset 0 -1px 1px color-mix(in srgb, var(--item-color) 25%, transparent),
-    0 2px 6px rgba(0, 0, 0, 0.04) !important;
-  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, background 0.18s ease !important;
+.dark .mini-ping-header,
+html[data-theme-appearance='dark'] .mini-ping-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
-html[data-card-material='liquid'] .mini-ping-chart-legend-item:hover {
-  transform: translateY(-2px) scale(1.018) !important;
-  box-shadow: 
-    inset 0 1.5px 2px #ffffff,
-    0 8px 20px -2px color-mix(in srgb, var(--item-color) 45%, transparent),
-    0 2px 6px rgba(0, 0, 0, 0.06) !important;
+.mini-ping-live-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: miniPingPulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  flex-shrink: 0;
 }
 
-html[data-card-material='liquid'] .mini-ping-chart-legend-item.is-active {
-  transform: translateY(-1.5px) !important;
-  box-shadow: 
-    0 0 0 1.5px var(--item-color),
-    inset 0 1.5px 2px #ffffff,
-    0 8px 24px -2px color-mix(in srgb, var(--item-color) 60%, transparent) !important;
+@keyframes miniPingPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
 }
 
-.mini-ping-chart .recharts-default-tooltip {
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
-  border-radius: 9px !important;
-  background: #ffffff !important;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18) !important;
+.mini-ping-title {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: var(--gray-12) !important;
 }
 
-.dark .mini-ping-chart .recharts-default-tooltip,
-html[data-theme-appearance='dark'] .mini-ping-chart .recharts-default-tooltip {
-  border: 1px solid rgba(255, 255, 255, 0.16) !important;
-  background: rgba(16, 21, 35, 0.98) !important;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65) !important;
+.mini-ping-badge-count {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--gray-11);
+  white-space: nowrap;
+}
+
+.dark .mini-ping-badge-count,
+html[data-theme-appearance='dark'] .mini-ping-badge-count {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--gray-10);
+}
+
+.mini-ping-hint {
+  font-size: 10.5px !important;
+  opacity: 0.75;
+  white-space: nowrap;
 }
 
 .mini-ping-reset-btn {
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.12);
   border-top: 1px solid rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.04);
   color: var(--gray-12);
   border-radius: 999px;
-  padding: 2px 9px;
+  padding: 2px 8px;
   font-size: 10.5px;
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
   line-height: 1.2;
-  box-shadow: inset 0 1px 1px #fff, 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: transform 0.14s ease, background 0.14s ease, box-shadow 0.14s ease;
+  white-space: nowrap;
+  transition: all 0.15s ease;
 }
 
 .mini-ping-reset-btn:hover {
-  background: #ffffff;
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.2);
   transform: translateY(-1px);
-  box-shadow: inset 0 1px 1px #fff, 0 3px 8px rgba(0, 0, 0, 0.1);
 }
 
 .dark .mini-ping-reset-btn,
 html[data-theme-appearance='dark'] .mini-ping-reset-btn {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .dark .mini-ping-reset-btn:hover,
 html[data-theme-appearance='dark'] .mini-ping-reset-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* 2. 独立纯净画布视窗区 */
+.mini-ping-chart-viewport {
+  background: rgba(248, 250, 252, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+  padding: 6px 4px 2px 0;
+  box-sizing: border-box;
+}
+
+.dark .mini-ping-chart-viewport,
+html[data-theme-appearance='dark'] .mini-ping-chart-viewport {
+  background: rgba(10, 14, 24, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .ping-y-axis-tick {
   fill: var(--gray-11);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 500;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .ping-y-axis-tick-unit {
-  font-size: 9px;
+  font-size: 8.5px;
+  opacity: 0.7;
 }
 
+/* 3. 苹果精工微晶胶囊图例网格 */
 .mini-ping-chart-legend {
   display: grid;
-  width: min(100%, calc(100vw - 64px));
+  width: 100%;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 10px;
+}
+
+@media (max-width: 480px) {
+  .mini-ping-chart-legend {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .mini-ping-chart-legend-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   min-width: 0;
-  border-radius: 9px;
-  padding: 6px 7px;
+  border-radius: 8px;
+  padding: 5px 8px;
   cursor: pointer;
   user-select: none;
   position: relative;
-  background: color-mix(in srgb, var(--item-color) 12%, rgba(255, 255, 255, var(--ping-glass-opacity, 0.94)));
-  backdrop-filter: blur(max(6px, calc(var(--glass-blur, 16px) * 0.5)));
-  -webkit-backdrop-filter: blur(max(6px, calc(var(--glass-blur, 16px) * 0.5)));
-  border: 1px solid color-mix(in srgb, var(--item-color) 35%, rgba(0, 0, 0, 0.08));
-  border-left: 3.5px solid var(--item-color);
-  box-shadow: 
-    inset 0 1px 1.5px #ffffff,
-    0 2px 5px rgba(0, 0, 0, 0.04);
-  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.16s ease, border-color 0.16s ease, opacity 0.16s ease, background 0.16s ease;
 }
 
 .dark .mini-ping-chart-legend-item,
 html[data-theme-appearance='dark'] .mini-ping-chart-legend-item {
-  background: color-mix(in srgb, var(--item-color) 16%, rgba(22, 28, 44, var(--ping-glass-opacity, 0.94)));
-  border: 1px solid color-mix(in srgb, var(--item-color) 40%, rgba(255, 255, 255, 0.12));
-  border-left: 3.5px solid var(--item-color);
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 2px 6px rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
 .mini-ping-chart-legend-item:hover {
-  transform: translateY(-2px);
-  background: color-mix(in srgb, var(--item-color) 18%, #ffffff);
+  transform: translateY(-1.5px);
+  border-color: color-mix(in srgb, var(--item-color) 65%, rgba(0, 0, 0, 0.15));
   box-shadow: 
-    inset 0 1px 1.5px #ffffff,
-    0 6px 16px -2px color-mix(in srgb, var(--item-color) 35%, transparent),
-    0 2px 4px rgba(0, 0, 0, 0.06);
+    0 6px 16px -2px color-mix(in srgb, var(--item-color) 25%, transparent),
+    0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
 .dark .mini-ping-chart-legend-item:hover,
 html[data-theme-appearance='dark'] .mini-ping-chart-legend-item:hover {
-  background: color-mix(in srgb, var(--item-color) 24%, rgba(30, 38, 58, 1));
+  background: rgba(255, 255, 255, 0.07);
+  border-color: color-mix(in srgb, var(--item-color) 65%, rgba(255, 255, 255, 0.2));
   box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 6px 18px -2px color-mix(in srgb, var(--item-color) 45%, transparent);
+    0 6px 18px -2px color-mix(in srgb, var(--item-color) 35%, transparent);
 }
 
 .mini-ping-chart-legend-item.is-active {
   transform: translateY(-1.5px);
-  background: color-mix(in srgb, var(--item-color) 22%, #ffffff);
-  border-color: var(--item-color);
-  border-left-color: var(--item-color);
+  border-color: var(--item-color) !important;
+  background: color-mix(in srgb, var(--item-color) 8%, #ffffff);
   box-shadow: 
     0 0 0 1.5px var(--item-color),
-    inset 0 1px 1.5px #ffffff,
-    0 6px 18px -2px color-mix(in srgb, var(--item-color) 45%, transparent);
+    0 6px 20px -2px color-mix(in srgb, var(--item-color) 40%, transparent) !important;
 }
 
 .dark .mini-ping-chart-legend-item.is-active,
 html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
-  background: color-mix(in srgb, var(--item-color) 28%, rgba(26, 34, 54, 1));
-  border-color: var(--item-color);
-  border-left-color: var(--item-color);
-  box-shadow: 
-    0 0 0 1.5px var(--item-color),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 6px 20px -2px color-mix(in srgb, var(--item-color) 55%, transparent);
+  background: color-mix(in srgb, var(--item-color) 12%, rgba(20, 26, 42, 1));
 }
 
 .mini-ping-chart-legend-item.is-dimmed {
-  opacity: 0.32;
-  filter: grayscale(25%);
+  opacity: 0.30;
+  filter: grayscale(35%);
 }
 
 .mini-ping-chart-legend-item.is-dimmed:hover {
-  opacity: 0.9;
+  opacity: 0.90;
   filter: none;
 }
 
-.mini-ping-chart-legend-name {
-  font-size: 10px !important;
-  line-height: 1.15 !important;
-  color: var(--gray-12) !important;
-  font-weight: 700 !important;
+.mini-ping-item-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin-bottom: 2px;
 }
 
-.mini-ping-chart-legend-stat {
-  display: block;
-  margin-top: 3px;
-  font-size: 9.5px !important;
-  line-height: 1.15 !important;
+.mini-ping-dot {
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mini-ping-item-name {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--gray-12);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--gray-11) !important;
-  font-weight: 600 !important;
+  flex: 1;
+}
+
+.mini-ping-focus-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 3.5px;
+  border-radius: 3px;
+  background: var(--item-color);
+  color: #fff;
+  line-height: 1.1;
+  flex-shrink: 0;
+}
+
+.mini-ping-item-value {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.mini-ping-latency-num {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.mini-ping-latency-unit {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--gray-10);
 }
 
 /* ========== Control Bar (search + toggle) ========== */

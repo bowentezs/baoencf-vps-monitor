@@ -136,34 +136,37 @@ export default function MiniPingChart({
 
   return (
     <Box
-      className="mini-ping-chart"
+      className={`mini-ping-chart${fillContainer ? ' is-embedded' : ''}`}
       style={{
         width: contentWidth,
         maxWidth: fillContainer ? 'none' : 'calc(100vw - 32px)',
-        padding: 8,
       }}
     >
+      {/* 1. 精工仪表盘 Header 栏 */}
       <Flex
         align="center"
         justify="between"
-        style={{
-          minHeight: 22,
-          marginBottom: 6,
-          padding: '0 4px',
-        }}
+        className="mini-ping-header"
       >
-        <Text size="1" weight="bold" color="gray" style={{ fontSize: 11 }}>
-          {activeTaskId === 'all' ? (
-            '全网多线延迟走势'
-          ) : (
-            <Flex align="center" gap="1">
-              <span>已聚焦线路：</span>
-              <span style={{ color: activeSeries[0]?.task.color, fontWeight: 700 }}>
-                {activeSeries[0]?.task.label}
-              </span>
-            </Flex>
-          )}
-        </Text>
+        <Flex align="center" gap="2" style={{ minWidth: 0, flex: 1 }}>
+          <span className="mini-ping-live-pulse" />
+          <Text size="2" weight="bold" className="mini-ping-title" truncate>
+            {activeTaskId === 'all' ? (
+              '全网多线延迟走势'
+            ) : (
+              <Flex align="center" gap="1" style={{ minWidth: 0 }}>
+                <span style={{ opacity: 0.75, fontWeight: 500 }}>聚焦线路:</span>
+                <span style={{ color: activeSeries[0]?.task.color, fontWeight: 700 }} title={activeSeries[0]?.task.label}>
+                  {activeSeries[0]?.task.label}
+                </span>
+              </Flex>
+            )}
+          </Text>
+          <span className="mini-ping-badge-count">
+            {seriesWithRecords.length} 线路
+          </span>
+        </Flex>
+
         {activeTaskId !== 'all' ? (
           <button
             type="button"
@@ -174,29 +177,31 @@ export default function MiniPingChart({
             ✕ 恢复全部
           </button>
         ) : (
-          <Text size="1" color="gray" style={{ fontSize: 10, opacity: 0.75 }}>
-            点击下方线路卡片可单独聚焦
+          <Text size="1" color="gray" className="mini-ping-hint">
+            点击下方线路聚焦
           </Text>
         )}
       </Flex>
 
-      <Box style={{ width: '100%', height: typeof height === 'number' ? Math.max(150, height - 28) : height }}>
+      {/* 2. 独立纯净画布视窗区 */}
+      <Box className="mini-ping-chart-viewport" style={{ width: '100%', height: typeof height === 'number' ? Math.max(150, height - 32) : height }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartRows} margin={{ top: 8, right: 10, bottom: 0, left: 0 }}>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.25} />
+          <LineChart data={chartRows} margin={{ top: 8, right: 12, bottom: 0, left: -6 }}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.35} stroke="var(--mini-ping-grid-stroke, rgba(0, 0, 0, 0.08))" />
             <XAxis
               dataKey="time"
               type="number"
               domain={xAxisDomain}
               tickFormatter={(value) => new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-              fontSize={11}
+              fontSize={10}
               tickLine={false}
               axisLine={false}
-              minTickGap={28}
+              minTickGap={32}
+              tick={{ fill: 'var(--mini-ping-axis-fill, #64748b)' }}
             />
             <YAxis
-              fontSize={11}
-              width={48}
+              fontSize={10}
+              width={46}
               tickLine={false}
               axisLine={false}
               allowDecimals={false}
@@ -210,9 +215,14 @@ export default function MiniPingChart({
                 name,
               ]}
               contentStyle={{
-                borderRadius: 9,
+                borderRadius: 10,
+                border: '1px solid var(--mini-ping-tooltip-border, rgba(0, 0, 0, 0.12))',
+                background: 'var(--mini-ping-tooltip-bg, rgba(255, 255, 255, 0.98))',
+                backdropFilter: 'blur(12px)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.16)',
                 color: 'var(--gray-12)',
                 fontSize: 12,
+                padding: '8px 12px',
               }}
             />
             {seriesWithRecords.map((item) => {
@@ -226,11 +236,12 @@ export default function MiniPingChart({
                   dataKey={item.task.key}
                   name={item.task.label}
                   stroke={item.task.color}
-                  strokeWidth={isFocused ? 3.5 : 2.5}
-                  strokeOpacity={1}
+                  strokeWidth={isFocused ? 3 : 2}
+                  strokeOpacity={isFocused ? 1 : (activeTaskId === 'all' ? 0.92 : 0.2)}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   dot={false}
+                  activeDot={{ r: 4, strokeWidth: 1.5, stroke: '#fff' }}
                   connectNulls
                   isAnimationActive={false}
                 />
@@ -240,13 +251,24 @@ export default function MiniPingChart({
         </ResponsiveContainer>
       </Box>
 
+      {/* 3. 苹果精工微晶胶囊图例网格 */}
       <Box className="mini-ping-chart-legend">
         {seriesWithRecords.map((item) => {
           const avg = getPingSeriesAverage(item.records);
           const isFocused = activeTaskId === item.task.id;
           const isDimmed = activeTaskId !== 'all' && !isFocused;
+
+          // 根据真实延迟数值智能匹配色阶
+          let latencyColor = 'var(--gray-10)';
+          if (avg !== null) {
+            if (avg <= 120) latencyColor = '#10b981'; // 极优：翠绿
+            else if (avg <= 240) latencyColor = '#0ea5e9'; // 良好：天蓝
+            else if (avg <= 350) latencyColor = '#f59e0b'; // 普通：琥珀金
+            else latencyColor = '#ef4444'; // 较高：警示红
+          }
+
           return (
-            <Box
+            <div
               key={item.task.key}
               className={`mini-ping-chart-legend-item${isFocused ? ' is-active' : ''}${isDimmed ? ' is-dimmed' : ''}`}
               style={{
@@ -255,43 +277,30 @@ export default function MiniPingChart({
               onClick={() => setActiveTaskId(activeTaskId === item.task.id ? 'all' : item.task.id)}
               title={`点击${isFocused ? '取消聚焦' : '聚焦查看'}此线路走势\n${item.task.type} ${item.task.target}`}
             >
-              <Flex align="center" justify="between" gap="1">
-                <Flex align="center" gap="1" style={{ minWidth: 0, flex: 1 }}>
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: 999,
-                      background: item.task.color,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <Text size="1" weight="bold" truncate className="mini-ping-chart-legend-name" style={{ color: item.task.color }}>
-                    {item.task.label}
-                  </Text>
-                </Flex>
+              <div className="mini-ping-item-header">
+                <span
+                  className="mini-ping-dot"
+                  style={{
+                    backgroundColor: item.task.color,
+                    boxShadow: `0 0 6px ${item.task.color}80`,
+                  }}
+                />
+                <span className="mini-ping-item-name" title={item.task.label}>
+                  {item.task.label}
+                </span>
                 {isFocused && (
-                  <span
-                    style={{
-                      fontSize: '9px',
-                      fontWeight: 700,
-                      padding: '1px 4px',
-                      borderRadius: 3,
-                      background: item.task.color,
-                      color: '#fff',
-                      lineHeight: 1.1,
-                      flexShrink: 0,
-                    }}
-                  >
+                  <span className="mini-ping-focus-tag">
                     聚焦
                   </span>
                 )}
-              </Flex>
-              <Text size="1" color="gray" className="mini-ping-chart-legend-stat">
-                {avg === null ? '全部超时' : `平均 ${formatPingMs(avg)}`}
-              </Text>
-            </Box>
+              </div>
+              <div className="mini-ping-item-value">
+                <span className="mini-ping-latency-num" style={{ color: latencyColor }}>
+                  {avg === null ? '超时' : `${Math.round(avg)}`}
+                </span>
+                {avg !== null && <span className="mini-ping-latency-unit">ms</span>}
+              </div>
+            </div>
           );
         })}
       </Box>

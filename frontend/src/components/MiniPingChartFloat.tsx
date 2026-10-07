@@ -16,7 +16,7 @@ interface MiniPingChartFloatProps {
 export default function MiniPingChartFloat({
   uuid,
   trigger,
-  chartWidth = 440,
+  chartWidth = 460,
   chartHeight = 260,
   limit = 360,
   rangeHours = 1,
@@ -45,7 +45,7 @@ export default function MiniPingChartFloat({
       </PopoverPrimitive.Trigger>
       <Popover.Content
         align="end"
-        sideOffset={8}
+        sideOffset={10}
         onClick={(event) => event.stopPropagation()}
         className="mini-ping-popover-content"
         style={{
@@ -53,7 +53,7 @@ export default function MiniPingChartFloat({
           border: 'none',
           background: 'transparent',
           boxShadow: 'none',
-          borderRadius: 14,
+          borderRadius: 16,
           zIndex: 5,
           width: chartWidth,
           maxWidth: 'calc(100vw - 24px)',
