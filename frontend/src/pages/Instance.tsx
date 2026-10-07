@@ -7,8 +7,25 @@ import {
 import {
   ArrowLeft,
   Server, Globe, Activity,
-  Layers
+  Layers, RotateCcw
 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import Loading from '../components/Loading';
 import DetailsGrid from '../components/DetailsGrid';
 import Flag from '../components/Flag';
@@ -42,7 +59,7 @@ import {
 import { buildMonitorChartData, getMonitorChartRenderData } from '../utils/monitorChartData';
 import { monitorYAxisProps, pingYAxisProps, wideYAxisProps } from '../utils/monitorChartAxis';
 import { formatBytes } from '../utils/format';
-import { getLocalStorageItem, setLocalStorageItem } from '../utils/browserStorage';
+import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/browserStorage';
 import { normalizeDailyTrafficResponse, type DailyTrafficRow } from '../utils/dailyTraffic';
 
 const formatSpeed = (bytes: number): string => {
@@ -95,6 +112,111 @@ const pingChartHeight = 210;
 const dailyTrafficChartHeight = 256;
 
 
+interface SortablePingCardProps {
+  item: PingTaskSeries;
+  isFocused: boolean;
+  isDimmed: boolean;
+  onFocusToggle: () => void;
+}
+
+function SortablePingCard({
+  item,
+  isFocused,
+  isDimmed,
+  onFocusToggle,
+}: SortablePingCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.task.id });
+
+  const quality = getPingSeriesQuality(item.records);
+
+  const style: React.CSSProperties = {
+    ['--item-color' as string]: item.task.color,
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.85 : undefined,
+    touchAction: isDragging ? 'none' : 'pan-y',
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`instance-ping-card${isFocused ? ' is-active' : ''}${isDimmed ? ' is-dimmed' : ''}${isDragging ? ' is-dragging' : ''}`}
+      style={style}
+      onClick={onFocusToggle}
+      title={`点击${isFocused ? '取消聚焦' : '聚焦查看'}此线路走势 · 长按可拖动排序\n${item.task.type} ${item.task.target}\n探测 ${quality.totalPackets} 次，丢包 ${quality.lostPackets} 次\n延迟区间: ${quality.minLatency ?? '-'} ~ ${quality.maxLatency ?? '-'} ms (基准中位: ${quality.medianLatency ?? '-'} ms)`}
+      {...attributes}
+      {...listeners}
+    >
+      {/* 头部：圆点 + 正文字色线路名 + 状态徽标 */}
+      <div className="instance-ping-card-header">
+        <div className="instance-ping-card-name-group">
+          <span className="instance-ping-status-dot" />
+          <span className="instance-ping-card-label">{item.task.label}</span>
+        </div>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          {isFocused && (
+            <span className="instance-ping-pill is-focus">聚焦</span>
+          )}
+          {quality.packetLossPercent > 0 ? (
+            <span className={`instance-ping-pill is-${quality.lossLevel}`}>
+              丢包 {quality.packetLossPercent}%
+            </span>
+          ) : quality.totalPackets > 0 ? (
+            <span className="instance-ping-pill is-good">
+              畅通
+            </span>
+          ) : (
+            <span className="instance-ping-pill" style={{ background: 'var(--gray-a3)', color: 'var(--gray-10)' }}>
+              无数据
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* 核心数值与连通概况 */}
+      <div className="instance-ping-card-body">
+        <div className="instance-ping-value-wrap">
+          <span className="instance-ping-value-num">
+            {quality.avgLatency === null ? '全部超时' : quality.avgLatency}
+          </span>
+          {quality.avgLatency !== null && <span className="instance-ping-value-unit">ms</span>}
+        </div>
+        <div className="instance-ping-body-meta">
+          {quality.totalPackets === 0 ? (
+            '无采样'
+          ) : quality.lostPackets > 0 ? (
+            <>
+              <span className="instance-ping-loss-highlight">{quality.lostPackets}次丢包</span> · {quality.totalPackets}次
+            </>
+          ) : (
+            `${quality.totalPackets} 次探测`
+          )}
+        </div>
+      </div>
+
+      {/* 底部指标对 */}
+      <div className="instance-ping-card-footer">
+        <div className="instance-ping-footer-item">
+          <span className="instance-ping-footer-label">中位</span>
+          <span className="instance-ping-footer-val">{quality.medianLatency !== null ? `${quality.medianLatency}ms` : '-'}</span>
+        </div>
+        <div className="instance-ping-footer-item">
+          <span className="instance-ping-footer-label">极值</span>
+          <span className="instance-ping-footer-val">{quality.minLatency ?? '-'} ~ {quality.maxLatency ?? '-'} ms</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function historyQuery(params: Record<string, string | number | undefined>): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -139,6 +261,30 @@ export default function Instance() {
   };
   const pingSectionRef = useRef<HTMLDivElement | null>(null);
   const scrollPosRef = useRef<number | null>(null);
+  const isDraggingPingRef = useRef(false);
+
+  const [pingTaskOrder, setPingTaskOrder] = useState<number[]>(() => {
+    try {
+      const saved = getLocalStorageItem('instancePingTaskOrder');
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed.map(Number).filter((n) => !Number.isNaN(n)) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const pingSensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 6,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   useLayoutEffect(() => {
     if (scrollPosRef.current === null) return undefined;
@@ -389,13 +535,74 @@ export default function Instance() {
   }));
 
   const pingSeriesWithRecords = getPingSeriesWithRecords(pingSeries);
+
+  const orderedPingSeries = useMemo(() => {
+    if (pingTaskOrder.length === 0) return pingSeriesWithRecords;
+    const orderMap = new Map<number, number>();
+    pingTaskOrder.forEach((id, idx) => orderMap.set(id, idx));
+
+    return [...pingSeriesWithRecords].sort((a, b) => {
+      const orderA = orderMap.has(a.task.id) ? orderMap.get(a.task.id)! : 999999;
+      const orderB = orderMap.has(b.task.id) ? orderMap.get(b.task.id)! : 999999;
+      if (orderA !== orderB) return orderA - orderB;
+      return 0;
+    });
+  }, [pingSeriesWithRecords, pingTaskOrder]);
+
+  const sortableTaskIds = useMemo(() => orderedPingSeries.map((item) => item.task.id), [orderedPingSeries]);
+
+  const hasCustomPingOrder = useMemo(() => {
+    if (pingTaskOrder.length === 0 || pingSeriesWithRecords.length === 0) return false;
+    return pingSeriesWithRecords.some((item) => pingTaskOrder.includes(item.task.id));
+  }, [pingTaskOrder, pingSeriesWithRecords]);
+
+  const handlePingDragStart = () => {
+    isDraggingPingRef.current = true;
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try { navigator.vibrate(18); } catch {}
+    }
+  };
+
+  const handlePingDragEnd = (event: DragEndEvent) => {
+    setTimeout(() => {
+      isDraggingPingRef.current = false;
+    }, 60);
+
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const activeId = Number(active.id);
+    const overId = Number(over.id);
+
+    const currentIds = orderedPingSeries.map((item) => item.task.id);
+    const oldIndex = currentIds.indexOf(activeId);
+    const newIndex = currentIds.indexOf(overId);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const nextIds = arrayMove(currentIds, oldIndex, newIndex);
+      setPingTaskOrder(nextIds);
+      setLocalStorageItem('instancePingTaskOrder', JSON.stringify(nextIds));
+    }
+  };
+
+  const handlePingDragCancel = () => {
+    setTimeout(() => {
+      isDraggingPingRef.current = false;
+    }, 60);
+  };
+
+  const handleResetPingOrder = () => {
+    setPingTaskOrder([]);
+    removeLocalStorageItem('instancePingTaskOrder');
+  };
+
   const visiblePingSeries = activePingTaskId === 'all'
-    ? pingSeriesWithRecords
-    : pingSeriesWithRecords.filter((item) => item.task.id === activePingTaskId);
-  const activeSeriesForDomain = visiblePingSeries.length > 0 ? visiblePingSeries : pingSeriesWithRecords;
-  const pingChartRows = buildPingChartRows(pingSeriesWithRecords);
+    ? orderedPingSeries
+    : orderedPingSeries.filter((item) => item.task.id === activePingTaskId);
+  const activeSeriesForDomain = visiblePingSeries.length > 0 ? visiblePingSeries : orderedPingSeries;
+  const pingChartRows = buildPingChartRows(orderedPingSeries);
   const pingYAxisDomain = getPingYAxisDomain(activeSeriesForDomain);
-  const pingXAxisDomain = getPingTimeDomain(pingSeriesWithRecords, pingTimeRangeHours[pingTimeRange]);
+  const pingXAxisDomain = getPingTimeDomain(orderedPingSeries, pingTimeRangeHours[pingTimeRange]);
   const pingChartTimeFormatter = (value: unknown) => {
     const dateInput = typeof value === 'string' || typeof value === 'number' || value instanceof Date ? value : '';
     const date = new Date(dateInput);
@@ -740,6 +947,18 @@ export default function Instance() {
                 ✕ 恢复全网对比
               </Button>
             )}
+            {hasCustomPingOrder && (
+              <Button
+                size="1"
+                variant="ghost"
+                color="gray"
+                onClick={handleResetPingOrder}
+                title="已应用自定义长按拖拽排序，点击恢复默认排序"
+                style={{ cursor: 'pointer', fontSize: '11px', height: '24px', padding: '0 6px' }}
+              >
+                <RotateCcw size={12} style={{ marginRight: 3 }} /> 恢复默认排序
+              </Button>
+            )}
             {pingSeries.length > 0 && (
               <Text size="1" color="gray">
                 {pingSeriesWithRecords.length} / {pingSeries.length} 个任务有记录
@@ -798,7 +1017,7 @@ export default function Instance() {
                   labelFormatter={pingChartTimeFormatter}
                   formatter={(value: unknown, name, item) => {
                     const row = item?.payload as Record<string, unknown> | undefined;
-                    const taskItem = pingSeriesWithRecords.find((s) => s.task.label === name);
+                    const taskItem = orderedPingSeries.find((s) => s.task.label === name);
                     const isLoss = taskItem && row ? Boolean(row[`${taskItem.task.key}_loss`]) : false;
                     if (isLoss || value === null || value === undefined || Number(value) < 0) {
                       return ['丢包 / 超时 🔴', name];
@@ -806,7 +1025,7 @@ export default function Instance() {
                     return [formatPingMs(Number(value)), name];
                   }}
                 />
-                {pingSeriesWithRecords.map((item) => {
+                {orderedPingSeries.map((item) => {
                   const isVisible = activePingTaskId === 'all' || activePingTaskId === item.task.id;
                   if (!isVisible) return null;
                   const isFocused = activePingTaskId === item.task.id;
@@ -828,87 +1047,40 @@ export default function Instance() {
             </ResponsiveContainer>
 
             <PingHeartbeatBar
-              series={pingSeriesWithRecords}
+              series={orderedPingSeries}
               activeTaskId={activePingTaskId}
               rangeHours={pingTimeRangeHours[pingTimeRange]}
             />
 
-            <div className="instance-ping-series-grid">
-              {pingSeriesWithRecords.map((item) => {
-                const quality = getPingSeriesQuality(item.records);
-                const isFocused = activePingTaskId === item.task.id;
-                const isDimmed = activePingTaskId !== 'all' && !isFocused;
+            <DndContext
+              sensors={pingSensors}
+              collisionDetection={closestCenter}
+              onDragStart={handlePingDragStart}
+              onDragEnd={handlePingDragEnd}
+              onDragCancel={handlePingDragCancel}
+            >
+              <SortableContext items={sortableTaskIds} strategy={rectSortingStrategy}>
+                <div className="instance-ping-series-grid">
+                  {orderedPingSeries.map((item) => {
+                    const isFocused = activePingTaskId === item.task.id;
+                    const isDimmed = activePingTaskId !== 'all' && !isFocused;
 
-                return (
-                  <div
-                    key={item.task.key}
-                    className={`instance-ping-card${isFocused ? ' is-active' : ''}${isDimmed ? ' is-dimmed' : ''}`}
-                    style={{ ['--item-color' as string]: item.task.color }}
-                    onClick={() => setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id)}
-                    title={`点击${isFocused ? '取消聚焦' : '聚焦查看'}此线路走势\n${item.task.type} ${item.task.target}\n探测 ${quality.totalPackets} 次，丢包 ${quality.lostPackets} 次\n延迟区间: ${quality.minLatency ?? '-'} ~ ${quality.maxLatency ?? '-'} ms (基准中位: ${quality.medianLatency ?? '-'} ms)`}
-                  >
-                    {/* 头部：圆点 + 正文字色线路名 + 状态徽标 */}
-                    <div className="instance-ping-card-header">
-                      <div className="instance-ping-card-name-group">
-                        <span className="instance-ping-status-dot" />
-                        <span className="instance-ping-card-label">{item.task.label}</span>
-                      </div>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        {isFocused && (
-                          <span className="instance-ping-pill is-focus">聚焦</span>
-                        )}
-                        {quality.packetLossPercent > 0 ? (
-                          <span className={`instance-ping-pill is-${quality.lossLevel}`}>
-                            丢包 {quality.packetLossPercent}%
-                          </span>
-                        ) : quality.totalPackets > 0 ? (
-                          <span className="instance-ping-pill is-good">
-                            畅通
-                          </span>
-                        ) : (
-                          <span className="instance-ping-pill" style={{ background: 'var(--gray-a3)', color: 'var(--gray-10)' }}>
-                            无数据
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 核心数值与连通概况 */}
-                    <div className="instance-ping-card-body">
-                      <div className="instance-ping-value-wrap">
-                        <span className="instance-ping-value-num">
-                          {quality.avgLatency === null ? '全部超时' : quality.avgLatency}
-                        </span>
-                        {quality.avgLatency !== null && <span className="instance-ping-value-unit">ms</span>}
-                      </div>
-                      <div className="instance-ping-body-meta">
-                        {quality.totalPackets === 0 ? (
-                          '无采样'
-                        ) : quality.lostPackets > 0 ? (
-                          <>
-                            <span className="instance-ping-loss-highlight">{quality.lostPackets}次丢包</span> · {quality.totalPackets}次
-                          </>
-                        ) : (
-                          `${quality.totalPackets} 次探测`
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 底部指标对 */}
-                    <div className="instance-ping-card-footer">
-                      <div className="instance-ping-footer-item">
-                        <span className="instance-ping-footer-label">中位</span>
-                        <span className="instance-ping-footer-val">{quality.medianLatency !== null ? `${quality.medianLatency}ms` : '-'}</span>
-                      </div>
-                      <div className="instance-ping-footer-item">
-                        <span className="instance-ping-footer-label">极值</span>
-                        <span className="instance-ping-footer-val">{quality.minLatency ?? '-'} ~ {quality.maxLatency ?? '-'} ms</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    return (
+                      <SortablePingCard
+                        key={item.task.key}
+                        item={item}
+                        isFocused={isFocused}
+                        isDimmed={isDimmed}
+                        onFocusToggle={() => {
+                          if (isDraggingPingRef.current) return;
+                          setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id);
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </SortableContext>
+            </DndContext>
           </>
         )}
       </Card>
