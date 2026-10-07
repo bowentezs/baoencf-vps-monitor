@@ -25,7 +25,6 @@ import {
   useSortable,
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import Loading from '../components/Loading';
 import DetailsGrid from '../components/DetailsGrid';
 import Flag from '../components/Flag';
@@ -134,11 +133,13 @@ function SortablePingCard({
     isDragging,
   } = useSortable({ id: item.task.id });
 
+  if (!item || !item.task) return null;
+
   const quality = getPingSeriesQuality(item.records);
 
   const style: React.CSSProperties = {
     ['--item-color' as string]: item.task.color,
-    transform: CSS.Transform.toString(transform),
+    transform: transform ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` : undefined,
     transition,
     zIndex: isDragging ? 50 : undefined,
     opacity: isDragging ? 0.85 : undefined,
@@ -498,9 +499,6 @@ export default function Instance() {
     setRecordsLoading(true);
   };
 
-  if (!client && clientLoading) return <Loading />;
-  if (error || !client) return <Text color="red" align="center" style={{ padding: 40 }}>{error || '未找到'}</Text>;
-
   const latestHistory = records.length > 0 ? records[records.length - 1] : null;
   const liveRecordWithTime = liveRecord as { time?: unknown } | undefined;
   const latestRecordTime = typeof liveRecordWithTime?.time === 'string'
@@ -617,6 +615,9 @@ export default function Instance() {
     label: row.day.slice(5).replace('-', '/'),
   }));
   const todayTraffic = dailyTraffic[dailyTraffic.length - 1];
+
+  if (!client && clientLoading) return <Loading />;
+  if (error || !client) return <Text color="red" align="center" style={{ padding: 40 }}>{error || '未找到'}</Text>;
 
   return (
     <div className="instance-page">
