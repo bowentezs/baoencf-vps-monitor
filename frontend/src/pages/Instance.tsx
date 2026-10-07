@@ -121,6 +121,7 @@ export default function Instance() {
   const [pingError, setPingError] = useState<string | null>(null);
   const [pingTimeRange, setPingTimeRange] = useState<PingTimeRange>('1h');
   const [pingViewMode, setPingViewMode] = useState<PingViewMode>('trend');
+  const [activePingTaskId, setActivePingTaskId] = useState<number | 'all'>('all');
   const [shouldLoadPing, setShouldLoadPing] = useState(false);
   const [gpuRecords, setGpuRecords] = useState<PublicGpuRecord[]>([]);
   const [trafficRangeDays, setTrafficRangeDays] = useState<TrafficRangeDays>(7);
@@ -241,6 +242,7 @@ export default function Instance() {
     setPingSeries([]);
     setPingError(null);
     setPingLoading(false);
+    setActivePingTaskId('all');
   }, [uuid]);
 
   useEffect(() => {
@@ -349,8 +351,12 @@ export default function Instance() {
   }));
 
   const pingSeriesWithRecords = getPingSeriesWithRecords(pingSeries);
+  const visiblePingSeries = activePingTaskId === 'all'
+    ? pingSeriesWithRecords
+    : pingSeriesWithRecords.filter((item) => item.task.id === activePingTaskId);
+  const activeSeriesForDomain = visiblePingSeries.length > 0 ? visiblePingSeries : pingSeriesWithRecords;
   const pingChartRows = buildPingChartRows(pingSeriesWithRecords);
-  const pingYAxisDomain = getPingYAxisDomain(pingSeriesWithRecords);
+  const pingYAxisDomain = getPingYAxisDomain(activeSeriesForDomain);
   const pingXAxisDomain = getPingTimeDomain(pingSeriesWithRecords, pingTimeRangeHours[pingTimeRange]);
   const dailyPingSummaries = buildDailyPingSummary(pingSeriesWithRecords);
   const pingChartTimeFormatter = (value: unknown) => {
@@ -759,17 +765,36 @@ export default function Instance() {
                               <Text size="1" weight="bold">
                                 {taskStat.avgLatency !== null ? `${taskStat.avgLatency} ms` : '-'}
                               </Text>
-                              {taskStat.medianLatency !== null && taskStat.medianLatency !== taskStat.avgLatency && (
-                                <Text size="1" color="gray" style={{ fontSize: '10.5px', display: 'block' }}>
-                                  基准 ~{taskStat.medianLatency}ms
-                                </Text>
-                              )}
                             </Box>
                             <Text size="1" color="gray" style={{ fontSize: '11px', whiteSpace: 'nowrap' }}>
                               {taskStat.lostPackets > 0
                                 ? `丢 ${taskStat.lostPackets}/${taskStat.totalPackets} 次`
                                 : `共 ${taskStat.totalPackets} 次`}
                             </Text>
+                          </Flex>
+                          {/* 微型双色丢包/成功健康条 */}
+                          <div className="instance-ping-health-bar" style={{ margin: '5px 0' }}>
+                            <div
+                              className="instance-ping-health-fill"
+                              style={{
+                                width: `${Math.max(0, 100 - taskStat.packetLossPercent)}%`,
+                                backgroundColor: taskStat.color,
+                              }}
+                            />
+                            {taskStat.packetLossPercent > 0 && (
+                              <div
+                                className="instance-ping-health-loss"
+                                style={{
+                                  width: `${taskStat.packetLossPercent}%`,
+                                  backgroundColor: 'var(--red-9)',
+                                }}
+                              />
+                            )}
+                          </div>
+                          <Flex justify="between" align="center" style={{ fontSize: '10.5px', color: 'var(--gray-10)' }}>
+                            <Text size="1">最低 {taskStat.minLatency !== null ? `${taskStat.minLatency}ms` : '-'}</Text>
+                            <Text size="1">基准 ~{taskStat.medianLatency !== null ? `${taskStat.medianLatency}ms` : '-'}</Text>
+                            <Text size="1">最高 {taskStat.maxLatency !== null ? `${taskStat.maxLatency}ms` : '-'}</Text>
                           </Flex>
                         </div>
                       ))}
@@ -785,6 +810,44 @@ export default function Instance() {
           </Text>
         ) : (
           <>
+            {pingSeriesWithRecords.length > 1 && (
+              <Flex align="center" gap="2" mb="2" wrap="wrap" className="instance-ping-filter-bar">
+                <Text size="1" color="gray" weight="medium" style={{ marginRight: '2px' }}>
+                  线路视图:
+                </Text>
+                <button
+                  type="button"
+                  className={`instance-ping-filter-btn${activePingTaskId === 'all' ? ' is-active' : ''}`}
+                  onClick={() => setActivePingTaskId('all')}
+                >
+                  全部对比 ({pingSeriesWithRecords.length})
+                </button>
+                {pingSeriesWithRecords.map((item) => {
+                  const isSelected = activePingTaskId === item.task.id;
+                  return (
+                    <button
+                      key={item.task.key}
+                      type="button"
+                      className={`instance-ping-filter-btn${isSelected ? ' is-active' : ''}`}
+                      style={isSelected ? { backgroundColor: item.task.color, borderColor: item.task.color } : undefined}
+                      onClick={() => setActivePingTaskId(isSelected ? 'all' : item.task.id)}
+                    >
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: 999,
+                          backgroundColor: isSelected ? '#fff' : item.task.color,
+                          display: 'inline-block',
+                        }}
+                      />
+                      {item.task.label}
+                    </button>
+                  );
+                })}
+              </Flex>
+            )}
+
             <ResponsiveContainer width="100%" height={pingChartHeight}>
               <LineChart data={pingChartRows} margin={monitorChartMargin}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
@@ -806,26 +869,34 @@ export default function Instance() {
                 />
                 <Tooltip
                   labelFormatter={pingChartTimeFormatter}
-                  formatter={(value: unknown, name) => [
-                    value === null || value === undefined || Number(value) < 0
-                      ? '丢包 / 超时 🔴'
-                      : formatPingMs(Number(value)),
-                    name,
-                  ]}
+                  formatter={(value: unknown, name, item) => {
+                    const row = item?.payload as Record<string, unknown> | undefined;
+                    const taskItem = pingSeriesWithRecords.find((s) => s.task.label === name);
+                    const isLoss = taskItem && row ? Boolean(row[`${taskItem.task.key}_loss`]) : false;
+                    if (isLoss || value === null || value === undefined || Number(value) < 0) {
+                      return ['丢包 / 超时 🔴', name];
+                    }
+                    return [formatPingMs(Number(value)), name];
+                  }}
                 />
-                {pingSeriesWithRecords.map((item) => (
-                  <Line
-                    key={item.task.key}
-                    type="linear"
-                    dataKey={item.task.key}
-                    name={item.task.label}
-                    stroke={item.task.color}
-                    strokeWidth={2}
-                    dot={false}
-                    connectNulls={false}
-                    isAnimationActive={false}
-                  />
-                ))}
+                {pingSeriesWithRecords.map((item) => {
+                  const isVisible = activePingTaskId === 'all' || activePingTaskId === item.task.id;
+                  if (!isVisible) return null;
+                  const isFocused = activePingTaskId === item.task.id;
+                  return (
+                    <Line
+                      key={item.task.key}
+                      type="monotone"
+                      dataKey={item.task.key}
+                      name={item.task.label}
+                      stroke={item.task.color}
+                      strokeWidth={isFocused ? 2.5 : 1.8}
+                      dot={false}
+                      connectNulls={true}
+                      isAnimationActive={false}
+                    />
+                  );
+                })}
               </LineChart>
             </ResponsiveContainer>
 
@@ -840,15 +911,22 @@ export default function Instance() {
                     : quality.lossLevel === 'moderate'
                     ? 'orange'
                     : 'red';
+                const isFocused = activePingTaskId === item.task.id;
+                const isDimmed = activePingTaskId !== 'all' && !isFocused;
+
                 return (
                   <div
                     key={item.task.key}
-                    className="instance-ping-series-item"
+                    className={`instance-ping-series-item${isFocused ? ' is-active' : ''}${isDimmed ? ' is-dimmed' : ''}`}
                     style={{
-                      borderColor: item.task.color,
-                      background: `color-mix(in srgb, ${item.task.color} 9%, var(--color-panel-solid))`,
+                      borderColor: isFocused ? item.task.color : undefined,
+                      background: isFocused
+                        ? `color-mix(in srgb, ${item.task.color} 14%, var(--color-panel-solid))`
+                        : `color-mix(in srgb, ${item.task.color} 7%, var(--color-panel-solid))`,
+                      ['--item-color' as string]: item.task.color,
                     }}
-                    title={`${item.task.type} ${item.task.target}\n探测 ${quality.totalPackets} 次，丢包 ${quality.lostPackets} 次\n延迟区间: ${quality.minLatency ?? '-'} ~ ${quality.maxLatency ?? '-'} ms (基准中位: ${quality.medianLatency ?? '-'} ms)`}
+                    onClick={() => setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id)}
+                    title={`点击${isFocused ? '取消聚焦' : '聚焦查看'}此线路走势\n${item.task.type} ${item.task.target}\n探测 ${quality.totalPackets} 次，丢包 ${quality.lostPackets} 次\n延迟区间: ${quality.minLatency ?? '-'} ~ ${quality.maxLatency ?? '-'} ms (基准中位: ${quality.medianLatency ?? '-'} ms)`}
                   >
                     <Flex justify="between" align="center" gap="2" style={{ minWidth: 0 }}>
                       <Flex align="center" gap="2" style={{ minWidth: 0 }}>
@@ -866,26 +944,57 @@ export default function Instance() {
                           {item.task.label}
                         </Text>
                       </Flex>
-                      {quality.totalPackets > 0 && (
-                        <Badge size="1" color={badgeColor} variant={quality.lossLevel === 'severe' ? 'solid' : 'soft'}>
-                          {quality.lossBadgeLabel}
-                        </Badge>
-                      )}
+                      <Flex align="center" gap="1">
+                        {isFocused && (
+                          <Badge size="1" color="gray" variant="surface">
+                            聚焦中
+                          </Badge>
+                        )}
+                        {quality.totalPackets > 0 && (
+                          <Badge size="1" color={badgeColor} variant={quality.lossLevel === 'severe' ? 'solid' : 'soft'}>
+                            {quality.lossBadgeLabel}
+                          </Badge>
+                        )}
+                      </Flex>
                     </Flex>
+
+                    {/* 主均值与发包/丢包计数 */}
                     <Flex justify="between" align="baseline" gap="2" mt="2">
                       <Box style={{ minWidth: 0 }}>
-                        <Text size="2" weight="bold" style={{ display: 'block' }}>
+                        <Text size="3" weight="bold" style={{ display: 'block', lineHeight: 1.2 }}>
                           {quality.avgLatency === null ? '全部超时' : `${quality.avgLatency} ms`}
                         </Text>
-                        {quality.medianLatency !== null && quality.medianLatency !== quality.avgLatency && (
-                          <Text size="1" color="gray" style={{ fontSize: '10.5px' }}>
-                            基准 ~{quality.medianLatency}ms
-                          </Text>
-                        )}
                       </Box>
                       <Text size="1" color="gray" style={{ fontSize: '11px', whiteSpace: 'nowrap' }}>
                         {quality.lostPackets > 0 ? `丢 ${quality.lostPackets}/${quality.totalPackets} 次` : `共 ${quality.totalPackets} 次`}
                       </Text>
+                    </Flex>
+
+                    {/* 微型双色丢包/成功健康条 */}
+                    <div className="instance-ping-health-bar">
+                      <div
+                        className="instance-ping-health-fill"
+                        style={{
+                          width: `${Math.max(0, 100 - quality.packetLossPercent)}%`,
+                          backgroundColor: item.task.color,
+                        }}
+                      />
+                      {quality.packetLossPercent > 0 && (
+                        <div
+                          className="instance-ping-health-loss"
+                          style={{
+                            width: `${quality.packetLossPercent}%`,
+                            backgroundColor: 'var(--red-9)',
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    {/* 最低 / 基准中位 / 最高极值矩阵 */}
+                    <Flex justify="between" align="center" style={{ fontSize: '11px', color: 'var(--gray-10)' }}>
+                      <Text size="1">最低 {quality.minLatency !== null ? `${quality.minLatency}ms` : '-'}</Text>
+                      <Text size="1">基准 ~{quality.medianLatency !== null ? `${quality.medianLatency}ms` : '-'}</Text>
+                      <Text size="1">最高 {quality.maxLatency !== null ? `${quality.maxLatency}ms` : '-'}</Text>
                     </Flex>
                   </div>
                 );

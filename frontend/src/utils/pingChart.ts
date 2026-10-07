@@ -34,7 +34,7 @@ export interface PingTaskSeries {
 
 export type PingChartRow = {
   time: number;
-  [key: string]: number | null;
+  [key: string]: number | boolean | null;
 };
 
 export type PingLossLevel = 'good' | 'minor' | 'moderate' | 'severe';
@@ -225,12 +225,23 @@ function findAnchor(anchors: number[], timestamp: number, toleranceMs: number) {
   return null;
 }
 
+function niceStep(range: number): number {
+  if (range <= 20) return 5;
+  if (range <= 50) return 10;
+  if (range <= 100) return 20;
+  if (range <= 250) return 50;
+  if (range <= 600) return 100;
+  if (range <= 1500) return 200;
+  return 500;
+}
+
 export function buildPingChartRows(series: PingTaskSeries[]) {
   const validIntervals = series
     .map((item) => item.task.intervalSec)
     .filter((value) => Number.isFinite(value) && value > 0);
   const minInterval = validIntervals.length ? Math.min(...validIntervals) : 60;
-  const toleranceMs = Math.min(1500, Math.max(800, Math.floor(minInterval * 1000 * 0.4)));
+  // 容差适应任务采样周期，保证同一轮探测任务（时差数秒至30秒）聚合到同一时间行，最小15秒，最大60秒
+  const toleranceMs = Math.max(15000, Math.min(60000, Math.floor(minInterval * 1000 * 0.45)));
   const anchors: number[] = [];
   const grouped: Record<number, PingChartRow> = {};
 
@@ -245,7 +256,9 @@ export function buildPingChartRows(series: PingTaskSeries[]) {
         grouped[useTimestamp] = { time: useTimestamp };
         if (anchor === null) anchors.push(useTimestamp);
       }
-      grouped[useTimestamp][item.task.key] = record.value < 0 ? null : Number(record.value);
+      const isLoss = record.value < 0;
+      grouped[useTimestamp][item.task.key] = isLoss ? null : Number(record.value);
+      grouped[useTimestamp][`${item.task.key}_loss`] = isLoss;
     }
   }
 
@@ -302,13 +315,13 @@ export function getPingYAxisDomain(series: PingTaskSeries[]): [number, number] {
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min;
-  const padding = range > 0 ? Math.max(5, range * 0.35) : Math.max(8, max * 0.25);
-  const lower = Math.max(0, min - padding);
-  const upper = max + padding;
+  const step = niceStep(range);
 
-  if (upper - lower < 12) {
-    const extra = (12 - (upper - lower)) / 2;
-    return [Math.max(0, lower - extra), upper + extra];
+  let lower = min <= 50 ? 0 : Math.max(0, Math.floor((min - step * 0.8) / step) * step);
+  let upper = Math.ceil((max + step * 0.6) / step) * step;
+
+  if (upper - lower < step * 2) {
+    upper = lower + step * 2;
   }
 
   return [lower, upper];
