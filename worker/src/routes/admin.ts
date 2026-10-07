@@ -131,6 +131,7 @@ const SETTINGS_SCOPE_KEYS = {
     'theme_card_opacity',
     'theme_card_blur',
     'theme_card_glow',
+    'theme_card_material',
   ],
   general: [
     'record_enabled',

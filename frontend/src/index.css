@@ -1484,6 +1484,79 @@ html[data-theme-appearance='dark'] .mini-ping-chart {
     0 40px 80px -12px rgba(0, 0, 0, 0.6) !important;
 }
 
+/* 💧 苹果液态玻璃模式 (Liquid Glass Material) 下的 MiniPing 浮窗水润增强 */
+html[data-card-material='liquid'] .mini-ping-chart {
+  border: 1px solid rgba(255, 255, 255, 0.75) !important;
+  border-top: 1.5px solid #ffffff !important;
+  box-shadow: 
+    0 0 0 1px rgba(255, 255, 255, 0.6),
+    inset 0 1.5px 3px rgba(255, 255, 255, 0.95),
+    inset 0 -1.5px 2px rgba(255, 255, 255, 0.35),
+    0 20px 48px -6px rgba(0, 0, 0, 0.22),
+    0 36px 70px -12px rgba(0, 0, 0, 0.16) !important;
+}
+
+html[data-card-material='liquid'] .mini-ping-chart::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 42%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.02) 80%, transparent 100%);
+  border-radius: 14px 14px 45% 45% / 14px 14px 14px 14px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+html[data-card-material='liquid'] .mini-ping-chart > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dark html[data-card-material='liquid'] .mini-ping-chart,
+html[data-theme-appearance='dark'][data-card-material='liquid'] .mini-ping-chart {
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.45) !important;
+  box-shadow: 
+    0 0 0 1px rgba(0, 0, 0, 0.7),
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.25),
+    inset 0 -1.5px 2px rgba(255, 255, 255, 0.08),
+    0 24px 52px -6px rgba(0, 0, 0, 0.8),
+    0 40px 80px -12px rgba(0, 0, 0, 0.6) !important;
+}
+
+.dark html[data-card-material='liquid'] .mini-ping-chart::before,
+html[data-theme-appearance='dark'][data-card-material='liquid'] .mini-ping-chart::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.01) 80%, transparent 100%);
+}
+
+/* 💧 苹果液态玻璃模式下的线路果冻胶囊增强 */
+html[data-card-material='liquid'] .mini-ping-chart-legend-item {
+  border-top: 1.5px solid color-mix(in srgb, var(--item-color) 40%, #ffffff) !important;
+  box-shadow: 
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.9),
+    inset 0 -1px 1px color-mix(in srgb, var(--item-color) 25%, transparent),
+    0 2px 6px rgba(0, 0, 0, 0.04) !important;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, background 0.18s ease !important;
+}
+
+html[data-card-material='liquid'] .mini-ping-chart-legend-item:hover {
+  transform: translateY(-2px) scale(1.018) !important;
+  box-shadow: 
+    inset 0 1.5px 2px #ffffff,
+    0 8px 20px -2px color-mix(in srgb, var(--item-color) 45%, transparent),
+    0 2px 6px rgba(0, 0, 0, 0.06) !important;
+}
+
+html[data-card-material='liquid'] .mini-ping-chart-legend-item.is-active {
+  transform: translateY(-1.5px) !important;
+  box-shadow: 
+    0 0 0 1.5px var(--item-color),
+    inset 0 1.5px 2px #ffffff,
+    0 8px 24px -2px color-mix(in srgb, var(--item-color) 60%, transparent) !important;
+}
+
 .mini-ping-chart .recharts-default-tooltip {
   border: 1px solid rgba(0, 0, 0, 0.1) !important;
   border-radius: 9px !important;

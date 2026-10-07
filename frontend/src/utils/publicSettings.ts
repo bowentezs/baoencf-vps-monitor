@@ -9,6 +9,7 @@ export interface PublicThemeSettings {
   cardOpacity: number;
   cardBlur: number;
   cardGlow: boolean;
+  cardMaterial: 'frosted' | 'liquid';
 }
 
 export interface PublicSettings {
@@ -45,6 +46,7 @@ const DEFAULT_PUBLIC_SETTINGS: PublicSettings = {
     cardOpacity: 70,
     cardBlur: 16,
     cardGlow: true,
+    cardMaterial: 'frosted',
   },
 };
 
@@ -110,6 +112,7 @@ export function normalizePublicSettings(payload: unknown): PublicSettings | null
       cardOpacity: integerSetting(theme?.cardOpacity, 70, 10, 100),
       cardBlur: integerSetting(theme?.cardBlur, 16, 0, 60),
       cardGlow: theme?.cardGlow !== false,
+      cardMaterial: theme?.cardMaterial === 'liquid' ? 'liquid' : 'frosted',
     },
   };
 }
