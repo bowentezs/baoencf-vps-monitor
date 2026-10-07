@@ -4344,6 +4344,14 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
               opacity 0.16s ease;
   user-select: none;
   cursor: pointer;
+  touch-action: pan-y;
+}
+
+.instance-ping-card.is-dragging {
+  opacity: 0.9 !important;
+  box-shadow: 0 14px 32px -4px rgba(0, 0, 0, 0.28), 0 0 0 2px var(--accent-9) !important;
+  z-index: 99 !important;
+  cursor: grabbing !important;
 }
 
 .instance-ping-card:hover {
