@@ -5,16 +5,20 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import { publicFetch } from '../utils/api';
+import { getLocalStorageItem, setLocalStorageItem } from '../utils/browserStorage';
 import { normalizeDailyTrafficResponse, type DailyTrafficRow } from '../utils/dailyTraffic';
 import { formatBytes } from '../utils/format';
 
 type TrafficRangeDays = 7 | 30;
+type TrafficChartType = 'line' | 'bar';
 
 interface DailyTrafficChartFloatProps {
   uuid: string;
@@ -31,9 +35,19 @@ export default function DailyTrafficChartFloat({
 }: DailyTrafficChartFloatProps) {
   const [open, setOpen] = useState(false);
   const [days, setDays] = useState<TrafficRangeDays>(7);
+  const [chartType, setChartType] = useState<TrafficChartType>(() => {
+    const saved = getLocalStorageItem('dailyTrafficChartType');
+    return saved === 'bar' ? 'bar' : 'line';
+  });
   const [rows, setRows] = useState<DailyTrafficRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+
+  const handleChartTypeChange = (value: string) => {
+    const next = value === 'bar' ? 'bar' : 'line';
+    setChartType(next);
+    setLocalStorageItem('dailyTrafficChartType', next);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -107,21 +121,31 @@ export default function DailyTrafficChartFloat({
           zIndex: 5,
         }}
       >
-        <Flex justify="between" align="center" gap="3" mb="2">
+        <Flex justify="between" align="center" gap="3" mb="2" wrap="wrap">
           <Box style={{ minWidth: 0 }}>
             <Text weight="bold" size="2" as="p" truncate>{clientName} · 每日流量</Text>
             <Text size="1" color="gray" as="p">
               北京时间 · 今日 ↑ {today ? formatBytes(today.up) : '-'} ↓ {today ? formatBytes(today.down) : '-'}
             </Text>
           </Box>
-          <SegmentedControl.Root
-            size="1"
-            value={String(days)}
-            onValueChange={(value) => setDays(value === '30' ? 30 : 7)}
-          >
-            <SegmentedControl.Item value="7">7天</SegmentedControl.Item>
-            <SegmentedControl.Item value="30">30天</SegmentedControl.Item>
-          </SegmentedControl.Root>
+          <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
+            <SegmentedControl.Root
+              size="1"
+              value={chartType}
+              onValueChange={handleChartTypeChange}
+            >
+              <SegmentedControl.Item value="line">折线</SegmentedControl.Item>
+              <SegmentedControl.Item value="bar">柱状</SegmentedControl.Item>
+            </SegmentedControl.Root>
+            <SegmentedControl.Root
+              size="1"
+              value={String(days)}
+              onValueChange={(value) => setDays(value === '30' ? 30 : 7)}
+            >
+              <SegmentedControl.Item value="7">7天</SegmentedControl.Item>
+              <SegmentedControl.Item value="30">30天</SegmentedControl.Item>
+            </SegmentedControl.Root>
+          </Flex>
         </Flex>
 
         <Box style={{ width: '100%', height: 250 }}>
@@ -135,36 +159,87 @@ export default function DailyTrafficChartFloat({
             </Flex>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 12, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.25} />
-                <XAxis
-                  dataKey="label"
-                  fontSize={11}
-                  minTickGap={days === 30 ? 18 : 8}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  width={58}
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => formatBytes(Number(value))}
-                />
-                <Tooltip
-                  labelFormatter={(label) => `${String(label)} 北京时间`}
-                  formatter={(value: number, name) => [formatBytes(Number(value)), name]}
-                  contentStyle={{
-                    border: '1px solid var(--gray-5)',
-                    borderRadius: 8,
-                    background: 'var(--color-panel-solid)',
-                    color: 'var(--gray-12)',
-                    fontSize: 12,
-                  }}
-                />
-                <Bar dataKey="up" name="上传" fill="var(--blue-9)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
-                <Bar dataKey="down" name="下载" fill="var(--green-9)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
-              </BarChart>
+              {chartType === 'line' ? (
+                <LineChart data={chartData} margin={{ top: 12, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.25} />
+                  <XAxis
+                    dataKey="label"
+                    fontSize={11}
+                    minTickGap={days === 30 ? 18 : 8}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    width={58}
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => formatBytes(Number(value))}
+                  />
+                  <Tooltip
+                    labelFormatter={(label) => `${String(label)} 北京时间`}
+                    formatter={(value: number, name) => [formatBytes(Number(value)), name]}
+                    contentStyle={{
+                      border: '1px solid var(--gray-5)',
+                      borderRadius: 8,
+                      background: 'var(--color-panel-solid)',
+                      color: 'var(--gray-12)',
+                      fontSize: 12,
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="up"
+                    name="上传"
+                    stroke="var(--blue-9)"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: 'var(--blue-9)' }}
+                    activeDot={{ r: 5 }}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="down"
+                    name="下载"
+                    stroke="var(--green-9)"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: 'var(--green-9)' }}
+                    activeDot={{ r: 5 }}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              ) : (
+                <BarChart data={chartData} margin={{ top: 12, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.25} />
+                  <XAxis
+                    dataKey="label"
+                    fontSize={11}
+                    minTickGap={days === 30 ? 18 : 8}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    width={58}
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => formatBytes(Number(value))}
+                  />
+                  <Tooltip
+                    labelFormatter={(label) => `${String(label)} 北京时间`}
+                    formatter={(value: number, name) => [formatBytes(Number(value)), name]}
+                    contentStyle={{
+                      border: '1px solid var(--gray-5)',
+                      borderRadius: 8,
+                      background: 'var(--color-panel-solid)',
+                      color: 'var(--gray-12)',
+                      fontSize: 12,
+                    }}
+                  />
+                  <Bar dataKey="up" name="上传" fill="var(--blue-9)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="down" name="下载" fill="var(--green-9)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              )}
             </ResponsiveContainer>
           )}
         </Box>

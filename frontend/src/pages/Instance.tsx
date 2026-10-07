@@ -42,6 +42,7 @@ import {
 import { buildMonitorChartData, getMonitorChartRenderData } from '../utils/monitorChartData';
 import { monitorYAxisProps, pingYAxisProps, wideYAxisProps } from '../utils/monitorChartAxis';
 import { formatBytes } from '../utils/format';
+import { getLocalStorageItem, setLocalStorageItem } from '../utils/browserStorage';
 import { normalizeDailyTrafficResponse, type DailyTrafficRow } from '../utils/dailyTraffic';
 
 const formatSpeed = (bytes: number): string => {
@@ -126,6 +127,16 @@ export default function Instance() {
   const [dailyTraffic, setDailyTraffic] = useState<DailyTrafficRow[]>([]);
   const [dailyTrafficLoading, setDailyTrafficLoading] = useState(true);
   const [dailyTrafficError, setDailyTrafficError] = useState(false);
+  const [dailyTrafficChartType, setDailyTrafficChartType] = useState<'line' | 'bar'>(() => {
+    const saved = getLocalStorageItem('dailyTrafficChartType');
+    return saved === 'bar' ? 'bar' : 'line';
+  });
+
+  const handleDailyTrafficChartTypeChange = (value: string) => {
+    const next = value === 'bar' ? 'bar' : 'line';
+    setDailyTrafficChartType(next);
+    setLocalStorageItem('dailyTrafficChartType', next);
+  };
   const pingSectionRef = useRef<HTMLDivElement | null>(null);
   const scrollPosRef = useRef<number | null>(null);
 
@@ -447,14 +458,24 @@ export default function Instance() {
               北京时间 · 今日 ↑ {todayTraffic ? formatBytes(todayTraffic.up) : '-'} ↓ {todayTraffic ? formatBytes(todayTraffic.down) : '-'}
             </Text>
           </Box>
-          <SegmentedControl.Root
-            size="1"
-            value={String(trafficRangeDays)}
-            onValueChange={(value) => setTrafficRangeDays(value === '30' ? 30 : 7)}
-          >
-            <SegmentedControl.Item value="7">7天</SegmentedControl.Item>
-            <SegmentedControl.Item value="30">30天</SegmentedControl.Item>
-          </SegmentedControl.Root>
+          <Flex align="center" gap="2" wrap="wrap">
+            <SegmentedControl.Root
+              size="1"
+              value={dailyTrafficChartType}
+              onValueChange={handleDailyTrafficChartTypeChange}
+            >
+              <SegmentedControl.Item value="line">折线</SegmentedControl.Item>
+              <SegmentedControl.Item value="bar">柱状</SegmentedControl.Item>
+            </SegmentedControl.Root>
+            <SegmentedControl.Root
+              size="1"
+              value={String(trafficRangeDays)}
+              onValueChange={(value) => setTrafficRangeDays(value === '30' ? 30 : 7)}
+            >
+              <SegmentedControl.Item value="7">7天</SegmentedControl.Item>
+              <SegmentedControl.Item value="30">30天</SegmentedControl.Item>
+            </SegmentedControl.Root>
+          </Flex>
         </Flex>
         <Box style={{ height: dailyTrafficChartHeight }}>
           {dailyTrafficLoading ? (
@@ -467,23 +488,61 @@ export default function Instance() {
             </Flex>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dailyTrafficChartData} margin={{ top: 12, right: 12, bottom: 4, left: 4 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
-                <XAxis
-                  dataKey="label"
-                  fontSize={12}
-                  minTickGap={16}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis {...wideYAxisProps} tickFormatter={(value) => formatBytes(Number(value))} />
-                <Tooltip
-                  labelFormatter={(label) => `${String(label)} 北京时间`}
-                  formatter={(value: number, name) => [formatBytes(Number(value)), name]}
-                />
-                <Bar dataKey="up" name="上传" fill="var(--blue-9)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
-                <Bar dataKey="down" name="下载" fill="var(--green-9)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
-              </BarChart>
+              {dailyTrafficChartType === 'line' ? (
+                <LineChart data={dailyTrafficChartData} margin={{ top: 12, right: 12, bottom: 4, left: 4 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis
+                    dataKey="label"
+                    fontSize={12}
+                    minTickGap={16}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis {...wideYAxisProps} tickFormatter={(value) => formatBytes(Number(value))} />
+                  <Tooltip
+                    labelFormatter={(label) => `${String(label)} 北京时间`}
+                    formatter={(value: number, name) => [formatBytes(Number(value)), name]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="up"
+                    name="上传"
+                    stroke="var(--blue-9)"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: 'var(--blue-9)' }}
+                    activeDot={{ r: 5 }}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="down"
+                    name="下载"
+                    stroke="var(--green-9)"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: 'var(--green-9)' }}
+                    activeDot={{ r: 5 }}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              ) : (
+                <BarChart data={dailyTrafficChartData} margin={{ top: 12, right: 12, bottom: 4, left: 4 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis
+                    dataKey="label"
+                    fontSize={12}
+                    minTickGap={16}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis {...wideYAxisProps} tickFormatter={(value) => formatBytes(Number(value))} />
+                  <Tooltip
+                    labelFormatter={(label) => `${String(label)} 北京时间`}
+                    formatter={(value: number, name) => [formatBytes(Number(value)), name]}
+                  />
+                  <Bar dataKey="up" name="上传" fill="var(--blue-9)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="down" name="下载" fill="var(--green-9)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              )}
             </ResponsiveContainer>
           )}
         </Box>
