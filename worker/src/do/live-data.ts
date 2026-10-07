@@ -113,6 +113,7 @@ interface LiveSnapshot {
   count: number;
   timestamp: number;
   metadata_version?: string;
+  last_report_times?: Record<string, number>;
 }
 
 interface AgentPolicySettings {
@@ -410,6 +411,8 @@ export class LiveDataDO {
   private networkMetadataSignatures = new Map<string, { signature: string; syncedAt: number }>();
   private basicInfoSignatures = new Map<string, string>();
   private geoRegionCache = new Map<string, { region: string; expiresAt: number }>();
+  private clientLastReportTimes = new Map<string, number>();
+  private expiredViewersNotified = new Set<string>();
 
   constructor(state: DurableObjectState, env: LiveDataEnv) {
     this.state = state;
@@ -566,10 +569,10 @@ export class LiveDataDO {
     return safeReport as MonitorReportPayload;
   }
 
-  private buildSnapshot(includeHidden = false): LiveSnapshot {
+  private buildSnapshot(includeHidden = false, includeOffline = false): LiveSnapshot {
     const now = Date.now();
     const onlineClients = Array.from(this.clients.values())
-      .filter(c => (includeHidden || !c.hidden) && (!c.expiresAt || c.expiresAt > now))
+      .filter(c => (includeHidden || !c.hidden) && (includeOffline || !c.expiresAt || c.expiresAt > now))
       .map(c => {
         const report = { ...(c.lastReport || {}) };
         if (!includeHidden) {
@@ -589,11 +592,14 @@ export class LiveDataDO {
     }, {});
 
     const snapshot: LiveSnapshot = {
-      online: onlineClients.map(c => c.uuid),
+      online: Array.from(this.clients.values())
+        .filter(c => (includeHidden || !c.hidden) && (!c.expiresAt || c.expiresAt > now))
+        .map(c => c.uuid),
       clients: onlineClients,
       data: liveData,
       count: onlineClients.length,
       timestamp: Date.now(),
+      last_report_times: Object.fromEntries(this.clientLastReportTimes),
     };
     if (this.adminClientsUpdatedAt !== null) {
       snapshot.metadata_version = String(this.adminClientsUpdatedAt);
@@ -601,12 +607,12 @@ export class LiveDataDO {
     return snapshot;
   }
 
-  private async buildSnapshotWithMetadataVersion(includeHidden = false): Promise<LiveSnapshot> {
+  private async buildSnapshotWithMetadataVersion(includeHidden = false, includeOffline = false): Promise<LiveSnapshot> {
     if (this.adminClientsUpdatedAt === null) {
       const snapshot = await this.readAdminClientsSnapshot();
       this.adminClientsUpdatedAt = snapshot?.updatedAt || 0;
     }
-    return this.buildSnapshot(includeHidden);
+    return this.buildSnapshot(includeHidden, includeOffline);
   }
 
   private sendSnapshot(ws: WebSocket) {
@@ -652,6 +658,8 @@ export class LiveDataDO {
     };
 
     this.clients.set(clientId, next);
+    this.clientLastReportTimes.set(clientId, now);
+    this.expiredViewersNotified.delete(clientId);
     if (ws) this.rememberAgentReportAttachment(ws, clientId, clientName, hidden, report, now, expiresAt);
     this.runBackground('do_live_network_metadata', this.syncNetworkMetadataFromReport(clientId, clientName, hidden, report, now));
 
@@ -1027,14 +1035,22 @@ export class LiveDataDO {
     for (const [uuid, client] of this.clients) {
       if (!client.expiresAt || client.expiresAt > now) continue;
 
-      this.clients.delete(uuid);
-      this.broadcastToViewers({
-        type: 'remove',
-        client: uuid,
-        timestamp: now,
-      }, client.hidden ? 'admin' : 'all');
-    }
+      if (!this.expiredViewersNotified.has(uuid)) {
+        this.expiredViewersNotified.add(uuid);
+        this.broadcastToViewers({
+          type: 'remove',
+          client: uuid,
+          timestamp: now,
+        }, client.hidden ? 'admin' : 'all');
+      }
 
+      const lastSeen = Number(client.lastReportTime || 0);
+      if (lastSeen > 0 && now - lastSeen > 7 * 24 * 60 * 60 * 1000) {
+        this.clients.delete(uuid);
+        this.clientLastReportTimes.delete(uuid);
+        this.expiredViewersNotified.delete(uuid);
+      }
+    }
   }
 
   private async scheduleExpiryAlarm(now: number) {
@@ -1177,13 +1193,16 @@ export class LiveDataDO {
 
     if (attachment.role !== 'agent') return;
 
-    this.clients.delete(attachment.clientId);
     if (existing) {
-      this.broadcastToViewers({
-        type: 'remove',
-        client: attachment.clientId,
-        timestamp: Date.now(),
-      }, existing.hidden ? 'admin' : 'all');
+      existing.expiresAt = Date.now();
+      if (!this.expiredViewersNotified.has(attachment.clientId)) {
+        this.expiredViewersNotified.add(attachment.clientId);
+        this.broadcastToViewers({
+          type: 'remove',
+          client: attachment.clientId,
+          timestamp: Date.now(),
+        }, existing.hidden ? 'admin' : 'all');
+      }
     }
   }
 
@@ -1322,6 +1341,8 @@ export class LiveDataDO {
     this.sessions.delete(meta.uuid);
     this.sessionRoles.delete(meta.uuid);
     this.clients.delete(meta.uuid);
+    this.clientLastReportTimes.delete(meta.uuid);
+    this.expiredViewersNotified.delete(meta.uuid);
     await this.removeAgentAuthByUuid(String(meta.uuid));
     if (!keepMetadata) {
       await this.removeAdminClientSnapshot(String(meta.uuid));
@@ -1790,7 +1811,8 @@ export class LiveDataDO {
     // HTTP GET - 获取缓存的实时数据
     if (request.method === 'GET') {
       const includeHidden = url.searchParams.get('include_hidden') === '1' || url.searchParams.get('include_hidden') === 'true';
-      return new Response(JSON.stringify(await this.buildSnapshotWithMetadataVersion(includeHidden)), {
+      const includeOffline = url.searchParams.get('include_offline') === '1' || url.searchParams.get('include_offline') === 'true';
+      return new Response(JSON.stringify(await this.buildSnapshotWithMetadataVersion(includeHidden, includeOffline)), {
         headers: { 'Content-Type': 'application/json' },
       });
     }

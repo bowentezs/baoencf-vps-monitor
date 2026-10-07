@@ -1165,7 +1165,12 @@ export default function AdminNotifications() {
                           />
                         </Table.Cell>
                         <Table.Cell>
-                          <Text size="2">{gracePeriod}</Text>
+                          <Flex align="center" gap="1">
+                            <Text size="2">{gracePeriod}s</Text>
+                            {gracePeriod >= 60 && (
+                              <Text size="1" color="gray">({(gracePeriod / 60).toFixed(1).replace(/\.0$/, '')}分)</Text>
+                            )}
+                          </Flex>
                         </Table.Cell>
                         <Table.Cell>
                           <Text size="1" color="gray">{lastNotifiedText}</Text>
@@ -1371,8 +1376,10 @@ export default function AdminNotifications() {
                 onChange={(e) => setEditForm({ ...editForm, grace_period: Number(e.target.value) })}
                 mt="1"
               />
-              <Text size="1" color="gray" mt="1">
-                服务器离线超过该时间后才会发送通知，避免网络抖动误报
+              <Text size="1" color={editForm.grace_period < 30 ? 'red' : 'gray'} mt="1">
+                {editForm.grace_period >= 60
+                  ? `约 ${(editForm.grace_period / 60).toFixed(1).replace(/\.0$/, '')} 分钟。服务器离线超过该时间后才会发送通知（最低 30 秒）`
+                  : '服务器离线超过该时间后才会发送通知，避免网络抖动误报（最低 30 秒）'}
               </Text>
             </label>
           </Flex>
@@ -1406,6 +1413,11 @@ export default function AdminNotifications() {
                 onChange={(e) => setBatchForm({ ...batchForm, grace_period: Number(e.target.value) })}
                 mt="1"
               />
+              <Text size="1" color={batchForm.grace_period < 30 ? 'red' : 'gray'} mt="1">
+                {batchForm.grace_period >= 60
+                  ? `约 ${(batchForm.grace_period / 60).toFixed(1).replace(/\.0$/, '')} 分钟。服务器离线超过该时间后才会发送通知（最低 30 秒）`
+                  : '服务器离线超过该时间后才会发送通知，避免网络抖动误报（最低 30 秒）'}
+              </Text>
             </label>
           </Flex>
           <Flex gap="2" justify="end" mt="4">

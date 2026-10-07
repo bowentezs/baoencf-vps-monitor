@@ -514,15 +514,25 @@ export function createScheduledRunContext(env: Bindings): ScheduledRunContext {
         try {
           const stub = env.LIVE_DATA.get(env.LIVE_DATA.idFromName('global'));
           const snapshot = await readLiveSnapshot(await stub.fetch(
-            new Request('https://do/live?include_hidden=1', { method: 'GET' }),
+            new Request('https://do/live?include_hidden=1&include_offline=1', { method: 'GET' }),
           ));
-          if (!snapshot?.clients) return null;
+          if (!snapshot) return null;
           const result = new Map<string, string>();
-          for (const client of snapshot.clients) {
-            const uuid = typeof client.uuid === 'string' ? client.uuid : '';
-            const timestamp = Number(client.lastReportTime);
-            if (uuid && Number.isFinite(timestamp) && timestamp > 0) {
-              result.set(uuid, new Date(timestamp).toISOString());
+          if (snapshot.last_report_times && typeof snapshot.last_report_times === 'object') {
+            for (const [uuid, timestamp] of Object.entries(snapshot.last_report_times)) {
+              const timeNum = Number(timestamp);
+              if (uuid && Number.isFinite(timeNum) && timeNum > 0) {
+                result.set(uuid, new Date(timeNum).toISOString());
+              }
+            }
+          }
+          if (Array.isArray(snapshot.clients)) {
+            for (const client of snapshot.clients) {
+              const uuid = typeof client.uuid === 'string' ? client.uuid : '';
+              const timestamp = Number(client.lastReportTime);
+              if (uuid && Number.isFinite(timestamp) && timestamp > 0 && !result.has(uuid)) {
+                result.set(uuid, new Date(timestamp).toISOString());
+              }
             }
           }
           return result;
@@ -609,6 +619,12 @@ async function runOfflineCheck(context: ScheduledRunContext, now: Date): Promise
   );
   const latestMap = new Map(latestTimes.map(row => [row.client, row.last_time]));
   const liveTimes = await context.getLiveReportTimes(enabled.map(item => item.client));
+  if (liveTimes === null) {
+    // 故障安全熔断保护（Fail-Safe Guard）：
+    // 当监控中枢 (Durable Object) 发生重启、冷启动或通信超时返回 null 时，
+    // 必须直接跳过本次离线检测，严禁退回旧数据库历史记录导致全网批量误报警！
+    return;
+  }
 
   for (const item of enabled) {
     const client = clientMap.get(item.client);
