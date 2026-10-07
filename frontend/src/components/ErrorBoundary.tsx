@@ -1,4 +1,4 @@
-﻿import { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
 import { Flex, Button, Heading, Text, Card, Code } from '@radix-ui/themes';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
@@ -39,7 +39,6 @@ export default class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
-      const showDetail = import.meta.env.DEV;
 
       return (
         <Flex
@@ -55,14 +54,17 @@ export default class ErrorBoundary extends Component<Props, State> {
               <Text size="2" color="gray">
                 抱歉，页面遇到了一个错误。请尝试刷新页面。
               </Text>
-              {showDetail && this.state.error && (
-                <Code size="1" style={{
-                  maxWidth: '100%', padding: '8px', borderRadius: '4px',
-                  backgroundColor: 'var(--gray-3)', wordBreak: 'break-all',
-                  fontSize: '11px', maxHeight: '60px', overflow: 'auto',
-                }}>
-                  {this.state.error.message}
-                </Code>
+              {this.state.error && (
+                <details style={{ width: '100%', fontSize: '12px', color: 'var(--gray-11)', textAlign: 'left' }}>
+                  <summary style={{ cursor: 'pointer', marginBottom: '6px' }}>查看详细错误原因</summary>
+                  <Code size="1" style={{
+                    display: 'block', maxWidth: '100%', padding: '8px', borderRadius: '4px',
+                    backgroundColor: 'var(--gray-3)', wordBreak: 'break-all',
+                    fontSize: '11px', maxHeight: '120px', overflow: 'auto',
+                  }}>
+                    {this.state.error.message || String(this.state.error)}
+                  </Code>
+                </details>
               )}
               <Flex gap="3" mt="2">
                 <Button onClick={this.handleReload}>

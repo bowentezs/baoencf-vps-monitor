@@ -352,7 +352,7 @@ export default function Instance() {
   const pingChartRows = buildPingChartRows(pingSeriesWithRecords);
   const pingYAxisDomain = getPingYAxisDomain(pingSeriesWithRecords);
   const pingXAxisDomain = getPingTimeDomain(pingSeriesWithRecords, pingTimeRangeHours[pingTimeRange]);
-  const dailyPingSummaries = useMemo(() => buildDailyPingSummary(pingSeriesWithRecords), [pingSeriesWithRecords]);
+  const dailyPingSummaries = buildDailyPingSummary(pingSeriesWithRecords);
   const pingChartTimeFormatter = (value: unknown) => {
     const dateInput = typeof value === 'string' || typeof value === 'number' || value instanceof Date ? value : '';
     const date = new Date(dateInput);
@@ -361,19 +361,17 @@ export default function Instance() {
       ? date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
       : date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   };
-  const dailyPingChartData = useMemo(() => {
-    return dailyPingSummaries.map((day) => {
-      const row: Record<string, unknown> = {
-        label: day.displayDate,
-        fullDate: day.fullDisplayDate,
-        date: day.date,
-      };
-      day.tasks.forEach((t) => {
-        row[t.taskKey] = t.avgLatency;
-      });
-      return row;
+  const dailyPingChartData = dailyPingSummaries.map((day) => {
+    const row: Record<string, unknown> = {
+      label: day.displayDate,
+      fullDate: day.fullDisplayDate,
+      date: day.date,
+    };
+    day.tasks.forEach((t) => {
+      row[t.taskKey] = t.avgLatency;
     });
-  }, [dailyPingSummaries]);
+    return row;
+  });
   const dailyTrafficChartData = dailyTraffic.map((row) => ({
     ...row,
     label: row.day.slice(5).replace('-', '/'),
