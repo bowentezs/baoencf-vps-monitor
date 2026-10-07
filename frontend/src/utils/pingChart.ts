@@ -81,16 +81,16 @@ export interface DailyPingSummary {
 }
 
 const pingSeriesColors = [
-  '#FF1744',
-  '#00C853',
-  '#2979FF',
-  '#FF9100',
-  '#D500F9',
-  '#00B8D4',
-  '#FFD600',
-  '#651FFF',
-  '#FF4081',
-  '#64DD17',
+  '#2563eb', // 科技蓝 (Blue 600)
+  '#7c3aed', // 联通紫 (Violet 600)
+  '#059669', // 移动翠 (Emerald 600)
+  '#d97706', // 琥珀金 (Amber 600)
+  '#0891b2', // 科技青 (Cyan 600)
+  '#db2777', // 玫红 (Pink 600)
+  '#4f46e5', // 藏蓝 (Indigo 600)
+  '#0d9488', // 松石青 (Teal 600)
+  '#ea580c', // 柿橙 (Orange 600)
+  '#65a30d', // 苔绿 (Lime 600)
 ];
 
 const demoTaskColorOrder = [
@@ -327,6 +327,32 @@ export function getPingYAxisDomain(series: PingTaskSeries[]): [number, number] {
   return [lower, upper];
 }
 
+export function getDailyPingYAxisDomain(
+  summaries: DailyPingSummary[],
+  activeTaskId?: number | 'all',
+): [number, number] {
+  const values: number[] = [];
+  for (const day of summaries) {
+    for (const t of day.tasks) {
+      if (activeTaskId && activeTaskId !== 'all' && t.taskId !== activeTaskId) continue;
+      if (t.avgLatency !== null && Number.isFinite(t.avgLatency) && t.avgLatency >= 0) {
+        values.push(t.avgLatency);
+      }
+    }
+  }
+  if (values.length === 0) return [0, 100];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min;
+  const step = niceStep(range);
+  let lower = min <= 50 ? 0 : Math.max(0, Math.floor((min - step * 0.8) / step) * step);
+  let upper = Math.ceil((max + step * 0.6) / step) * step;
+  if (upper - lower < step * 2) {
+    upper = lower + step * 2;
+  }
+  return [lower, upper];
+}
+
 export function getPingSeriesAverage(records: PingRecord[]): number | null {
   const chronological = records
     .map((record) => Number(record.value))
@@ -433,13 +459,13 @@ export function getLossLevelInfo(lossPercent: number, totalPackets: number): {
   badgeLabel: string;
 } {
   if (totalPackets === 0) {
-    return { level: 'good', badgeLabel: '无记录' };
+    return { level: 'good', badgeLabel: '无数据' };
   }
   if (lossPercent <= 0) {
-    return { level: 'good', badgeLabel: '优 0%' };
+    return { level: 'good', badgeLabel: '畅通' };
   }
   if (lossPercent <= 5) {
-    return { level: 'minor', badgeLabel: `轻微 ${lossPercent}%` };
+    return { level: 'minor', badgeLabel: `丢包 ${lossPercent}%` };
   }
   if (lossPercent <= 20) {
     return { level: 'moderate', badgeLabel: `中度 ${lossPercent}%` };
