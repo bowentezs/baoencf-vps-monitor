@@ -168,18 +168,7 @@ export default function MiniPingChart({
           <button
             type="button"
             onClick={() => setActiveTaskId('all')}
-            style={{
-              border: 'none',
-              background: 'var(--gray-a4)',
-              color: 'var(--gray-12)',
-              borderRadius: 4,
-              padding: '2px 8px',
-              fontSize: 10.5,
-              fontWeight: 600,
-              cursor: 'pointer',
-              lineHeight: 1.2,
-              transition: 'background 0.15s ease',
-            }}
+            className="mini-ping-reset-btn"
             title="恢复显示所有线路"
           >
             ✕ 恢复全部
@@ -221,9 +210,12 @@ export default function MiniPingChart({
                 name,
               ]}
               contentStyle={{
-                border: '1px solid var(--gray-5)',
+                border: '1px solid rgba(255, 255, 255, 0.45)',
                 borderRadius: 8,
-                background: 'var(--color-panel-solid)',
+                background: 'var(--color-panel-translucent, rgba(255, 255, 255, 0.82))',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
                 color: 'var(--gray-12)',
                 fontSize: 12,
               }}
@@ -263,11 +255,6 @@ export default function MiniPingChart({
               key={item.task.key}
               className={`mini-ping-chart-legend-item${isFocused ? ' is-active' : ''}${isDimmed ? ' is-dimmed' : ''}`}
               style={{
-                border: `1px solid ${item.task.color}`,
-                borderLeft: `4px solid ${item.task.color}`,
-                background: isFocused
-                  ? `color-mix(in srgb, ${item.task.color} 18%, var(--color-panel-solid))`
-                  : `color-mix(in srgb, ${item.task.color} 8%, var(--color-panel-solid))`,
                 ['--item-color' as string]: item.task.color,
               }}
               onClick={() => setActiveTaskId(activeTaskId === item.task.id ? 'all' : item.task.id)}

@@ -47,11 +47,13 @@ export default function MiniPingChartFloat({
         align="end"
         sideOffset={8}
         onClick={(event) => event.stopPropagation()}
+        className="mini-ping-popover-content"
         style={{
           padding: 0,
           border: 'none',
-          boxShadow: 'hsl(206 22% 7% / 35%) 0px 10px 38px -10px, hsl(206 22% 7% / 20%) 0px 10px 20px -15px',
-          borderRadius: 'var(--radius-3)',
+          background: 'transparent',
+          boxShadow: 'none',
+          borderRadius: 14,
           zIndex: 5,
           width: chartWidth,
           maxWidth: 'calc(100vw - 24px)',
