@@ -30,9 +30,10 @@ import {
 } from 'recharts';
 import {
   buildPingChartRows,
+  buildDailyPingSummary,
   fetchPingTaskSeries,
   formatPingMs,
-  getPingSeriesAverage,
+  getPingSeriesQuality,
   getPingSeriesWithRecords,
   getPingTimeDomain,
   getPingYAxisDomain,
@@ -62,21 +63,23 @@ const formatUptime = (seconds: number): string => {
 };
 
 type TimeRange = '1h' | '4h' | '24h' | '3d';
+type PingTimeRange = '1h' | '6h' | '24h' | '3d';
+type PingViewMode = 'trend' | 'daily';
 type ChartTab = 'cpu' | 'ram' | 'disk' | 'network' | 'connections' | 'process' | 'temp' | 'gpu';
 type TrafficRangeDays = 7 | 30;
+
+const pingTimeRangeHours: Record<PingTimeRange, number> = {
+  '1h': 1,
+  '6h': 6,
+  '24h': 24,
+  '3d': 72,
+};
 
 const timeRangeMs: Record<TimeRange, number> = {
   '1h': 3600000,
   '4h': 14400000,
   '24h': 86400000,
   '3d': 259200000,
-};
-
-const timeRangeHours: Record<TimeRange, number> = {
-  '1h': 1,
-  '4h': 4,
-  '24h': 24,
-  '3d': 72,
 };
 
 const timeRangePointLimit: Record<TimeRange, number> = {
@@ -116,6 +119,8 @@ export default function Instance() {
   const [pingSeries, setPingSeries] = useState<PingTaskSeries[]>([]);
   const [pingLoading, setPingLoading] = useState(false);
   const [pingError, setPingError] = useState<string | null>(null);
+  const [pingTimeRange, setPingTimeRange] = useState<PingTimeRange>('1h');
+  const [pingViewMode, setPingViewMode] = useState<PingViewMode>('trend');
   const [shouldLoadPing, setShouldLoadPing] = useState(false);
   const [gpuRecords, setGpuRecords] = useState<PublicGpuRecord[]>([]);
   const [trafficRangeDays, setTrafficRangeDays] = useState<TrafficRangeDays>(7);
@@ -263,7 +268,15 @@ export default function Instance() {
     setPingError(null);
     setPingLoading(true);
 
-    fetchPingTaskSeries(uuid, { limit: 360, maxTasks: 8, rangeHours: timeRangeHours[timeRange], cursor: new Date().toISOString(), includeHidden: isAuthenticated, signal: controller.signal })
+    const rangeHours = pingViewMode === 'daily' ? 72 : pingTimeRangeHours[pingTimeRange];
+    fetchPingTaskSeries(uuid, {
+      limit: 1000,
+      maxTasks: 8,
+      rangeHours,
+      cursor: new Date().toISOString(),
+      includeHidden: isAuthenticated,
+      signal: controller.signal,
+    })
       .then((series) => {
         if (!controller.signal.aborted) setPingSeries(series);
       })
@@ -278,7 +291,7 @@ export default function Instance() {
       });
 
     return () => controller.abort();
-  }, [shouldLoadPing, timeRange, uuid, authLoading, isAuthenticated]);
+  }, [shouldLoadPing, pingTimeRange, pingViewMode, uuid, authLoading, isAuthenticated]);
 
   // Load GPU records (only for GPU-capable clients)
   useEffect(() => {
@@ -338,7 +351,29 @@ export default function Instance() {
   const pingSeriesWithRecords = getPingSeriesWithRecords(pingSeries);
   const pingChartRows = buildPingChartRows(pingSeriesWithRecords);
   const pingYAxisDomain = getPingYAxisDomain(pingSeriesWithRecords);
-  const pingXAxisDomain = getPingTimeDomain(pingSeriesWithRecords, timeRangeHours[timeRange]);
+  const pingXAxisDomain = getPingTimeDomain(pingSeriesWithRecords, pingTimeRangeHours[pingTimeRange]);
+  const dailyPingSummaries = useMemo(() => buildDailyPingSummary(pingSeriesWithRecords), [pingSeriesWithRecords]);
+  const pingChartTimeFormatter = (value: unknown) => {
+    const dateInput = typeof value === 'string' || typeof value === 'number' || value instanceof Date ? value : '';
+    const date = new Date(dateInput);
+    if (Number.isNaN(date.getTime())) return '';
+    return pingTimeRange === '24h' || pingTimeRange === '3d'
+      ? date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+      : date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  };
+  const dailyPingChartData = useMemo(() => {
+    return dailyPingSummaries.map((day) => {
+      const row: Record<string, unknown> = {
+        label: day.displayDate,
+        fullDate: day.fullDisplayDate,
+        date: day.date,
+      };
+      day.tasks.forEach((t) => {
+        row[t.taskKey] = t.avgLatency;
+      });
+      return row;
+    });
+  }, [dailyPingSummaries]);
   const dailyTrafficChartData = dailyTraffic.map((row) => ({
     ...row,
     label: row.day.slice(5).replace('-', '/'),
@@ -597,12 +632,28 @@ export default function Instance() {
       <div ref={pingSectionRef}>
       <Card mb="4">
         <Flex justify="between" align="center" mb="3" gap="3" wrap="wrap">
-          <Text weight="bold">Ping 延迟</Text>
-          {pingSeries.length > 0 && (
-            <Text size="1" color="gray">
-              {pingSeriesWithRecords.length} / {pingSeries.length} 个任务有记录
-            </Text>
-          )}
+          <Flex align="center" gap="3" wrap="wrap">
+            <Text weight="bold">Ping 延迟</Text>
+            <SegmentedControl.Root size="1" value={pingViewMode} onValueChange={(v) => setPingViewMode(v as PingViewMode)}>
+              <SegmentedControl.Item value="trend">实时走势</SegmentedControl.Item>
+              <SegmentedControl.Item value="daily">每日质量</SegmentedControl.Item>
+            </SegmentedControl.Root>
+          </Flex>
+          <Flex align="center" gap="3" wrap="wrap">
+            {pingViewMode === 'trend' && (
+              <SegmentedControl.Root size="1" value={pingTimeRange} onValueChange={(v) => setPingTimeRange(v as PingTimeRange)}>
+                <SegmentedControl.Item value="1h">1小时</SegmentedControl.Item>
+                <SegmentedControl.Item value="6h">6小时</SegmentedControl.Item>
+                <SegmentedControl.Item value="24h">24小时</SegmentedControl.Item>
+                <SegmentedControl.Item value="3d">3天</SegmentedControl.Item>
+              </SegmentedControl.Root>
+            )}
+            {pingSeries.length > 0 && (
+              <Text size="1" color="gray">
+                {pingSeriesWithRecords.length} / {pingSeries.length} 个任务有记录
+              </Text>
+            )}
+          </Flex>
         </Flex>
 
         {pingLoading ? (
@@ -615,9 +666,107 @@ export default function Instance() {
           <Text size="2" color="gray" align="center" style={{ display: 'block', padding: '20px' }}>
             暂无 Ping 任务
           </Text>
-        ) : pingChartRows.length === 0 || pingSeriesWithRecords.length === 0 ? (
+        ) : pingSeriesWithRecords.length === 0 ? (
           <Text size="2" color="gray" align="center" style={{ display: 'block', padding: '20px' }}>
             暂无该节点的 Ping 记录
+          </Text>
+        ) : pingViewMode === 'daily' ? (
+          dailyPingSummaries.length === 0 ? (
+            <Text size="2" color="gray" align="center" style={{ display: 'block', padding: '20px' }}>
+              暂无每日历史记录
+            </Text>
+          ) : (
+            <Flex direction="column" gap="4">
+              <Box style={{ height: 210 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dailyPingChartData} margin={monitorChartMargin}>
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis
+                      dataKey="label"
+                      fontSize={12}
+                      minTickGap={16}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis {...pingYAxisProps} allowDecimals={false} tick={<PingYAxisTick />} />
+                    <Tooltip
+                      labelFormatter={(label) => `${String(label)} (北京时间)`}
+                      formatter={(value: unknown, name) => [
+                        value === null || value === undefined ? '无数据' : formatPingMs(Number(value)),
+                        name,
+                      ]}
+                    />
+                    {pingSeriesWithRecords.map((item) => (
+                      <Bar
+                        key={item.task.key}
+                        dataKey={item.task.key}
+                        name={item.task.label}
+                        fill={item.task.color}
+                        radius={[3, 3, 0, 0]}
+                        isAnimationActive={false}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+
+              <Flex direction="column" gap="2">
+                {dailyPingSummaries.slice().reverse().map((day) => (
+                  <Card key={day.date} variant="surface" style={{ padding: '10px 14px' }}>
+                    <Flex justify="between" align="center" mb="2" wrap="wrap" gap="2">
+                      <Flex align="center" gap="2">
+                        <Text size="2" weight="bold">{day.fullDisplayDate}</Text>
+                        <Text size="1" color="gray">({day.date})</Text>
+                        {day.isToday && <Badge size="1" color="blue" variant="solid">今天</Badge>}
+                      </Flex>
+                    </Flex>
+                    <div className="instance-ping-daily-grid">
+                      {day.tasks.map((taskStat) => (
+                        <div
+                          key={taskStat.taskId}
+                          className="instance-ping-daily-item"
+                          style={{
+                            borderLeft: `3px solid ${taskStat.color}`,
+                            padding: '6px 10px',
+                            background: 'var(--gray-a2)',
+                            borderRadius: '4px',
+                          }}
+                        >
+                          <Flex justify="between" align="center" gap="2">
+                            <Text size="1" weight="medium" truncate style={{ color: taskStat.color }}>
+                              {taskStat.taskLabel}
+                            </Text>
+                            {taskStat.totalPackets > 0 && taskStat.packetLossPercent > 0 ? (
+                              <Badge size="1" color="red" variant="soft">
+                                丢包 {taskStat.packetLossPercent}% ({taskStat.lostPackets}包)
+                              </Badge>
+                            ) : taskStat.totalPackets > 0 ? (
+                              <Badge size="1" color="green" variant="soft">0% 丢包</Badge>
+                            ) : (
+                              <Badge size="1" color="gray" variant="soft">无记录</Badge>
+                            )}
+                          </Flex>
+                          <Flex justify="between" align="center" gap="2" mt="1">
+                            <Text size="1" weight="bold">
+                              {taskStat.avgLatency !== null ? `${taskStat.avgLatency} ms` : '-'}
+                            </Text>
+                            <Text size="1" color="gray">
+                              {taskStat.minLatency !== null && taskStat.maxLatency !== null
+                                ? `区间 ${taskStat.minLatency}~${taskStat.maxLatency} ms · 共${taskStat.totalPackets}次`
+                                : `共 ${taskStat.totalPackets} 次`}
+                            </Text>
+                          </Flex>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                ))}
+              </Flex>
+            </Flex>
+          )
+        ) : pingChartRows.length === 0 ? (
+          <Text size="2" color="gray" align="center" style={{ display: 'block', padding: '20px' }}>
+            暂无该时间段的 Ping 记录
           </Text>
         ) : (
           <>
@@ -628,7 +777,7 @@ export default function Instance() {
                   dataKey="time"
                   type="number"
                   domain={pingXAxisDomain}
-                  tickFormatter={chartTimeFormatter}
+                  tickFormatter={pingChartTimeFormatter}
                   fontSize={12}
                   minTickGap={28}
                   tickLine={false}
@@ -641,22 +790,24 @@ export default function Instance() {
                   tick={<PingYAxisTick />}
                 />
                 <Tooltip
-                  labelFormatter={chartTimeFormatter}
-                  formatter={(value: number, name) => [
-                    formatPingMs(value),
+                  labelFormatter={pingChartTimeFormatter}
+                  formatter={(value: unknown, name) => [
+                    value === null || value === undefined || Number(value) < 0
+                      ? '丢包 / 超时'
+                      : formatPingMs(Number(value)),
                     name,
                   ]}
                 />
                 {pingSeriesWithRecords.map((item) => (
                   <Line
                     key={item.task.key}
-                    type="monotone"
+                    type="linear"
                     dataKey={item.task.key}
                     name={item.task.label}
                     stroke={item.task.color}
-                    strokeWidth={2.5}
+                    strokeWidth={2}
                     dot={false}
-                    connectNulls
+                    connectNulls={false}
                     isAnimationActive={false}
                   />
                 ))}
@@ -665,7 +816,7 @@ export default function Instance() {
 
             <div className="instance-ping-series-grid">
               {pingSeriesWithRecords.map((item) => {
-                const avg = getPingSeriesAverage(item.records);
+                const quality = getPingSeriesQuality(item.records);
                 return (
                   <div
                     key={item.task.key}
@@ -691,9 +842,20 @@ export default function Instance() {
                         {item.task.label}
                       </Text>
                     </Flex>
-                    <Text size="1" color="gray" className="instance-ping-series-stat">
-                      {avg === null ? '全部超时' : `平均 ${formatPingMs(avg)}`}
-                    </Text>
+                    <Flex justify="between" align="center" gap="1" mt="1">
+                      <Text size="1" color="gray" className="instance-ping-series-stat">
+                        {quality.avgLatency === null ? '全部超时' : `平均 ${formatPingMs(quality.avgLatency)}`}
+                      </Text>
+                      {quality.totalPackets > 0 && quality.packetLossPercent > 0 ? (
+                        <Badge size="1" color="red" variant="soft">
+                          丢包 {quality.packetLossPercent}%
+                        </Badge>
+                      ) : quality.totalPackets > 0 ? (
+                        <Badge size="1" color="green" variant="soft">
+                          0% 丢包
+                        </Badge>
+                      ) : null}
+                    </Flex>
                   </div>
                 );
               })}

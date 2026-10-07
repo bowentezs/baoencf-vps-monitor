@@ -3867,6 +3867,17 @@ html[data-monitor-theme='next'] .node-network-value strong {
   text-overflow: ellipsis;
 }
 
+.instance-ping-daily-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+}
+
+.instance-ping-daily-item {
+  min-width: 0;
+  transition: background-color 0.15s ease;
+}
+
 .instance-top-summary {
   overflow: hidden;
   border-color: var(--gray-4);
