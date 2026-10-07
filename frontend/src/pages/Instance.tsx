@@ -509,7 +509,7 @@ export default function Instance() {
                     name="上传"
                     stroke="var(--blue-9)"
                     strokeWidth={2}
-                    dot={{ r: 3, fill: 'var(--blue-9)' }}
+                    dot={false}
                     activeDot={{ r: 5 }}
                     isAnimationActive={false}
                   />
@@ -519,7 +519,7 @@ export default function Instance() {
                     name="下载"
                     stroke="var(--green-9)"
                     strokeWidth={2}
-                    dot={{ r: 3, fill: 'var(--green-9)' }}
+                    dot={false}
                     activeDot={{ r: 5 }}
                     isAnimationActive={false}
                   />
