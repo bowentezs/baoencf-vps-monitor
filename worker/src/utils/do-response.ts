@@ -5,6 +5,7 @@ export type LiveSnapshot = {
   count: number;
   timestamp?: number;
   metadata_version?: string;
+  last_report_times?: Record<string, number>;
 };
 
 export type RateLimitResult = {
@@ -67,6 +68,9 @@ export async function readLiveSnapshot(response: Response): Promise<LiveSnapshot
   }
   if (typeof value.metadata_version === 'string' && value.metadata_version.trim() !== '') {
     snapshot.metadata_version = value.metadata_version;
+  }
+  if (isRecord(value.last_report_times)) {
+    snapshot.last_report_times = value.last_report_times as Record<string, number>;
   }
   return snapshot;
 }
