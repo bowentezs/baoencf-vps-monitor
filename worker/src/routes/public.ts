@@ -1610,7 +1610,7 @@ publicRoutes.get('/records/gpu', async (c) => {
 publicRoutes.get('/records/ping', async (c) => {
   const uuid = c.req.query('uuid');
   const taskId = parseInt(c.req.query('task_id') || '0');
-  const limit = readIntParam(c.req.query('limit'), 120, 360);
+  const limit = readIntParam(c.req.query('limit'), 120, 1000);
 
   if (!uuid || !taskId) {
     return c.json({ error: '缺少参数' }, 400);
@@ -1650,7 +1650,7 @@ publicRoutes.get('/records/ping/batch', async (c) => {
   const taskIds = taskSpecs.length > 0
     ? taskSpecs.map(task => task.taskId)
     : readIntListParam(c.req.query('task_ids'), 16);
-  const limit = readIntParam(c.req.query('limit'), 120, 360);
+  const limit = readIntParam(c.req.query('limit'), 120, 1000);
   const baseIntervalSec = readIntParam(c.req.query('base_interval'), 60, 86_400);
   const cursorParam = readTimeCursorParam(c.req.query('cursor'));
   if (cursorParam.error) return c.json({ error: cursorParam.error }, 400);

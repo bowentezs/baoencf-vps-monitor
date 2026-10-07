@@ -37,6 +37,40 @@ export type PingChartRow = {
   [key: string]: number | null;
 };
 
+export interface PingSeriesQuality {
+  avgLatency: number | null;
+  minLatency: number | null;
+  maxLatency: number | null;
+  totalPackets: number;
+  lostPackets: number;
+  packetLossPercent: number;
+}
+
+export interface DailyPingTaskStat {
+  taskId: number;
+  taskKey: string;
+  taskLabel: string;
+  target: string;
+  type: string;
+  color: string;
+  avgLatency: number | null;
+  minLatency: number | null;
+  maxLatency: number | null;
+  packetLossPercent: number;
+  totalPackets: number;
+  lostPackets: number;
+  successPackets: number;
+}
+
+export interface DailyPingSummary {
+  date: string;
+  displayDate: string;
+  fullDisplayDate: string;
+  isToday: boolean;
+  timestamp: number;
+  tasks: DailyPingTaskStat[];
+}
+
 const pingSeriesColors = [
   '#FF1744',
   '#00C853',
@@ -320,9 +354,9 @@ export async function fetchPingTaskSeries(
   const requestLimitForTask = (task: NormalizedPingTask) => {
     if (rangeHours && rangeHours > 0) {
       const rangeLimit = Math.ceil((rangeHours * 3600) / task.intervalSec) + 4;
-      return Math.min(360, Math.max(8, rangeLimit));
+      return Math.min(1000, Math.max(8, rangeLimit));
     }
-    return Math.min(360, Math.max(1, limit));
+    return Math.min(1000, Math.max(1, limit));
   };
 
   if (tasks.length > 0) {
@@ -370,4 +404,119 @@ export async function fetchPingTaskSeries(
   );
 
   return limitPingSeriesToRecentRange(series, rangeHours);
+}
+
+export function getPingSeriesQuality(records: PingRecord[]): PingSeriesQuality {
+  let validSum = 0;
+  let validCount = 0;
+  let lostCount = 0;
+  let min: number | null = null;
+  let max: number | null = null;
+
+  for (const record of records) {
+    const val = Number(record.value);
+    if (!Number.isFinite(val)) continue;
+    if (val < 0) {
+      lostCount++;
+    } else {
+      validCount++;
+      validSum += val;
+      if (min === null || val < min) min = val;
+      if (max === null || val > max) max = val;
+    }
+  }
+
+  const totalPackets = validCount + lostCount;
+  const packetLossPercent = totalPackets > 0 ? Number(((lostCount / totalPackets) * 100).toFixed(1)) : 0;
+  const avgLatency = validCount > 0 ? Math.round(validSum / validCount) : null;
+
+  return {
+    avgLatency,
+    minLatency: min !== null ? Math.round(min) : null,
+    maxLatency: max !== null ? Math.round(max) : null,
+    totalPackets,
+    lostPackets: lostCount,
+    packetLossPercent,
+  };
+}
+
+export function buildDailyPingSummary(series: PingTaskSeries[]): DailyPingSummary[] {
+  const dayTaskMap = new Map<string, Map<number, {
+    records: PingRecord[];
+    task: NormalizedPingTask;
+  }>>();
+
+  const todayStr = (() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  })();
+
+  for (const item of series) {
+    for (const record of item.records) {
+      const d = new Date(record.time);
+      if (!Number.isFinite(d.getTime())) continue;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const dateKey = `${y}-${m}-${day}`;
+
+      let taskMap = dayTaskMap.get(dateKey);
+      if (!taskMap) {
+        taskMap = new Map();
+        dayTaskMap.set(dateKey, taskMap);
+      }
+
+      let taskData = taskMap.get(item.task.id);
+      if (!taskData) {
+        taskData = { records: [], task: item.task };
+        taskMap.set(item.task.id, taskData);
+      }
+      taskData.records.push(record);
+    }
+  }
+
+  const summaries: DailyPingSummary[] = [];
+
+  for (const [dateKey, taskMap] of dayTaskMap.entries()) {
+    const [y, m, d] = dateKey.split('-').map(Number);
+    const dayStart = new Date(y, m - 1, d).getTime();
+    const isToday = dateKey === todayStr;
+
+    const taskStats: DailyPingTaskStat[] = [];
+    for (const item of series) {
+      const taskData = taskMap.get(item.task.id);
+      const records = taskData?.records || [];
+      const quality = getPingSeriesQuality(records);
+
+      taskStats.push({
+        taskId: item.task.id,
+        taskKey: item.task.key,
+        taskLabel: item.task.label,
+        target: item.task.target,
+        type: item.task.type,
+        color: item.task.color,
+        avgLatency: quality.avgLatency,
+        minLatency: quality.minLatency,
+        maxLatency: quality.maxLatency,
+        packetLossPercent: quality.packetLossPercent,
+        totalPackets: quality.totalPackets,
+        lostPackets: quality.lostPackets,
+        successPackets: quality.totalPackets - quality.lostPackets,
+      });
+    }
+
+    summaries.push({
+      date: dateKey,
+      displayDate: `${m}/${String(d).padStart(2, '0')}`,
+      fullDisplayDate: `${m}月${d}日`,
+      isToday,
+      timestamp: dayStart,
+      tasks: taskStats,
+    });
+  }
+
+  return summaries.sort((a, b) => a.timestamp - b.timestamp);
 }
