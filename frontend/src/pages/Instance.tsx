@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Flex, Card, Text, Badge, Heading,
@@ -127,6 +127,18 @@ export default function Instance() {
   const [dailyTrafficLoading, setDailyTrafficLoading] = useState(true);
   const [dailyTrafficError, setDailyTrafficError] = useState(false);
   const pingSectionRef = useRef<HTMLDivElement | null>(null);
+  const scrollPosRef = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (scrollPosRef.current === null) return undefined;
+    const targetY = scrollPosRef.current;
+    window.scrollTo({ top: targetY, behavior: 'instant' });
+    const frameId = requestAnimationFrame(() => {
+      window.scrollTo({ top: targetY, behavior: 'instant' });
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [uuid]);
+
   const { liveData } = useLiveData();
   const liveRecord = uuid ? liveData?.data?.[uuid] : undefined;
   const onlineSet = useMemo(() => new Set(liveData?.online || []), [liveData?.online]);
@@ -158,8 +170,16 @@ export default function Instance() {
   useEffect(() => {
     let cancelled = false;
     if (!uuid || authLoading) return;
-    setClientLoading(true);
-    setError(null);
+
+    const existing = clients.find((c) => c.uuid === uuid);
+    if (existing) {
+      setClient(existing);
+      setError(null);
+    } else {
+      setClientLoading(true);
+      setError(null);
+    }
+
     publicFetch(`/nodes${isAuthenticated ? '?include_hidden=1' : ''}`)
       .then((data) => {
         if (cancelled) return;
@@ -168,12 +188,13 @@ export default function Instance() {
         const found = visible.find((c) => c.uuid === uuid) || null;
         if (found) {
           setClient(found);
+          setError(null);
         } else {
           setError('服务器不存在');
         }
       })
       .catch(() => {
-        if (!cancelled) setError('加载失败');
+        if (!cancelled && !existing) setError('加载失败');
       })
       .finally(() => {
         if (!cancelled) setClientLoading(false);
@@ -236,7 +257,14 @@ export default function Instance() {
   }, [uuid, trafficRangeDays, authLoading, isAuthenticated]);
 
   useEffect(() => {
-    setShouldLoadPing(false);
+    const isPingNearViewport = () => {
+      const el = pingSectionRef.current;
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      return rect.top < window.innerHeight + 350 && rect.bottom > -350;
+    };
+
+    setShouldLoadPing(isPingNearViewport());
     setPingSeries([]);
     setPingError(null);
     setPingLoading(false);
@@ -312,7 +340,7 @@ export default function Instance() {
     setRecordsLoading(true);
   };
 
-  if (clientLoading || (recordsLoading && records.length === 0)) return <Loading />;
+  if (!client && clientLoading) return <Loading />;
   if (error || !client) return <Text color="red" align="center" style={{ padding: 40 }}>{error || '未找到'}</Text>;
 
   const latestHistory = records.length > 0 ? records[records.length - 1] : null;
@@ -379,7 +407,11 @@ export default function Instance() {
           activeUuid={uuid || ''}
           onlineSet={onlineSet}
           liveData={liveData?.data || {}}
-          onSelect={(nextUuid) => navigate(`/instance/${nextUuid}`)}
+          onSelect={(nextUuid) => {
+            if (nextUuid === uuid) return;
+            scrollPosRef.current = window.scrollY;
+            navigate(`/instance/${nextUuid}`);
+          }}
         />
 
         <section className="instance-detail-panel">
@@ -487,7 +519,11 @@ export default function Instance() {
           </Flex>
 
           <Box pt="3">
-            {chartTab === 'gpu' ? (
+            {records.length === 0 && recordsLoading ? (
+              <Flex align="center" justify="center" style={{ height: monitorChartHeight }}>
+                <Text size="2" color="gray">加载监控数据…</Text>
+              </Flex>
+            ) : chartTab === 'gpu' ? (
               <ResponsiveContainer width="100%" height={monitorChartHeight}>
                 <LineChart data={gpuChartData} margin={monitorChartMargin}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
