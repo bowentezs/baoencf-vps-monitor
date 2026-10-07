@@ -165,6 +165,17 @@ export default function Layout() {
   const blurProgress = Math.min(1, Math.max(0, cardBlur / 60));
   const glassSaturate = Math.round(110 + blurProgress * 110);
   const glassContrast = Math.round(100 + blurProgress * 15);
+  const pingGlassOpacity = (0.85 + (cardOpacity / 100) * 0.13).toFixed(3);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    root.style.setProperty('--glass-opacity', (cardOpacity / 100).toFixed(2));
+    root.style.setProperty('--glass-blur', `${cardBlur}px`);
+    root.style.setProperty('--glass-saturate', `${glassSaturate}%`);
+    root.style.setProperty('--glass-contrast', `${glassContrast}%`);
+    root.style.setProperty('--ping-glass-opacity', pingGlassOpacity);
+  }, [cardOpacity, cardBlur, glassSaturate, glassContrast, pingGlassOpacity]);
   const layoutStyle: React.CSSProperties & Record<string, string | undefined> = {
     backgroundColor: hasCustomBg ? (isDark ? "#050816" : "#f8fafc") : "var(--accent-1)",
     ...(activeBgDesktop ? { "--bg-desktop": `url(${JSON.stringify(activeBgDesktop)})` } : {}),
@@ -175,6 +186,7 @@ export default function Layout() {
     "--glass-contrast": `${glassContrast}%`,
     "--glass-sheen": blurProgress.toFixed(2),
     "--glass-glow-display": cardGlow ? "block" : "none",
+    "--ping-glass-opacity": pingGlassOpacity,
   };
 
   return (
