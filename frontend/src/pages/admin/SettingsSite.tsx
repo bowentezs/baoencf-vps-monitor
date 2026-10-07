@@ -477,11 +477,36 @@ export default function SettingsSite() {
             {(() => {
               const rawBg = safeBackgroundUrl(settings.theme_bg_desktop) || safeBackgroundUrl(settings.theme_bg_mobile) || '';
               const hasCustomBg = Boolean(rawBg);
+              const isLiquid = settings.theme_card_material === 'liquid';
               const cardOpacityNum = Math.min(100, Math.max(10, Number(settings.theme_card_opacity || 70))) / 100;
               const cardBlurNum = Math.min(60, Math.max(0, Number(settings.theme_card_blur ?? 16)));
               const blurProgress = cardBlurNum / 60;
               const glassSaturate = Math.round(110 + blurProgress * 110);
               const glassContrast = Math.round(100 + blurProgress * 15);
+
+              // 区分材质视觉体系：苹果液态玻璃 vs 经典哑光毛玻璃
+              const cardBgImage = hasCustomBg
+                ? (isLiquid
+                    ? (previewDark
+                        ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), radial-gradient(circle at 10% 10%, rgba(139, 92, 246, 0.22), transparent 45%), radial-gradient(circle at 90% 90%, rgba(56, 189, 248, 0.18), transparent 45%)'
+                        : 'linear-gradient(135deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.03) 100%), radial-gradient(circle at 15% 15%, rgba(224, 242, 254, 0.35), transparent 50%), radial-gradient(circle at 85% 85%, rgba(250, 232, 255, 0.30), transparent 50%)')
+                    : 'none')
+                : 'none';
+
+              const cardBorder = hasCustomBg
+                ? (isLiquid
+                    ? (previewDark ? '1.5px solid rgba(255, 255, 255, 0.36)' : '1.5px solid rgba(255, 255, 255, 0.90)')
+                    : (previewDark ? '1px solid rgba(255, 255, 255, 0.14)' : '1px solid rgba(0, 0, 0, 0.10)'))
+                : (previewDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.08)');
+
+              const cardBoxShadow = hasCustomBg
+                ? (isLiquid
+                    ? (previewDark
+                        ? '0 0 0 1px rgba(0, 0, 0, 0.40), inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.95), inset 1px 0 2px 0 rgba(56, 189, 248, 0.34), inset -1px -1.5px 2.5px 0 rgba(192, 132, 252, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 20px 48px -6px rgba(0, 0, 0, 0.65)'
+                        : '0 0 0 1px rgba(255, 255, 255, 0.85), inset 0 1.5px 2px 0 #ffffff, inset 1px 0 2px 0 rgba(56, 189, 248, 0.28), inset -1px -1.5px 2px 0 rgba(236, 72, 153, 0.20), inset 0 0 0 1px rgba(255, 255, 255, 0.45), 0 12px 32px -4px rgba(100, 116, 139, 0.12)')
+                    : (previewDark ? '0 12px 36px rgba(0, 0, 0, 0.40)' : '0 8px 24px rgba(0, 0, 0, 0.06)'))
+                : (previewDark ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 4px 20px rgba(0, 0, 0, 0.06)');
+
               return (
                 <div
                   style={{
@@ -493,25 +518,15 @@ export default function SettingsSite() {
                     backgroundColor: hasCustomBg
                       ? (previewDark ? `rgba(12, 16, 28, ${cardOpacityNum})` : `rgba(255, 255, 255, ${cardOpacityNum})`)
                       : (previewDark ? '#111827' : '#ffffff'),
-                    backgroundImage: hasCustomBg
-                      ? (previewDark
-                          ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), radial-gradient(circle at 10% 10%, rgba(139, 92, 246, 0.22), transparent 45%), radial-gradient(circle at 90% 90%, rgba(56, 189, 248, 0.18), transparent 45%)'
-                          : 'linear-gradient(135deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.03) 100%), radial-gradient(circle at 15% 15%, rgba(224, 242, 254, 0.35), transparent 50%), radial-gradient(circle at 85% 85%, rgba(250, 232, 255, 0.30), transparent 50%)')
-                      : 'none',
-                    border: hasCustomBg
-                      ? (previewDark ? '1.5px solid rgba(255, 255, 255, 0.32)' : '1.5px solid rgba(255, 255, 255, 0.85)')
-                      : (previewDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.08)'),
-                    boxShadow: hasCustomBg
-                      ? (previewDark
-                          ? '0 0 0 1px rgba(0, 0, 0, 0.40), inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.90), inset 1px 0 2px 0 rgba(56, 189, 248, 0.32), inset -1px -1.5px 2.5px 0 rgba(192, 132, 252, 0.26), inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 20px 48px -6px rgba(0, 0, 0, 0.65)'
-                          : '0 0 0 1px rgba(255, 255, 255, 0.80), inset 0 1.5px 2px 0 #ffffff, inset 1px 0 2px 0 rgba(56, 189, 248, 0.25), inset -1px -1.5px 2px 0 rgba(236, 72, 153, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.40), 0 12px 32px -4px rgba(100, 116, 139, 0.10)')
-                      : (previewDark ? '0 4px 20px rgba(0, 0, 0, 0.35)' : '0 4px 20px rgba(0, 0, 0, 0.06)'),
+                    backgroundImage: cardBgImage,
+                    border: cardBorder,
+                    boxShadow: cardBoxShadow,
                     color: previewDark ? '#f8fafc' : '#0f172a',
                     padding: '16px 18px',
-                    transition: 'backdrop-filter 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease',
+                    transition: 'all 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                 >
-                  {/* 顶沿流光彩虹条 (仅在启用背景壁纸时展示) */}
+                  {/* 顶沿流光彩虹条 (仅在启用背景壁纸且开启了光晕时展示) */}
                   {hasCustomBg && settings.theme_card_glow !== 'false' && (
                     <div
                       style={{
@@ -519,12 +534,14 @@ export default function SettingsSite() {
                         top: 0,
                         left: 0,
                         right: 0,
-                        height: 2.5,
-                        background: 'linear-gradient(90deg, transparent, #38bdf8 25%, #8b5cf6 50%, #ec4899 75%, transparent)',
-                        backgroundSize: '200% 100%',
-                        animation: 'liquidGlassGlowFlow 8s ease-in-out infinite alternate',
-                        opacity: 1,
-                        boxShadow: '0 0 14px rgba(139, 92, 246, 0.9), 0 0 5px #38bdf8',
+                        height: isLiquid ? 2.5 : 1.5,
+                        background: isLiquid
+                          ? 'linear-gradient(90deg, transparent, #38bdf8 25%, #8b5cf6 50%, #ec4899 75%, transparent)'
+                          : 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4) 50%, transparent)',
+                        backgroundSize: isLiquid ? '200% 100%' : '100% 100%',
+                        animation: isLiquid ? 'liquidGlassGlowFlow 8s ease-in-out infinite alternate' : 'none',
+                        opacity: isLiquid ? 1 : 0.75,
+                        boxShadow: isLiquid ? '0 0 14px rgba(139, 92, 246, 0.9), 0 0 5px #38bdf8' : '0 0 6px rgba(255, 255, 255, 0.25)',
                         zIndex: 2,
                       }}
                     />
@@ -535,6 +552,17 @@ export default function SettingsSite() {
                     <Flex align="center" gap="2">
                       <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e' }} />
                       <span style={{ fontSize: 13, fontWeight: 700 }}>US-LAX · 洛杉矶 BGP 高防</span>
+                      <span style={{
+                        fontSize: 10,
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        background: isLiquid ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.12)',
+                        color: isLiquid ? '#38bdf8' : (previewDark ? '#94a3b8' : '#64748b'),
+                        border: isLiquid ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid rgba(255, 255, 255, 0.15)',
+                        fontWeight: 600,
+                      }}>
+                        {isLiquid ? '✨ 水润晶体' : '🌫️ 哑光磨砂'}
+                      </span>
                     </Flex>
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: previewDark ? 'rgba(34,197,94,0.18)' : 'rgba(34,197,94,0.22)', color: '#22c55e', fontWeight: 600 }}>
                       在线 99.98%
@@ -552,9 +580,11 @@ export default function SettingsSite() {
                         : '1px solid rgba(255, 255, 255, 0.65)',
                       borderRadius: 8,
                       padding: '7px 9px',
-                      boxShadow: previewDark
-                        ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08)'
-                        : 'inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.8), 0 2px 8px rgba(0, 0, 0, 0.03)',
+                      boxShadow: isLiquid
+                        ? (previewDark
+                            ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08)'
+                            : 'inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.8), 0 2px 8px rgba(0, 0, 0, 0.03)')
+                        : 'none',
                     }}>
                       <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
                         <span>CPU 负载</span>
@@ -573,9 +603,11 @@ export default function SettingsSite() {
                         : '1px solid rgba(255, 255, 255, 0.65)',
                       borderRadius: 8,
                       padding: '7px 9px',
-                      boxShadow: previewDark
-                        ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08)'
-                        : 'inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.8), 0 2px 8px rgba(0, 0, 0, 0.03)',
+                      boxShadow: isLiquid
+                        ? (previewDark
+                            ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08)'
+                            : 'inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.8), 0 2px 8px rgba(0, 0, 0, 0.03)')
+                        : 'none',
                     }}>
                       <Flex justify="between" style={{ fontSize: 11, marginBottom: 5, opacity: 0.85 }}>
                         <span>内存占用</span>
@@ -598,7 +630,7 @@ export default function SettingsSite() {
                     {hasCustomBg ? (
                       <>
                         <span>底色浓度: {Math.round(cardOpacityNum * 100)}% ({cardOpacityNum >= 0.85 ? '实心遮挡' : cardOpacityNum <= 0.25 ? '极薄透水膜' : '微晶半透'})</span>
-                        <span>背景虚化: {cardBlurNum}px ({cardBlurNum === 0 ? '原图高清' : cardBlurNum >= 28 ? '重度雾化' : '柔和磨砂'})</span>
+                        <span>质感体系: {isLiquid ? '苹果液态玻璃 (棱镜高光 · 水润流光)' : '经典毛玻璃 (纯净哑光 · 极简平整)'}</span>
                       </>
                     ) : (
                       <>
