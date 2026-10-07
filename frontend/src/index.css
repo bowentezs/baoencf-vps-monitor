@@ -3848,10 +3848,8 @@ html[data-monitor-theme='next'] .node-network-value strong {
 .ping-heartbeat-box {
   margin-top: 14px;
   padding: 10px 14px;
-  background: var(--color-surface, rgba(255, 255, 255, 0.72));
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--gray-a4);
+  background: var(--color-panel-solid);
+  border: 1px solid var(--gray-4);
   border-radius: var(--radius-3);
   transition: border-color 0.16s ease;
 }
