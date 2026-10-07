@@ -1459,81 +1459,53 @@ html[data-monitor-theme='next'] .node-network-value strong {
 
 .mini-ping-chart {
   position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.46) 0%, rgba(255, 255, 255, 0.16) 45%, rgba(255, 255, 255, 0.28) 100%) !important;
-  backdrop-filter: blur(28px) saturate(210%) contrast(108%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(210%) contrast(108%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.65) !important;
-  border-top: 1.5px solid rgba(255, 255, 255, 0.95) !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 254, 0.93) 100%) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
   border-radius: 14px !important;
   box-shadow: 
-    0 0 0 1px rgba(255, 255, 255, 0.35),
-    inset 0 1.5px 2.5px rgba(255, 255, 255, 0.95),
-    inset 0 -1.5px 2px rgba(255, 255, 255, 0.35),
-    0 12px 36px -4px rgba(0, 0, 0, 0.12),
-    0 24px 60px -8px rgba(0, 0, 0, 0.14) !important;
-}
-
-.mini-ping-chart::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 46%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.04) 80%, transparent 100%);
-  border-radius: 14px 14px 38% 38% / 14px 14px 12px 12px;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.mini-ping-chart > * {
-  position: relative;
-  z-index: 1;
+    0 0 0 1px rgba(0, 0, 0, 0.06),
+    inset 0 1.5px 2px #ffffff,
+    0 16px 40px -6px rgba(0, 0, 0, 0.2),
+    0 30px 65px -12px rgba(0, 0, 0, 0.15) !important;
 }
 
 .dark .mini-ping-chart,
 html[data-theme-appearance='dark'] .mini-ping-chart {
-  background: linear-gradient(135deg, rgba(25, 34, 56, 0.62) 0%, rgba(13, 18, 32, 0.42) 50%, rgba(26, 36, 62, 0.54) 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  border-top: 1.5px solid rgba(255, 255, 255, 0.42) !important;
+  background: linear-gradient(135deg, rgba(22, 28, 44, 0.95) 0%, rgba(13, 17, 28, 0.93) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.3) !important;
   box-shadow: 
-    0 0 0 1px rgba(0, 0, 0, 0.5),
-    inset 0 1.5px 2px rgba(255, 255, 255, 0.32),
-    inset 0 -1.5px 2px rgba(255, 255, 255, 0.08),
-    0 16px 40px -4px rgba(0, 0, 0, 0.65),
-    0 30px 70px -8px rgba(0, 0, 0, 0.45) !important;
-}
-
-.dark .mini-ping-chart::before,
-html[data-theme-appearance='dark'] .mini-ping-chart::before {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.02) 80%, transparent 100%);
+    0 0 0 1px rgba(0, 0, 0, 0.7),
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.18),
+    0 20px 48px -6px rgba(0, 0, 0, 0.75),
+    0 36px 75px -12px rgba(0, 0, 0, 0.55) !important;
 }
 
 .mini-ping-chart .recharts-default-tooltip {
-  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
   border-top: 1.5px solid rgba(255, 255, 255, 0.95) !important;
   border-radius: 9px !important;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.68) 0%, rgba(255, 255, 255, 0.32) 100%) !important;
-  backdrop-filter: blur(16px) saturate(200%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(200%) !important;
-  box-shadow: inset 0 1.5px 2px rgba(255, 255, 255, 0.9), 0 12px 30px rgba(0, 0, 0, 0.12) !important;
+  background: rgba(255, 255, 255, 0.97) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.15) !important;
 }
 
 .dark .mini-ping-chart .recharts-default-tooltip,
 html[data-theme-appearance='dark'] .mini-ping-chart .recharts-default-tooltip {
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  border-top: 1.5px solid rgba(255, 255, 255, 0.45) !important;
-  background: linear-gradient(135deg, rgba(25, 34, 56, 0.75) 0%, rgba(13, 18, 32, 0.5) 100%) !important;
-  box-shadow: inset 0 1.5px 1.5px rgba(255, 255, 255, 0.28), 0 12px 32px rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  background: rgba(16, 21, 35, 0.97) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6) !important;
 }
 
 .mini-ping-reset-btn {
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-top: 1.2px solid rgba(255, 255, 255, 0.95);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.22) 100%);
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: var(--gray-12);
   border-radius: 999px;
   padding: 2px 9px;
@@ -1541,33 +1513,32 @@ html[data-theme-appearance='dark'] .mini-ping-chart .recharts-default-tooltip {
   font-weight: 650;
   cursor: pointer;
   line-height: 1.2;
-  box-shadow: inset 0 1px 1.5px #fff, inset 0 -1px 1px rgba(255, 255, 255, 0.3), 0 2px 6px rgba(0, 0, 0, 0.06);
-  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), background 0.16s ease, box-shadow 0.16s ease;
+  box-shadow: inset 0 1px 1px #fff, 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: transform 0.14s ease, background 0.14s ease, box-shadow 0.14s ease;
 }
 
 .mini-ping-reset-btn:hover {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.45) 100%);
-  transform: translateY(-1px) scale(1.02);
-  box-shadow: inset 0 1px 1.5px #fff, 0 4px 12px rgba(0, 0, 0, 0.12);
+  background: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 1px #fff, 0 3px 8px rgba(0, 0, 0, 0.1);
 }
 
 .dark .mini-ping-reset-btn,
 html[data-theme-appearance='dark'] .mini-ping-reset-btn {
-  border-color: rgba(255, 255, 255, 0.22);
-  border-top-color: rgba(255, 255, 255, 0.45);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 2px 6px rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .dark .mini-ping-reset-btn:hover,
 html[data-theme-appearance='dark'] .mini-ping-reset-btn:hover {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.1) 100%);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.45);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .ping-y-axis-tick {
   fill: var(--gray-11);
   font-size: 11px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1586,112 +1557,76 @@ html[data-theme-appearance='dark'] .mini-ping-reset-btn:hover {
 
 .mini-ping-chart-legend-item {
   min-width: 0;
-  border-radius: 10px;
+  border-radius: 9px;
   padding: 6px 7px;
   cursor: pointer;
   user-select: none;
   position: relative;
-  background: linear-gradient(140deg, 
-    color-mix(in srgb, var(--item-color) 20%, rgba(255, 255, 255, 0.68)) 0%, 
-    color-mix(in srgb, var(--item-color) 8%, rgba(255, 255, 255, 0.28)) 50%,
-    color-mix(in srgb, var(--item-color) 16%, rgba(255, 255, 255, 0.5)) 100%
-  );
-  backdrop-filter: blur(14px) saturate(190%);
-  -webkit-backdrop-filter: blur(14px) saturate(190%);
-  border: 1px solid color-mix(in srgb, var(--item-color) 42%, rgba(255, 255, 255, 0.75));
-  border-top: 1.5px solid color-mix(in srgb, var(--item-color) 30%, #ffffff);
+  background: color-mix(in srgb, var(--item-color) 12%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--item-color) 35%, rgba(0, 0, 0, 0.08));
   border-left: 3.5px solid var(--item-color);
   box-shadow: 
-    inset 0 1.5px 2px rgba(255, 255, 255, 0.85),
-    inset 0 -1px 1.5px color-mix(in srgb, var(--item-color) 25%, transparent),
-    0 2px 8px -1px color-mix(in srgb, var(--item-color) 22%, rgba(0, 0, 0, 0.05));
-  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, opacity 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+    inset 0 1px 1.5px #ffffff,
+    0 2px 5px rgba(0, 0, 0, 0.04);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease, background 0.16s ease, border-color 0.16s ease;
 }
 
 .dark .mini-ping-chart-legend-item,
 html[data-theme-appearance='dark'] .mini-ping-chart-legend-item {
-  background: linear-gradient(140deg, 
-    color-mix(in srgb, var(--item-color) 26%, rgba(30, 42, 68, 0.65)) 0%, 
-    color-mix(in srgb, var(--item-color) 12%, rgba(14, 20, 36, 0.42)) 50%,
-    color-mix(in srgb, var(--item-color) 20%, rgba(26, 36, 58, 0.55)) 100%
-  );
-  border: 1px solid color-mix(in srgb, var(--item-color) 45%, rgba(255, 255, 255, 0.18));
-  border-top: 1.5px solid rgba(255, 255, 255, 0.38);
+  background: color-mix(in srgb, var(--item-color) 16%, rgba(22, 28, 44, 1));
+  border: 1px solid color-mix(in srgb, var(--item-color) 40%, rgba(255, 255, 255, 0.12));
   border-left: 3.5px solid var(--item-color);
   box-shadow: 
-    inset 0 1.5px 1.5px rgba(255, 255, 255, 0.25),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.4),
-    0 3px 12px rgba(0, 0, 0, 0.35);
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
 .mini-ping-chart-legend-item:hover {
-  transform: translateY(-2px) scale(1.015);
-  background: linear-gradient(140deg, 
-    color-mix(in srgb, var(--item-color) 30%, rgba(255, 255, 255, 0.85)) 0%, 
-    color-mix(in srgb, var(--item-color) 14%, rgba(255, 255, 255, 0.48)) 50%,
-    color-mix(in srgb, var(--item-color) 24%, rgba(255, 255, 255, 0.68)) 100%
-  );
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--item-color) 18%, #ffffff);
   box-shadow: 
-    inset 0 1.5px 2px #ffffff,
-    inset 0 -1px 1.5px color-mix(in srgb, var(--item-color) 35%, transparent),
-    0 8px 22px -2px color-mix(in srgb, var(--item-color) 45%, transparent),
-    0 2px 6px rgba(0, 0, 0, 0.06);
+    inset 0 1px 1.5px #ffffff,
+    0 6px 16px -2px color-mix(in srgb, var(--item-color) 35%, transparent),
+    0 2px 4px rgba(0, 0, 0, 0.06);
 }
 
 .dark .mini-ping-chart-legend-item:hover,
 html[data-theme-appearance='dark'] .mini-ping-chart-legend-item:hover {
-  background: linear-gradient(140deg, 
-    color-mix(in srgb, var(--item-color) 35%, rgba(42, 58, 92, 0.78)) 0%, 
-    color-mix(in srgb, var(--item-color) 18%, rgba(20, 28, 50, 0.55)) 50%,
-    color-mix(in srgb, var(--item-color) 28%, rgba(36, 50, 80, 0.7)) 100%
-  );
+  background: color-mix(in srgb, var(--item-color) 24%, rgba(30, 38, 58, 1));
   box-shadow: 
-    inset 0 1.5px 1.5px rgba(255, 255, 255, 0.38),
-    0 8px 24px -2px color-mix(in srgb, var(--item-color) 55%, transparent),
-    0 4px 10px rgba(0, 0, 0, 0.4);
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 6px 18px -2px color-mix(in srgb, var(--item-color) 45%, transparent);
 }
 
 .mini-ping-chart-legend-item.is-active {
   transform: translateY(-1.5px);
-  background: linear-gradient(140deg, 
-    color-mix(in srgb, var(--item-color) 36%, rgba(255, 255, 255, 0.92)) 0%, 
-    color-mix(in srgb, var(--item-color) 20%, rgba(255, 255, 255, 0.65)) 50%,
-    color-mix(in srgb, var(--item-color) 30%, rgba(255, 255, 255, 0.8)) 100%
-  );
-  border-color: color-mix(in srgb, var(--item-color) 85%, #ffffff);
-  border-top-color: #ffffff;
+  background: color-mix(in srgb, var(--item-color) 22%, #ffffff);
+  border-color: var(--item-color);
   border-left-color: var(--item-color);
   box-shadow: 
     0 0 0 1.5px var(--item-color),
-    inset 0 1.5px 2px #ffffff,
-    0 8px 26px -2px color-mix(in srgb, var(--item-color) 55%, transparent),
-    0 2px 8px rgba(0, 0, 0, 0.08);
+    inset 0 1px 1.5px #ffffff,
+    0 6px 18px -2px color-mix(in srgb, var(--item-color) 45%, transparent);
 }
 
 .dark .mini-ping-chart-legend-item.is-active,
 html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
-  background: linear-gradient(140deg, 
-    color-mix(in srgb, var(--item-color) 42%, rgba(36, 50, 82, 0.88)) 0%, 
-    color-mix(in srgb, var(--item-color) 24%, rgba(18, 26, 46, 0.68)) 50%,
-    color-mix(in srgb, var(--item-color) 34%, rgba(30, 44, 72, 0.8)) 100%
-  );
-  border-color: color-mix(in srgb, var(--item-color) 85%, rgba(255, 255, 255, 0.45));
-  border-top-color: rgba(255, 255, 255, 0.55);
+  background: color-mix(in srgb, var(--item-color) 28%, rgba(26, 34, 54, 1));
+  border-color: var(--item-color);
   border-left-color: var(--item-color);
   box-shadow: 
     0 0 0 1.5px var(--item-color),
-    inset 0 1.5px 2px rgba(255, 255, 255, 0.4),
-    0 8px 28px -2px color-mix(in srgb, var(--item-color) 70%, transparent),
-    0 4px 12px rgba(0, 0, 0, 0.5);
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 6px 20px -2px color-mix(in srgb, var(--item-color) 55%, transparent);
 }
 
 .mini-ping-chart-legend-item.is-dimmed {
-  opacity: 0.28;
-  filter: grayscale(30%);
+  opacity: 0.32;
+  filter: grayscale(25%);
 }
 
 .mini-ping-chart-legend-item.is-dimmed:hover {
-  opacity: 0.85;
+  opacity: 0.9;
   filter: none;
 }
 
