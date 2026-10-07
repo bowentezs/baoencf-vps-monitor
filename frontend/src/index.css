@@ -3877,12 +3877,12 @@ html[data-monitor-theme='next'] .node-network-value strong {
 }
 
 .instance-ping-health-bar {
-  height: 4px;
+  height: 3.5px;
   border-radius: 999px;
-  background-color: var(--gray-a4);
+  background-color: var(--gray-a3);
   overflow: hidden;
   display: flex;
-  margin: 6px 0;
+  margin: 7px 0 6px 0;
   width: 100%;
 }
 
