@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Box, Button, Flex, Slider, Text } from '@radix-ui/themes';
+import { Box, Button, Flex, SegmentedControl, Slider, Text } from '@radix-ui/themes';
 import { Download, RotateCcw, Save, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import Loading from '../../components/Loading';
@@ -381,6 +381,23 @@ export default function SettingsSite() {
           />
         </div>
 
+        <div style={{ maxWidth: 420, marginBottom: 16 }}>
+          <Text size="2" weight="medium" style={{ display: 'block', marginBottom: 6 }}>卡片材质质感体系</Text>
+          <SegmentedControl.Root
+            value={settings.theme_card_material === 'liquid' ? 'liquid' : 'frosted'}
+            onValueChange={(val) => updateSetting('theme_card_material', val)}
+            size="2"
+          >
+            <SegmentedControl.Item value="frosted">经典毛玻璃 (哑光温润)</SegmentedControl.Item>
+            <SegmentedControl.Item value="liquid">苹果液态玻璃 (水润晶莹)</SegmentedControl.Item>
+          </SegmentedControl.Root>
+          <Text size="1" color="gray" style={{ display: 'block', marginTop: 5 }}>
+            {settings.theme_card_material === 'liquid'
+              ? '✨ 苹果液态玻璃：激活水滴表面张力倒角、双层折射高光切线、微凸水润透镜反光与凝胶水珠质感。'
+              : '🌫️ 经典毛玻璃：呈现优雅平滑、极简温润、高遮光不透字的经典磨砂质感。'}
+          </Text>
+        </div>
+
         {/* 🎨 实时所见即所得效果预览沙盒 */}
         <Box
           style={{
@@ -608,7 +625,8 @@ export default function SettingsSite() {
               updateSetting('theme_card_opacity', '70');
               updateSetting('theme_card_blur', '16');
               updateSetting('theme_card_glow', 'true');
-              toast.success('已填入 Gloria 极光星空与最佳毛玻璃预设，点击右上角保存即可生效');
+              updateSetting('theme_card_material', 'liquid');
+              toast.success('已填入 Gloria 极光星空与液态水晶预设，点击右上角保存即可生效');
             }}
           >
             一键填入 Gloria 极光星空预设
@@ -625,6 +643,7 @@ export default function SettingsSite() {
               updateSetting('theme_card_opacity', '70');
               updateSetting('theme_card_blur', '16');
               updateSetting('theme_card_glow', 'true');
+              updateSetting('theme_card_material', 'frosted');
               toast.info('已恢复默认外观设置');
             }}
           >

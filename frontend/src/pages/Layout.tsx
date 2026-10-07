@@ -54,6 +54,7 @@ export default function Layout() {
   const [cardOpacity, setCardOpacity] = useState(70);
   const [cardBlur, setCardBlur] = useState(16);
   const [cardGlow, setCardGlow] = useState(true);
+  const [cardMaterial, setCardMaterial] = useState<'frosted' | 'liquid'>('frosted');
 
   useEffect(() => {
     const applyPublicSettings = () => {
@@ -80,6 +81,8 @@ export default function Layout() {
           setCardBlur(data.theme_settings.cardBlur);
         if (typeof data.theme_settings?.cardGlow === "boolean")
           setCardGlow(data.theme_settings.cardGlow);
+        if (data.theme_settings?.cardMaterial)
+          setCardMaterial(data.theme_settings.cardMaterial);
         if (!hasLocalDisplayThemePreference()) {
           setDisplayThemeFromSettings(normalizeDisplayTheme(data.active_theme));
         }
@@ -175,7 +178,8 @@ export default function Layout() {
     root.style.setProperty('--glass-saturate', `${glassSaturate}%`);
     root.style.setProperty('--glass-contrast', `${glassContrast}%`);
     root.style.setProperty('--ping-glass-opacity', pingGlassOpacity);
-  }, [cardOpacity, cardBlur, glassSaturate, glassContrast, pingGlassOpacity]);
+    root.setAttribute('data-card-material', cardMaterial);
+  }, [cardOpacity, cardBlur, glassSaturate, glassContrast, pingGlassOpacity, cardMaterial]);
   const layoutStyle: React.CSSProperties & Record<string, string | undefined> = {
     backgroundColor: hasCustomBg ? (isDark ? "#050816" : "#f8fafc") : "var(--accent-1)",
     ...(activeBgDesktop ? { "--bg-desktop": `url(${JSON.stringify(activeBgDesktop)})` } : {}),

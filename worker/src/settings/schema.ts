@@ -357,6 +357,12 @@ export const SETTING_SCHEMA = {
     defaultValue: 'true',
     public: true,
   },
+  theme_card_material: {
+    type: 'enum',
+    defaultValue: 'frosted',
+    public: true,
+    values: ['frosted', 'liquid'],
+  },
   active_theme: {
     type: 'string',
     defaultValue: 'monitor',
@@ -650,6 +656,7 @@ export type PublicThemeSettings = {
   cardOpacity: number;
   cardBlur: number;
   cardGlow: boolean;
+  cardMaterial: 'frosted' | 'liquid';
 };
 
 export type PublicSettings = Record<string, string | PublicThemeSettings> & {
@@ -672,6 +679,7 @@ export function buildPublicSettings(stored: Record<string, string>): PublicSetti
     cardOpacity: Number(adminSettings.theme_card_opacity),
     cardBlur: Number(adminSettings.theme_card_blur),
     cardGlow: adminSettings.theme_card_glow !== 'false',
+    cardMaterial: adminSettings.theme_card_material === 'liquid' ? 'liquid' : 'frosted',
   };
 
   return publicSettings as PublicSettings;
