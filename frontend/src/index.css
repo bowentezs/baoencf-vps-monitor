@@ -3844,77 +3844,238 @@ html[data-monitor-theme='next'] .node-network-value strong {
   overflow: hidden;
 }
 
-.instance-ping-series-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.instance-ping-series-item {
-  min-width: 0;
-  border: 1px solid var(--gray-5);
-  border-left-width: 4px;
-  border-radius: 8px;
-  padding: 8px 10px;
-  cursor: pointer;
-  user-select: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
-  position: relative;
-}
-
-.instance-ping-series-item:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-}
-
-.instance-ping-series-item.is-active {
-  box-shadow: 0 0 0 2px var(--item-color, var(--accent-9)), 0 4px 14px rgba(0, 0, 0, 0.08);
-}
-
-.instance-ping-series-item.is-dimmed {
-  opacity: 0.55;
-}
-
-.instance-ping-health-bar {
-  height: 3.5px;
-  border-radius: 999px;
-  background-color: var(--gray-a3);
-  overflow: hidden;
+/* ========== 现代化 Ping 监控仪表盘组件 ========== */
+.instance-ping-date-group {
+  margin-top: 16px;
   display: flex;
-  margin: 7px 0 6px 0;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.instance-ping-date-group:first-child {
+  margin-top: 6px;
+}
+
+.instance-ping-date-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 2px;
+}
+
+.instance-ping-date-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--gray-12);
+}
+
+.instance-ping-date-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--blue-a3);
+  color: var(--blue-11);
+  border: 1px solid var(--blue-a5);
+}
+
+.instance-ping-date-summary {
+  font-size: 11.5px;
+  color: var(--gray-9);
+}
+
+.instance-ping-series-grid,
+.instance-ping-daily-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
+  gap: 10px;
   width: 100%;
 }
 
-.instance-ping-health-fill {
-  height: 100%;
-  border-radius: 999px 0 0 999px;
-  transition: width 0.3s ease;
+.instance-ping-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 12px 14px;
+  min-height: 108px;
+  background: var(--color-panel-solid);
+  border: 1px solid var(--gray-4);
+  border-radius: var(--radius-3);
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.16s ease,
+              background-color 0.16s ease,
+              opacity 0.16s ease;
+  user-select: none;
+  cursor: pointer;
 }
 
-.instance-ping-health-loss {
-  height: 100%;
-  border-radius: 0 999px 999px 0;
-  transition: width 0.3s ease;
+.instance-ping-card:hover {
+  transform: translateY(-1.5px);
+  border-color: color-mix(in srgb, var(--item-color, var(--gray-8)) 45%, var(--gray-6));
+  box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--item-color, #000) 12%, rgba(0, 0, 0, 0.05));
 }
 
-.instance-ping-series-stat {
-  display: block;
-  margin-top: 4px;
+.instance-ping-card.is-active {
+  border-color: var(--item-color, var(--accent-9));
+  box-shadow: 0 0 0 1.5px var(--item-color, var(--accent-9)), 0 6px 20px -3px rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--item-color) 4%, var(--color-panel-solid));
+}
+
+.instance-ping-card.is-dimmed {
+  opacity: 0.38;
+}
+
+/* 卡片第一行：线路名与状态微标 */
+.instance-ping-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.instance-ping-card-name-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.instance-ping-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--item-color, var(--gray-8));
+  flex-shrink: 0;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--item-color, var(--gray-8)) 65%, transparent);
+}
+
+.instance-ping-card-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-12);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.instance-ping-daily-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 8px;
+.instance-ping-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 2.5px 6.5px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
-.instance-ping-daily-item {
-  min-width: 0;
-  transition: background-color 0.15s ease;
+.instance-ping-pill.is-good {
+  background: color-mix(in srgb, var(--green-9) 8%, transparent);
+  color: var(--green-11);
+  border: 1px solid color-mix(in srgb, var(--green-9) 20%, transparent);
+}
+
+.instance-ping-pill.is-minor {
+  background: color-mix(in srgb, var(--amber-9) 12%, transparent);
+  color: var(--amber-11);
+  border: 1px solid color-mix(in srgb, var(--amber-9) 26%, transparent);
+}
+
+.instance-ping-pill.is-moderate {
+  background: color-mix(in srgb, var(--orange-9) 14%, transparent);
+  color: var(--orange-11);
+  border: 1px solid color-mix(in srgb, var(--orange-9) 28%, transparent);
+}
+
+.instance-ping-pill.is-severe {
+  background: color-mix(in srgb, var(--red-9) 16%, transparent);
+  color: var(--red-11);
+  border: 1px solid color-mix(in srgb, var(--red-9) 30%, transparent);
+}
+
+.instance-ping-pill.is-focus {
+  background: var(--gray-a3);
+  color: var(--gray-11);
+  border: 1px solid var(--gray-a5);
+}
+
+/* 卡片第二行：核心数值与探测计数 */
+.instance-ping-card-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin: 8px 0 6px 0;
+}
+
+.instance-ping-value-wrap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.instance-ping-value-num {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  color: var(--gray-12);
+}
+
+.instance-ping-value-unit {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-9);
+}
+
+.instance-ping-body-meta {
+  font-size: 11px;
+  color: var(--gray-9);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.instance-ping-loss-highlight {
+  color: var(--red-11);
+  font-weight: 600;
+}
+
+/* 卡片第三行：极值与中位基准（现代指标对） */
+.instance-ping-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 7px;
+  margin-top: auto;
+  border-top: 1px solid var(--gray-a3);
+  font-size: 10.5px;
+  color: var(--gray-9);
+}
+
+.instance-ping-footer-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.instance-ping-footer-label {
+  color: var(--gray-8);
+  font-weight: 500;
+}
+
+.instance-ping-footer-val {
+  font-family: var(--font-mono, monospace);
+  color: var(--gray-11);
+  font-weight: 500;
 }
 
 .instance-top-summary {
@@ -5066,8 +5227,9 @@ html[data-monitor-theme='next'] .node-network-value strong {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .instance-ping-series-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .instance-ping-series-grid,
+  .instance-ping-daily-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   }
 
   .node-resource-ring-grid {
@@ -5547,8 +5709,9 @@ html[data-monitor-theme='next'] .node-network-value strong {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .instance-ping-series-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .instance-ping-series-grid,
+  .instance-ping-daily-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
 
   .node-resource-ring-chart {
