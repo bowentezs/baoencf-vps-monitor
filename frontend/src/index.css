@@ -3847,16 +3847,55 @@ html[data-monitor-theme='next'] .node-network-value strong {
 .instance-ping-series-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
   margin-top: 12px;
 }
 
 .instance-ping-series-item {
   min-width: 0;
-  border: 1px solid;
+  border: 1px solid var(--gray-5);
   border-left-width: 4px;
-  border-radius: 7px;
-  padding: 7px 8px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  position: relative;
+}
+
+.instance-ping-series-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.instance-ping-series-item.is-active {
+  box-shadow: 0 0 0 2px var(--item-color, var(--accent-9)), 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.instance-ping-series-item.is-dimmed {
+  opacity: 0.55;
+}
+
+.instance-ping-health-bar {
+  height: 4px;
+  border-radius: 999px;
+  background-color: var(--gray-a4);
+  overflow: hidden;
+  display: flex;
+  margin: 6px 0;
+  width: 100%;
+}
+
+.instance-ping-health-fill {
+  height: 100%;
+  border-radius: 999px 0 0 999px;
+  transition: width 0.3s ease;
+}
+
+.instance-ping-health-loss {
+  height: 100%;
+  border-radius: 0 999px 999px 0;
+  transition: width 0.3s ease;
 }
 
 .instance-ping-series-stat {
