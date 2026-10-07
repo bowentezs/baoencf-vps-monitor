@@ -382,31 +382,30 @@ export default function Instance() {
   });
 
   const isMultiDayDaily = dailyPingSummaries.length >= 2;
-  const singleDayBarData = useMemo(() => {
-    if (dailyPingSummaries.length === 0) return [];
-    const latestDay = dailyPingSummaries[dailyPingSummaries.length - 1];
-    return latestDay.tasks
-      .filter((t) => activePingTaskId === 'all' || activePingTaskId === t.taskId)
-      .map((t) => ({
-        name: t.taskLabel,
-        latency: t.avgLatency ?? 0,
-        color: t.color,
-        packetLoss: t.packetLossPercent,
-        lostPackets: t.lostPackets,
-        totalPackets: t.totalPackets,
-        median: t.medianLatency,
-        min: t.minLatency,
-        max: t.maxLatency,
-      }));
-  }, [dailyPingSummaries, activePingTaskId]);
+  const latestPingDay = dailyPingSummaries.length > 0 ? dailyPingSummaries[dailyPingSummaries.length - 1] : null;
+  const singleDayBarData = latestPingDay
+    ? latestPingDay.tasks
+        .filter((t) => activePingTaskId === 'all' || activePingTaskId === t.taskId)
+        .map((t) => ({
+          name: t.taskLabel,
+          latency: t.avgLatency ?? 0,
+          color: t.color,
+          packetLoss: t.packetLossPercent,
+          lostPackets: t.lostPackets,
+          totalPackets: t.totalPackets,
+          median: t.medianLatency,
+          min: t.minLatency,
+          max: t.maxLatency,
+        }))
+    : [];
 
-  const singleDayYDomain = useMemo(() => {
+  const singleDayYDomain: [number, number] = (() => {
     const values = singleDayBarData.map((d) => d.latency).filter((v) => v > 0);
     if (values.length === 0) return [0, 100];
     const max = Math.max(...values);
     const step = max <= 50 ? 10 : max <= 150 ? 25 : max <= 300 ? 50 : max <= 600 ? 100 : 200;
     return [0, Math.ceil((max * 1.25) / step) * step];
-  }, [singleDayBarData]);
+  })();
 
   const dailyTrafficChartData = dailyTraffic.map((row) => ({
     ...row,
