@@ -115,6 +115,7 @@ interface SortablePingCardProps {
   item: PingTaskSeries;
   isFocused: boolean;
   isDimmed: boolean;
+  canSort?: boolean;
   onFocusToggle: () => void;
 }
 
@@ -122,6 +123,7 @@ function SortablePingCard({
   item,
   isFocused,
   isDimmed,
+  canSort = false,
   onFocusToggle,
 }: SortablePingCardProps) {
   const {
@@ -131,7 +133,10 @@ function SortablePingCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.task.id });
+  } = useSortable({
+    id: item.task.id,
+    disabled: !canSort,
+  });
 
   if (!item || !item.task) return null;
 
@@ -139,12 +144,14 @@ function SortablePingCard({
 
   const style: React.CSSProperties = {
     ['--item-color' as string]: item.task.color,
-    transform: transform ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` : undefined,
-    transition,
+    transform: canSort && transform ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` : undefined,
+    transition: canSort ? transition : undefined,
     zIndex: isDragging ? 50 : undefined,
     opacity: isDragging ? 0.85 : undefined,
-    touchAction: isDragging ? 'none' : 'pan-y',
+    touchAction: canSort ? (isDragging ? 'none' : 'pan-y') : undefined,
   };
+
+  const sortHint = canSort ? ' · 长按可拖动排序' : '';
 
   return (
     <div
@@ -152,9 +159,9 @@ function SortablePingCard({
       className={`instance-ping-card${isFocused ? ' is-active' : ''}${isDimmed ? ' is-dimmed' : ''}${isDragging ? ' is-dragging' : ''}`}
       style={style}
       onClick={onFocusToggle}
-      title={`点击${isFocused ? '取消聚焦' : '聚焦查看'}此线路走势 · 长按可拖动排序\n${item.task.type} ${item.task.target}\n探测 ${quality.totalPackets} 次，丢包 ${quality.lostPackets} 次\n延迟区间: ${quality.minLatency ?? '-'} ~ ${quality.maxLatency ?? '-'} ms (基准中位: ${quality.medianLatency ?? '-'} ms)`}
-      {...attributes}
-      {...listeners}
+      title={`点击${isFocused ? '取消聚焦' : '聚焦查看'}此线路走势${sortHint}\n${item.task.type} ${item.task.target}\n探测 ${quality.totalPackets} 次，丢包 ${quality.lostPackets} 次\n延迟区间: ${quality.minLatency ?? '-'} ~ ${quality.maxLatency ?? '-'} ms (基准中位: ${quality.medianLatency ?? '-'} ms)`}
+      {...(canSort ? attributes : {})}
+      {...(canSort ? listeners : {})}
     >
       {/* 头部：圆点 + 正文字色线路名 + 状态徽标 */}
       <div className="instance-ping-card-header">
@@ -535,7 +542,7 @@ export default function Instance() {
   const pingSeriesWithRecords = getPingSeriesWithRecords(pingSeries);
 
   const orderedPingSeries = useMemo(() => {
-    if (pingTaskOrder.length === 0) return pingSeriesWithRecords;
+    if (!isAuthenticated || pingTaskOrder.length === 0) return pingSeriesWithRecords;
     const orderMap = new Map<number, number>();
     pingTaskOrder.forEach((id, idx) => orderMap.set(id, idx));
 
@@ -545,16 +552,17 @@ export default function Instance() {
       if (orderA !== orderB) return orderA - orderB;
       return 0;
     });
-  }, [pingSeriesWithRecords, pingTaskOrder]);
+  }, [pingSeriesWithRecords, pingTaskOrder, isAuthenticated]);
 
   const sortableTaskIds = useMemo(() => orderedPingSeries.map((item) => item.task.id), [orderedPingSeries]);
 
   const hasCustomPingOrder = useMemo(() => {
-    if (pingTaskOrder.length === 0 || pingSeriesWithRecords.length === 0) return false;
+    if (!isAuthenticated || pingTaskOrder.length === 0 || pingSeriesWithRecords.length === 0) return false;
     return pingSeriesWithRecords.some((item) => pingTaskOrder.includes(item.task.id));
-  }, [pingTaskOrder, pingSeriesWithRecords]);
+  }, [isAuthenticated, pingTaskOrder, pingSeriesWithRecords]);
 
   const handlePingDragStart = () => {
+    if (!isAuthenticated) return;
     isDraggingPingRef.current = true;
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try { navigator.vibrate(18); } catch {}
@@ -562,6 +570,7 @@ export default function Instance() {
   };
 
   const handlePingDragEnd = (event: DragEndEvent) => {
+    if (!isAuthenticated) return;
     setTimeout(() => {
       isDraggingPingRef.current = false;
     }, 60);
@@ -1072,6 +1081,7 @@ export default function Instance() {
                         item={item}
                         isFocused={isFocused}
                         isDimmed={isDimmed}
+                        canSort={isAuthenticated}
                         onFocusToggle={() => {
                           if (isDraggingPingRef.current) return;
                           setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id);
