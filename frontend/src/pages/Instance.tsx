@@ -125,7 +125,15 @@ function CustomPingTooltip({
 
   const timeLabel = timeFormatter(label);
 
-  const items = orderedSeries.map((item) => {
+  // 1. 若处于单线路聚焦状态（activeTaskId !== 'all'），严格仅展示该聚焦线路；
+  // 2. 否则全网对比模式下展示全量线路对比。
+  const targetSeries = activeTaskId !== 'all'
+    ? orderedSeries.filter((item) => item.task.id === activeTaskId)
+    : orderedSeries;
+
+  const effectiveSeries = targetSeries.length > 0 ? targetSeries : orderedSeries;
+
+  const items = effectiveSeries.map((item) => {
     const rawVal = row[item.task.key];
     const isLoss = Boolean(row[`${item.task.key}_loss`]);
     const numVal = typeof rawVal === 'number' && Number.isFinite(rawVal) ? rawVal : null;
@@ -143,6 +151,10 @@ function CustomPingTooltip({
   if (items.length === 0) return null;
 
   const sortedItems = [...items].sort((a, b) => {
+    if (hoveredKey) {
+      if (a.key === hoveredKey) return -1;
+      if (b.key === hoveredKey) return 1;
+    }
     if (a.isLoss && !b.isLoss) return -1;
     if (!a.isLoss && b.isLoss) return 1;
     const valA = a.value ?? -1;
@@ -150,17 +162,22 @@ function CustomPingTooltip({
     return valB - valA;
   });
 
+  const isSingle = sortedItems.length === 1;
   const isMulti = sortedItems.length > 4;
 
   return (
-    <div className="custom-ping-tooltip">
+    <div className={`custom-ping-tooltip${isSingle ? ' is-single' : ''}`}>
       <div className="custom-ping-tooltip-header">
         <span>{timeLabel}</span>
-        {sortedItems.some((i) => i.isLoss) && (
-          <span className="custom-ping-tooltip-header-hint">
+        {sortedItems.some((i) => i.isLoss) ? (
+          <span className="custom-ping-tooltip-header-hint" style={{ color: 'var(--red-10)', fontWeight: 600 }}>
             ⚠️ 存在丢包
           </span>
-        )}
+        ) : isSingle && activeTaskId !== 'all' ? (
+          <span className="custom-ping-tooltip-header-hint">
+            聚焦单线
+          </span>
+        ) : null}
       </div>
       <div className={`custom-ping-tooltip-grid${isMulti ? ' is-multi' : ''}`}>
         {sortedItems.map((item) => {
@@ -1143,7 +1160,11 @@ export default function Instance() {
                           strokeWidth={isHovered ? 3.0 : isFocused ? 2.5 : 1.6}
                           strokeOpacity={isOtherHovered ? 0.15 : 1}
                           dot={false}
-                          activeDot={false}
+                          activeDot={
+                            isFocused || isHovered
+                              ? { r: 4.5, strokeWidth: 1.5, stroke: '#fff' }
+                              : false
+                          }
                           connectNulls={true}
                           isAnimationActive={false}
                         />
