@@ -30,10 +30,6 @@ function computeTooltipItems({
   }).filter((item) => item.hasData);
 
   const sortedItems = [...items].sort((a, b) => {
-    if (hoveredKey) {
-      if (a.key === hoveredKey) return -1;
-      if (b.key === hoveredKey) return 1;
-    }
     if (a.isLoss && !b.isLoss) return -1;
     if (!a.isLoss && b.isLoss) return 1;
     const valA = a.value ?? -1;
@@ -112,15 +108,26 @@ test('全网对比模式时：输出全部线路并按丢包优先与延迟降�
   assert.equal(result.sortedItems[1].label, 'GD 电信'); // 1316ms 延迟最高排第二
 });
 
-test('全网对比且悬停某条线路时：悬停线路置顶优先呈现', () => {
-  const result = computeTooltipItems({
+test('全网对比时：悬停不会触发元素位移重排（保证布局绝对稳定，零闪烁）', () => {
+  const resultWithoutHover = computeTooltipItems({
+    row: mockRow,
+    orderedSeries: mockSeries,
+    activeTaskId: 'all',
+    hoveredKey: null,
+  });
+
+  const resultWithHover = computeTooltipItems({
     row: mockRow,
     orderedSeries: mockSeries,
     activeTaskId: 'all',
     hoveredKey: 'ah_telecom', // 悬停 AH 电信
   });
 
-  assert.equal(result.sortedItems[0].label, 'AH 电信');
+  // 验证两者的元素顺序完全一致，绝不因悬停改变元素几何索引
+  assert.deepEqual(
+    resultWithoutHover.sortedItems.map(i => i.key),
+    resultWithHover.sortedItems.map(i => i.key)
+  );
 });
 
 test('未知 activeTaskId 容错：安全降级为全量对比而不崩溃', () => {
