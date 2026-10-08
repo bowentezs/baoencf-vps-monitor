@@ -106,6 +106,7 @@ interface CustomPingTooltipProps {
   hoveredKey: string | null;
   activeTaskId: number | 'all';
   onHoverKey: (key: string | null) => void;
+  onSelectTaskId?: (id: number) => void;
 }
 
 function CustomPingTooltip({
@@ -117,6 +118,7 @@ function CustomPingTooltip({
   hoveredKey,
   activeTaskId,
   onHoverKey,
+  onSelectTaskId,
 }: CustomPingTooltipProps) {
   if (!active || !payload || payload.length === 0) return null;
 
@@ -150,11 +152,8 @@ function CustomPingTooltip({
 
   if (items.length === 0) return null;
 
+  // 🛡️ 静态稳定排序：绝对禁止因 hover 动态调整元素索引，杜绝鼠标下方布局位移引发的死循环闪烁
   const sortedItems = [...items].sort((a, b) => {
-    if (hoveredKey) {
-      if (a.key === hoveredKey) return -1;
-      if (b.key === hoveredKey) return 1;
-    }
     if (a.isLoss && !b.isLoss) return -1;
     if (!a.isLoss && b.isLoss) return 1;
     const valA = a.value ?? -1;
@@ -177,7 +176,11 @@ function CustomPingTooltip({
           <span className="custom-ping-tooltip-header-hint">
             聚焦单线
           </span>
-        ) : null}
+        ) : (
+          <span className="custom-ping-tooltip-header-hint">
+            点击线路可聚焦
+          </span>
+        )}
       </div>
       <div className={`custom-ping-tooltip-grid${isMulti ? ' is-multi' : ''}`}>
         {sortedItems.map((item) => {
@@ -189,6 +192,11 @@ function CustomPingTooltip({
               className={`custom-ping-tooltip-item${item.isLoss ? ' is-loss' : ''}${isItemHovered ? ' is-hovered' : ''}${isItemFocused ? ' is-active' : ''}`}
               onMouseEnter={() => onHoverKey(item.key)}
               onMouseLeave={() => onHoverKey(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectTaskId?.(item.id);
+              }}
+              title={`点击单独聚焦查看 ${item.label} 折线走势`}
             >
               <div className="custom-ping-tooltip-name-wrap">
                 <span
@@ -1141,6 +1149,7 @@ export default function Instance() {
                           hoveredKey={hoveredPingKey}
                           activeTaskId={activePingTaskId}
                           onHoverKey={setHoveredPingKey}
+                          onSelectTaskId={(id) => setActivePingTaskId(id)}
                         />
                       }
                     />
@@ -1167,6 +1176,8 @@ export default function Instance() {
                           }
                           connectNulls={true}
                           isAnimationActive={false}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id)}
                         />
                       );
                     })}
