@@ -647,3 +647,54 @@ export function buildDailyPingSummary(series: PingTaskSeries[]): DailyPingSummar
 
   return summaries.sort((a, b) => a.timestamp - b.timestamp);
 }
+
+/**
+ * 根据鼠标光标所在的 Y 像素坐标，计算当前采样点距离光标最近的折线 Key（近邻磁吸算法）
+ */
+export function findClosestPingSeriesKey({
+  chartY,
+  chartHeight,
+  topPad = 12,
+  bottomPad = 34,
+  yMin = 0,
+  yMax = 100,
+  row,
+  series,
+}: {
+  chartY: number;
+  chartHeight: number;
+  topPad?: number;
+  bottomPad?: number;
+  yMin?: number;
+  yMax?: number;
+  row?: PingChartRow | Record<string, unknown> | null;
+  series: PingTaskSeries[];
+}): string | null {
+  if (!row || !series || series.length === 0) return null;
+  const plotHeight = Math.max(1, chartHeight - topPad - bottomPad);
+  const normalizedY = Math.max(0, Math.min(1, (chartY - topPad) / plotHeight));
+  const cursorVal = yMax - normalizedY * (yMax - yMin);
+
+  let closestKey: string | null = null;
+  let minDiff = Infinity;
+
+  for (const item of series) {
+    const rawVal = row[item.task.key];
+    const isLoss = Boolean(row[`${item.task.key}_loss`]);
+    // 丢包点折线通常在顶峰呈现，等效判定在 yMax 附近
+    const effectiveVal = isLoss
+      ? yMax
+      : typeof rawVal === 'number' && Number.isFinite(rawVal)
+      ? rawVal
+      : null;
+    if (effectiveVal === null) continue;
+
+    const diff = Math.abs(effectiveVal - cursorVal);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestKey = item.task.key;
+    }
+  }
+
+  return closestKey;
+}

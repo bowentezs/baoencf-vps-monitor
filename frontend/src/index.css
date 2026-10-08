@@ -4515,73 +4515,42 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
   font-size: 11px;
 }
 
-/* Ping 延迟主布局：宽屏桌面端左右两栏并排，彻底根除折线图被下方多地区顶出视口遮挡 */
+/* Ping 延迟主布局：全幅舒展上下流式布局，折线图 100% 满宽，地区卡片自适应平铺下方零挤压 */
 .instance-ping-main-layout {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   width: 100%;
-  align-items: start;
-}
-
-@media (min-width: 1080px) {
-  .instance-ping-main-layout {
-    grid-template-columns: minmax(0, 1.45fr) minmax(360px, 1fr);
-    gap: 16px;
-  }
 }
 
 .instance-ping-chart-pane {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
   min-width: 0;
 }
 
 .instance-ping-cards-pane {
   display: flex;
   flex-direction: column;
+  width: 100%;
   min-width: 0;
-  max-height: 326px; /* 精确对应左侧折线图 (260px) + 心跳条 (45px) + 间距等高 */
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 4px;
-  padding-bottom: 2px;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
 }
 
-.instance-ping-cards-pane::-webkit-scrollbar {
-  width: 5px;
+.instance-ping-cards-pane .instance-ping-series-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+  width: 100%;
 }
 
-.instance-ping-cards-pane::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.instance-ping-cards-pane::-webkit-scrollbar-thumb {
-  background: var(--gray-a4);
-  border-radius: 999px;
-}
-
-.instance-ping-cards-pane::-webkit-scrollbar-thumb:hover {
-  background: var(--gray-a7);
-}
-
-@media (min-width: 1080px) {
-  .instance-ping-cards-pane .instance-ping-series-grid {
-    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-    gap: 8px;
-  }
-
-  .instance-ping-cards-pane .instance-ping-card {
-    padding: 10px 12px;
-    min-height: 96px;
-  }
-}
-
-@media (max-width: 1079px) {
-  .instance-ping-cards-pane {
-    max-height: 246px; /* 窄屏上下堆叠时限高 2 行 */
-  }
+.instance-ping-cards-pane .instance-ping-card {
+  padding: 10px 12px;
+  min-height: 94px;
 }
 
 .instance-ping-series-grid,
@@ -4619,10 +4588,11 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
   cursor: grabbing !important;
 }
 
-.instance-ping-card:hover {
-  transform: translateY(-1.5px);
-  border-color: color-mix(in srgb, var(--item-color, var(--gray-8)) 45%, var(--gray-6));
-  box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--item-color, #000) 12%, rgba(0, 0, 0, 0.05));
+.instance-ping-card:hover,
+.instance-ping-card.is-hovered {
+  transform: translateY(-2px);
+  border-color: var(--item-color, var(--accent-9));
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--item-color, var(--accent-9)) 70%, transparent), 0 8px 20px -4px color-mix(in srgb, var(--item-color, #000) 20%, transparent);
 }
 
 .instance-ping-card.is-active {
