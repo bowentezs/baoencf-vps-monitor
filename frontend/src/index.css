@@ -4524,9 +4524,21 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.08);
   padding: 8px 10px;
   min-width: 170px;
+  max-height: 290px;
+  overflow-y: auto;
+  overflow-x: hidden;
   pointer-events: auto;
   user-select: none;
   backdrop-filter: blur(8px);
+}
+
+.instance-ping-custom-tooltip::-webkit-scrollbar {
+  width: 4px;
+}
+
+.instance-ping-custom-tooltip::-webkit-scrollbar-thumb {
+  background: var(--gray-6);
+  border-radius: 4px;
 }
 
 .instance-ping-tooltip-header {
