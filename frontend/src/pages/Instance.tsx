@@ -465,7 +465,6 @@ export default function Instance() {
     const rangeHours = pingTimeRangeHours[pingTimeRange];
     fetchPingTaskSeries(uuid, {
       limit: 1000,
-      maxTasks: 8,
       rangeHours,
       cursor: new Date().toISOString(),
       includeHidden: isAuthenticated,
