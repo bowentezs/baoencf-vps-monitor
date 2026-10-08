@@ -4516,60 +4516,6 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
   font-weight: 500;
 }
 
-/* 折线图上方交互式线路图例栏 */
-.instance-ping-legend-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
-  padding: 4px 0;
-  user-select: none;
-}
-
-.instance-ping-legend-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 24px;
-  padding: 0 10px;
-  font-size: 11px;
-  font-weight: 500;
-  border-radius: 9999px;
-  border: 1px solid var(--gray-4);
-  background: var(--color-panel-solid);
-  color: var(--gray-11);
-  cursor: pointer;
-  transition: all 0.16s ease;
-  outline: none;
-}
-
-.instance-ping-legend-pill:hover {
-  transform: translateY(-1px);
-  border-color: var(--pill-color, var(--accent-9));
-  color: var(--gray-12);
-  box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--pill-color, #000) 25%, transparent);
-}
-
-.instance-ping-legend-pill.is-active {
-  border-color: var(--pill-color, var(--accent-9));
-  background: color-mix(in srgb, var(--pill-color, var(--accent-9)) 12%, var(--color-panel-solid));
-  color: var(--pill-color, var(--accent-9));
-  font-weight: 600;
-  box-shadow: 0 0 0 1px var(--pill-color, var(--accent-9)), 0 2px 10px -2px rgba(0, 0, 0, 0.1);
-}
-
-.instance-ping-legend-pill.is-dimmed {
-  opacity: 0.45;
-}
-
-.instance-ping-legend-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
 .instance-top-summary {
   overflow: hidden;
   border-color: var(--gray-4);

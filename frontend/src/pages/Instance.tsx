@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useLayoutEffect, Fragment } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Flex, Card, Text, Badge, Heading,
@@ -233,6 +233,7 @@ export default function Instance() {
   const [pingError, setPingError] = useState<string | null>(null);
   const [pingTimeRange, setPingTimeRange] = useState<PingTimeRange>('1h');
   const [activePingTaskId, setActivePingTaskId] = useState<number | 'all'>('all');
+  const [hoveredPingTaskId, setHoveredPingTaskId] = useState<number | null>(null);
   const [shouldLoadPing, setShouldLoadPing] = useState(false);
   const [gpuRecords, setGpuRecords] = useState<PublicGpuRecord[]>([]);
   const [trafficRangeDays, setTrafficRangeDays] = useState<TrafficRangeDays>(7);
@@ -417,6 +418,7 @@ export default function Instance() {
     setPingError(null);
     setPingLoading(false);
     setActivePingTaskId('all');
+    setHoveredPingTaskId(null);
   }, [uuid]);
 
   useEffect(() => {
@@ -978,36 +980,6 @@ export default function Instance() {
           </Text>
         ) : (
           <>
-            <div className="instance-ping-legend-bar">
-              <button
-                type="button"
-                className={`instance-ping-legend-pill ${activePingTaskId === 'all' ? 'is-active' : 'is-dimmed'}`}
-                onClick={() => setActivePingTaskId('all')}
-                title="显示所有线路折线"
-              >
-                <span>全部线路 ({orderedPingSeries.length})</span>
-              </button>
-              {orderedPingSeries.map((item) => {
-                const isSelected = activePingTaskId === item.task.id;
-                const isDimmed = activePingTaskId !== 'all' && !isSelected;
-                return (
-                  <button
-                    key={item.task.key}
-                    type="button"
-                    className={`instance-ping-legend-pill ${isSelected ? 'is-active' : ''} ${isDimmed ? 'is-dimmed' : ''}`}
-                    style={{
-                      ['--pill-color' as string]: item.task.color,
-                    }}
-                    onClick={() => setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id)}
-                    title={`点击${isSelected ? '恢复全网对比' : '单独显示'}「${item.task.label}」折线`}
-                  >
-                    <span className="instance-ping-legend-dot" style={{ backgroundColor: item.task.color }} />
-                    <span>{item.task.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
             <ResponsiveContainer width="100%" height={pingChartHeight}>
               <LineChart data={pingChartRows} margin={monitorChartMargin}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
@@ -1050,26 +1022,48 @@ export default function Instance() {
                   const isVisible = activePingTaskId === 'all' || activePingTaskId === item.task.id;
                   if (!isVisible) return null;
                   const isFocused = activePingTaskId === item.task.id;
+                  const isHovered = hoveredPingTaskId === item.task.id;
+
                   return (
-                    <Line
-                      key={item.task.key}
-                      type="monotone"
-                      dataKey={item.task.key}
-                      name={item.task.label}
-                      stroke={item.task.color}
-                      strokeWidth={isFocused ? 2.8 : 1.8}
-                      dot={false}
-                      activeDot={{
-                        r: 6,
-                        strokeWidth: 2,
-                        cursor: 'pointer',
-                        onClick: () => setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id),
-                      }}
-                      connectNulls={true}
-                      isAnimationActive={false}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id)}
-                    />
+                    <Fragment key={item.task.key}>
+                      {/* 16px 宽隐形交互热区折线：100% 灵敏捕获鼠标触碰与直接点击 */}
+                      <Line
+                        type="monotone"
+                        dataKey={item.task.key}
+                        stroke="transparent"
+                        strokeWidth={16}
+                        dot={false}
+                        activeDot={false}
+                        connectNulls={true}
+                        isAnimationActive={false}
+                        tooltipType="none"
+                        legendType="none"
+                        style={{ cursor: 'pointer' }}
+                        onMouseEnter={() => setHoveredPingTaskId(item.task.id)}
+                        onMouseLeave={() => setHoveredPingTaskId((curr) => (curr === item.task.id ? null : curr))}
+                        onClick={() => {
+                          setActivePingTaskId((curr) => (curr === item.task.id ? 'all' : item.task.id));
+                        }}
+                      />
+                      {/* 真实视觉呈现折线：彻底去掉圆点，高亮加粗与淡化联动 */}
+                      <Line
+                        type="monotone"
+                        dataKey={item.task.key}
+                        name={item.task.label}
+                        stroke={item.task.color}
+                        strokeWidth={isFocused ? 3.2 : (isHovered ? 2.8 : 1.8)}
+                        strokeOpacity={
+                          activePingTaskId === 'all'
+                            ? (hoveredPingTaskId !== null ? (isHovered ? 1 : 0.22) : 1)
+                            : 1
+                        }
+                        dot={false}
+                        activeDot={false}
+                        connectNulls={true}
+                        isAnimationActive={false}
+                        style={{ pointerEvents: 'none', transition: 'stroke-width 0.15s ease, stroke-opacity 0.15s ease' }}
+                      />
+                    </Fragment>
                   );
                 })}
               </LineChart>
