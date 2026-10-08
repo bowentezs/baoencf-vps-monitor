@@ -345,10 +345,6 @@ export default function Instance() {
   const [pingTimeRange, setPingTimeRange] = useState<PingTimeRange>('1h');
   const [activePingTaskId, setActivePingTaskId] = useState<number | 'all'>('all');
   const [hoveredPingKey, setHoveredPingKey] = useState<string | null>(null);
-  const [pingScaleMode, setPingScaleMode] = useState<'normal' | 'full'>(() => {
-    const saved = getLocalStorageItem('instancePingScaleMode');
-    return saved === 'full' ? 'full' : 'normal';
-  });
   const [shouldLoadPing, setShouldLoadPing] = useState(false);
   const [gpuRecords, setGpuRecords] = useState<PublicGpuRecord[]>([]);
   const [trafficRangeDays, setTrafficRangeDays] = useState<TrafficRangeDays>(7);
@@ -705,7 +701,7 @@ export default function Instance() {
     : orderedPingSeries.filter((item) => item.task.id === activePingTaskId);
   const activeSeriesForDomain = visiblePingSeries.length > 0 ? visiblePingSeries : orderedPingSeries;
   const pingChartRows = buildPingChartRows(orderedPingSeries);
-  const pingYAxisDomain = getPingYAxisDomain(activeSeriesForDomain, pingScaleMode);
+  const pingYAxisDomain = getPingYAxisDomain(activeSeriesForDomain);
   const pingXAxisDomain = getPingTimeDomain(orderedPingSeries, pingTimeRangeHours[pingTimeRange]);
   const pingChartTimeFormatter = (value: unknown) => {
     const dateInput = typeof value === 'string' || typeof value === 'number' || value instanceof Date ? value : '';
@@ -1043,20 +1039,6 @@ export default function Instance() {
             </SegmentedControl.Root>
           </Flex>
           <Flex align="center" gap="3" wrap="wrap">
-            <Button
-              size="1"
-              variant="soft"
-              color={pingScaleMode === 'normal' ? 'blue' : 'gray'}
-              onClick={() => {
-                const next = pingScaleMode === 'normal' ? 'full' : 'normal';
-                setPingScaleMode(next);
-                setLocalStorageItem('instancePingScaleMode', next);
-              }}
-              title={pingScaleMode === 'normal' ? '当前已自动平滑极端突刺（聚焦常态波形），点击展开全量极值' : '当前展示完整全局极值，点击聚焦常态波形'}
-              style={{ cursor: 'pointer', fontSize: '11px', height: '24px', padding: '0 8px' }}
-            >
-              {pingScaleMode === 'normal' ? '🎯 聚焦常态' : '🔍 完整极值'}
-            </Button>
             {activePingTaskId !== 'all' && (
               <Button
                 size="1"
