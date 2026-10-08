@@ -48,6 +48,7 @@ import {
 import {
   buildPingChartRows,
   fetchPingTaskSeries,
+  findClosestPingSeriesKey,
   formatPingMs,
   getPingSeriesQuality,
   getPingSeriesWithRecords,
@@ -775,6 +776,30 @@ export default function Instance() {
       : date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const handlePingChartMouseMove = (state: any) => {
+    if (!state || activePingTaskId !== 'all') return;
+    const activeIndex = state.activeTooltipIndex;
+    const chartY = state.chartY;
+    if (typeof activeIndex !== 'number' || typeof chartY !== 'number') return;
+    const row = pingChartRows[activeIndex];
+    if (!row) return;
+
+    const closestKey = findClosestPingSeriesKey({
+      chartY,
+      chartHeight: pingChartHeight,
+      topPad: monitorChartMargin.top ?? 12,
+      bottomPad: (monitorChartMargin.bottom ?? 4) + 30,
+      yMin: pingYAxisDomain[0] ?? 0,
+      yMax: pingYAxisDomain[1] ?? 100,
+      row,
+      series: orderedPingSeries,
+    });
+
+    if (closestKey && closestKey !== hoveredPingKey) {
+      setHoveredPingKey(closestKey);
+    }
+  };
+
   const dailyTrafficChartData = dailyTraffic.map((row) => ({
     ...row,
     label: row.day.slice(5).replace('-', '/'),
@@ -1167,6 +1192,7 @@ export default function Instance() {
                   <LineChart
                     data={pingChartRows}
                     margin={monitorChartMargin}
+                    onMouseMove={handlePingChartMouseMove}
                     onMouseLeave={() => setHoveredPingKey(null)}
                   >
                     <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />

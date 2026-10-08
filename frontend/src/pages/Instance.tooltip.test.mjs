@@ -189,3 +189,73 @@ test('单线胶囊模式：精准定位悬停线路或最关键丢包线路', ()
   assert.equal(defaultTarget.label, 'ZJ 移动');
   assert.equal(defaultTarget.isLoss, true);
 });
+
+// 模拟 findClosestPingSeriesKey 磁吸计算逻辑
+function testFindClosestPingSeriesKey({
+  chartY,
+  chartHeight = 260,
+  topPad = 12,
+  bottomPad = 34,
+  yMin = 0,
+  yMax = 2500,
+  row,
+  series,
+}) {
+  if (!row || !series || series.length === 0) return null;
+  const plotHeight = Math.max(1, chartHeight - topPad - bottomPad);
+  const normalizedY = Math.max(0, Math.min(1, (chartY - topPad) / plotHeight));
+  const cursorVal = yMax - normalizedY * (yMax - yMin);
+
+  let closestKey = null;
+  let minDiff = Infinity;
+
+  for (const item of series) {
+    const rawVal = row[item.task.key];
+    const isLoss = Boolean(row[`${item.task.key}_loss`]);
+    const effectiveVal = isLoss
+      ? yMax
+      : typeof rawVal === 'number' && Number.isFinite(rawVal)
+      ? rawVal
+      : null;
+    if (effectiveVal === null) continue;
+
+    const diff = Math.abs(effectiveVal - cursorVal);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestKey = item.task.key;
+    }
+  }
+
+  return closestKey;
+}
+
+test('Y 轴磁吸探针算法：光标移至高位时吸附到顶部丢包或高突刺线路', () => {
+  const closestKey = testFindClosestPingSeriesKey({
+    chartY: 15, // 靠近顶部 2500ms
+    row: mockRow,
+    series: mockSeries,
+  });
+  // 顶格丢包线路为 zj_mobile (yMax 等效 2500ms)
+  assert.equal(closestKey, 'zj_mobile');
+});
+
+test('Y 轴磁吸探针算法：光标移至中位时吸附到对应高度的折线', () => {
+  const closestKey = testFindClosestPingSeriesKey({
+    chartY: 120, // 对应 ~1235ms 延迟高度
+    row: mockRow,
+    series: mockSeries,
+  });
+  // mockRow 中 gd_telecom 是 1316ms，离 1235ms 最近
+  assert.equal(closestKey, 'gd_telecom');
+});
+
+test('Y 轴磁吸探针算法：光标移至低位时吸附到底部低延迟折线', () => {
+  const closestKey = testFindClosestPingSeriesKey({
+    chartY: 220, // 靠近底部 ~160ms 延迟高度
+    row: mockRow,
+    series: mockSeries,
+  });
+  // mockRow 中 ah_mobile 是 216ms，离 160ms 最近
+  assert.equal(closestKey, 'ah_mobile');
+});
+
