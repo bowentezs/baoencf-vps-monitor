@@ -4334,6 +4334,35 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
   max-width: 440px;
 }
 
+.custom-ping-tooltip.is-single {
+  max-width: 220px;
+  min-width: 160px;
+  padding: 6px 10px;
+}
+
+.custom-ping-tooltip.is-single .custom-ping-tooltip-header {
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.custom-ping-tooltip.is-single .custom-ping-tooltip-grid {
+  grid-template-columns: 1fr;
+}
+
+.custom-ping-tooltip.is-single .custom-ping-tooltip-item {
+  padding: 3px 6px;
+}
+
+.custom-ping-tooltip.is-single .custom-ping-tooltip-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.custom-ping-tooltip.is-single .custom-ping-tooltip-value {
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .custom-ping-tooltip-header {
   display: flex;
   justify-content: space-between;
