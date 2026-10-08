@@ -978,6 +978,36 @@ export default function Instance() {
           </Text>
         ) : (
           <>
+            <div className="instance-ping-legend-bar">
+              <button
+                type="button"
+                className={`instance-ping-legend-pill ${activePingTaskId === 'all' ? 'is-active' : 'is-dimmed'}`}
+                onClick={() => setActivePingTaskId('all')}
+                title="显示所有线路折线"
+              >
+                <span>全部线路 ({orderedPingSeries.length})</span>
+              </button>
+              {orderedPingSeries.map((item) => {
+                const isSelected = activePingTaskId === item.task.id;
+                const isDimmed = activePingTaskId !== 'all' && !isSelected;
+                return (
+                  <button
+                    key={item.task.key}
+                    type="button"
+                    className={`instance-ping-legend-pill ${isSelected ? 'is-active' : ''} ${isDimmed ? 'is-dimmed' : ''}`}
+                    style={{
+                      ['--pill-color' as string]: item.task.color,
+                    }}
+                    onClick={() => setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id)}
+                    title={`点击${isSelected ? '恢复全网对比' : '单独显示'}「${item.task.label}」折线`}
+                  >
+                    <span className="instance-ping-legend-dot" style={{ backgroundColor: item.task.color }} />
+                    <span>{item.task.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             <ResponsiveContainer width="100%" height={pingChartHeight}>
               <LineChart data={pingChartRows} margin={monitorChartMargin}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
@@ -1027,10 +1057,18 @@ export default function Instance() {
                       dataKey={item.task.key}
                       name={item.task.label}
                       stroke={item.task.color}
-                      strokeWidth={isFocused ? 2.5 : 1.8}
+                      strokeWidth={isFocused ? 2.8 : 1.8}
                       dot={false}
+                      activeDot={{
+                        r: 6,
+                        strokeWidth: 2,
+                        cursor: 'pointer',
+                        onClick: () => setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id),
+                      }}
                       connectNulls={true}
                       isAnimationActive={false}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id)}
                     />
                   );
                 })}
