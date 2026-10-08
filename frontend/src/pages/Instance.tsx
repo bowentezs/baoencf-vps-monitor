@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useLayoutEffect, Fragment } from 'react';
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Flex, Card, Text, Badge, Heading,
@@ -239,28 +239,45 @@ function PingChartTooltipContent({
   if (!active || !payload || payload.length === 0) return null;
 
   const focusedTaskId = hoveredPingTaskId ?? (activePingTaskId !== 'all' ? activePingTaskId : null);
+  const rowData = (payload[0]?.payload || {}) as Record<string, unknown>;
+
+  // 建立当前时刻各线路采样值映射
+  const payloadValueMap = new Map<string, unknown>();
+  for (const entry of payload) {
+    if (entry.dataKey && !payloadValueMap.has(String(entry.dataKey))) {
+      payloadValueMap.set(String(entry.dataKey), entry.value);
+    }
+  }
+
+  // 严格以 orderedPingSeries 为唯一真理源，绝无重复项，顺序与卡片一致
+  const displaySeries = activePingTaskId === 'all'
+    ? orderedPingSeries
+    : orderedPingSeries.filter((s) => s.task.id === activePingTaskId);
 
   return (
     <div className="instance-ping-custom-tooltip">
       <div className="instance-ping-tooltip-header">
         <span className="instance-ping-tooltip-time">{timeFormatter(label)}</span>
         {focusedTaskId !== null && (
-          <span className="instance-ping-tooltip-focus-tag">高亮对应地区</span>
+          <span className="instance-ping-tooltip-focus-tag">
+            {activePingTaskId !== 'all' ? '单独显示中' : '高亮对应地区'}
+          </span>
         )}
       </div>
       <div className="instance-ping-tooltip-list">
-        {payload.map((entry) => {
-          const taskItem = orderedPingSeries.find((s) => s.task.label === entry.name || s.task.key === entry.dataKey);
-          if (!taskItem) return null;
-
-          const row = entry.payload;
-          const isLoss = row ? Boolean(row[`${taskItem.task.key}_loss`]) : false;
+        {displaySeries.map((taskItem) => {
+          const rawVal = payloadValueMap.has(taskItem.task.key)
+            ? payloadValueMap.get(taskItem.task.key)
+            : rowData[taskItem.task.key];
+          const isLoss = Boolean(rowData[`${taskItem.task.key}_loss`]);
           const isCurrentFocused = focusedTaskId === taskItem.task.id;
           const isDimmed = focusedTaskId !== null && !isCurrentFocused;
 
-          const valueDisplay = (isLoss || entry.value === null || entry.value === undefined || Number(entry.value) < 0)
+          const valueDisplay = isLoss
             ? '丢包 / 超时 🔴'
-            : formatPingMs(Number(entry.value));
+            : (rawVal === null || rawVal === undefined || Number(rawVal) < 0)
+              ? '无采样'
+              : formatPingMs(Number(rawVal));
 
           return (
             <div
@@ -275,7 +292,7 @@ function PingChartTooltipContent({
                 e.stopPropagation();
                 onSelectTask(taskItem.task.id);
               }}
-              title={`点击${isCurrentFocused ? '取消单独显示' : '单独高亮显示'}「${taskItem.task.label}」折线`}
+              title={`点击${isCurrentFocused && activePingTaskId === taskItem.task.id ? '恢复全网对比' : '单独高亮显示'}「${taskItem.task.label}」折线`}
             >
               <div className="instance-ping-tooltip-label-wrap">
                 <span
@@ -1067,7 +1084,11 @@ export default function Instance() {
         ) : (
           <>
             <ResponsiveContainer width="100%" height={pingChartHeight}>
-              <LineChart data={pingChartRows} margin={monitorChartMargin}>
+              <LineChart
+                data={pingChartRows}
+                margin={monitorChartMargin}
+                onMouseLeave={() => setHoveredPingTaskId(null)}
+              >
                 <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
                 <XAxis
                   dataKey="time"
@@ -1105,45 +1126,33 @@ export default function Instance() {
                   const isHovered = hoveredPingTaskId === item.task.id;
 
                   return (
-                    <Fragment key={item.task.key}>
-                      {/* 16px 宽隐形交互热区折线：100% 灵敏捕获鼠标触碰与直接点击 */}
-                      <Line
-                        type="monotone"
-                        dataKey={item.task.key}
-                        stroke="transparent"
-                        strokeWidth={16}
-                        dot={false}
-                        activeDot={false}
-                        connectNulls={true}
-                        isAnimationActive={false}
-                        tooltipType="none"
-                        legendType="none"
-                        style={{ cursor: 'pointer' }}
-                        onMouseEnter={() => setHoveredPingTaskId(item.task.id)}
-                        onMouseLeave={() => setHoveredPingTaskId((curr) => (curr === item.task.id ? null : curr))}
-                        onClick={() => {
-                          setActivePingTaskId((curr) => (curr === item.task.id ? 'all' : item.task.id));
-                        }}
-                      />
-                      {/* 真实视觉呈现折线：彻底去掉圆点，高亮加粗与淡化联动 */}
-                      <Line
-                        type="monotone"
-                        dataKey={item.task.key}
-                        name={item.task.label}
-                        stroke={item.task.color}
-                        strokeWidth={isFocused ? 3.2 : (isHovered ? 2.8 : 1.8)}
-                        strokeOpacity={
-                          activePingTaskId === 'all'
-                            ? (hoveredPingTaskId !== null ? (isHovered ? 1 : 0.22) : 1)
-                            : 1
-                        }
-                        dot={false}
-                        activeDot={false}
-                        connectNulls={true}
-                        isAnimationActive={false}
-                        style={{ pointerEvents: 'none', transition: 'stroke-width 0.15s ease, stroke-opacity 0.15s ease' }}
-                      />
-                    </Fragment>
+                    <Line
+                      key={item.task.key}
+                      type="monotone"
+                      dataKey={item.task.key}
+                      name={item.task.label}
+                      stroke={item.task.color}
+                      strokeWidth={isFocused ? 3.2 : (isHovered ? 2.8 : 2.0)}
+                      strokeOpacity={
+                        activePingTaskId === 'all'
+                          ? (hoveredPingTaskId !== null ? (isHovered ? 1 : 0.22) : 1)
+                          : 1
+                      }
+                      dot={false}
+                      activeDot={false}
+                      connectNulls={true}
+                      isAnimationActive={false}
+                      style={{
+                        cursor: 'pointer',
+                        pointerEvents: 'stroke',
+                        transition: 'stroke-width 0.15s ease, stroke-opacity 0.15s ease',
+                      }}
+                      onMouseEnter={() => setHoveredPingTaskId(item.task.id)}
+                      onMouseLeave={() => setHoveredPingTaskId((curr) => (curr === item.task.id ? null : curr))}
+                      onClick={() => {
+                        setActivePingTaskId((curr) => (curr === item.task.id ? 'all' : item.task.id));
+                      }}
+                    />
                   );
                 })}
               </LineChart>
