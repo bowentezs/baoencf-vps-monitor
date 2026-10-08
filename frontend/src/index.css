@@ -4334,6 +4334,73 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
   max-width: 440px;
 }
 
+/* 🍏 方案 1：智能单线微胶囊浮窗 (Smart Single-Line Capsule) */
+.custom-ping-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-panel-solid) 92%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--gray-4);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  font-size: 11.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  z-index: 100;
+  transition: opacity 0.15s ease;
+}
+
+.custom-ping-capsule-time {
+  font-weight: 500;
+  color: var(--gray-11);
+  font-family: var(--code-font-family, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.custom-ping-capsule-divider {
+  color: var(--gray-7);
+  font-weight: 600;
+}
+
+.custom-ping-capsule-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.custom-ping-capsule-name {
+  font-weight: 600;
+  color: var(--gray-12);
+  font-size: 11.5px;
+}
+
+.custom-ping-capsule-value {
+  font-family: var(--code-font-family, ui-monospace, monospace);
+  font-weight: 700;
+  color: var(--gray-12);
+  font-size: 12px;
+}
+
+.custom-ping-capsule-value.is-loss {
+  color: var(--red-10);
+  font-weight: 700;
+}
+
+.custom-ping-capsule-loss-tag {
+  font-size: 10px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--red-9) 15%, transparent);
+  color: var(--red-10);
+  border-radius: 999px;
+  padding: 1px 6px;
+  margin-left: 2px;
+}
+
 .custom-ping-tooltip.is-single {
   max-width: 220px;
   min-width: 160px;

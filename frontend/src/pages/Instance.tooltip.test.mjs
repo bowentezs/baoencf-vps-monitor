@@ -45,6 +45,26 @@ function computeTooltipItems({
   };
 }
 
+function resolveCapsuleTargetItem({
+  items,
+  activeTaskId,
+  hoveredKey,
+}) {
+  const sortedItems = [...items].sort((a, b) => {
+    if (a.isLoss && !b.isLoss) return -1;
+    if (!a.isLoss && b.isLoss) return 1;
+    const valA = a.value ?? -1;
+    const valB = b.value ?? -1;
+    return valB - valA;
+  });
+
+  const targetItem = (activeTaskId !== 'all'
+    ? sortedItems.find((i) => i.id === activeTaskId)
+    : (hoveredKey ? sortedItems.find((i) => i.key === hoveredKey) : null)) || sortedItems[0];
+
+  return targetItem;
+}
+
 const mockSeries = [
   { task: { id: 1, key: 'ah_mobile', label: 'AH 移动', color: '#ec4899' } },
   { task: { id: 2, key: 'ah_telecom', label: 'AH 电信', color: '#f59e0b' } },
@@ -139,4 +159,33 @@ test('未知 activeTaskId 容错：安全降级为全量对比而不崩溃', () 
   });
 
   assert.equal(result.sortedItems.length, 5);
+});
+
+test('单线胶囊模式：精准定位悬停线路或最关键丢包线路', () => {
+  const items = mockSeries.map(s => ({
+    id: s.task.id,
+    key: s.task.key,
+    label: s.task.label,
+    color: s.task.color,
+    value: mockRow[s.task.key],
+    isLoss: Boolean(mockRow[`${s.task.key}_loss`]),
+  }));
+
+  // 1. 悬停特定线路时，胶囊精准展示该线路
+  const hoveredTarget = resolveCapsuleTargetItem({
+    items,
+    activeTaskId: 'all',
+    hoveredKey: 'ah_mobile',
+  });
+  assert.equal(hoveredTarget.label, 'AH 移动');
+  assert.equal(hoveredTarget.value, 216);
+
+  // 2. 未悬停时，胶囊优先展示发生丢包的故障线路
+  const defaultTarget = resolveCapsuleTargetItem({
+    items,
+    activeTaskId: 'all',
+    hoveredKey: null,
+  });
+  assert.equal(defaultTarget.label, 'ZJ 移动');
+  assert.equal(defaultTarget.isLoss, true);
 });
