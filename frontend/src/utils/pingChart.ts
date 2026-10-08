@@ -331,13 +331,27 @@ export function getPingYAxisDomain(series: PingTaskSeries[]): [number, number] {
   const values = getPingValues(series);
   if (values.length === 0) return [0, 100];
 
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min;
+  const validValues = values.filter((v) => Number.isFinite(v) && v >= 0);
+  if (validValues.length === 0) return [0, 100];
+
+  const min = Math.min(...validValues);
+  const rawMax = Math.max(...validValues);
+
+  // 离群毛刺抑制：计算 95% 分位数，若偶发极端突刺远超常态水平，自适应收敛 Y 轴上限
+  let effectiveMax = rawMax;
+  if (validValues.length >= 8) {
+    const sorted = [...validValues].sort((a, b) => a - b);
+    const p95 = sorted[Math.floor(sorted.length * 0.95)];
+    if (rawMax > p95 * 2.2 && p95 >= 30) {
+      effectiveMax = Math.min(rawMax, Math.max(Math.ceil(p95 * 2.0), 120));
+    }
+  }
+
+  const range = effectiveMax - min;
   const step = niceStep(range);
 
   let lower = min <= 50 ? 0 : Math.max(0, Math.floor((min - step * 0.8) / step) * step);
-  let upper = Math.ceil((max + step * 0.6) / step) * step;
+  let upper = Math.ceil((effectiveMax + step * 0.5) / step) * step;
 
   if (upper - lower < step * 2) {
     upper = lower + step * 2;

@@ -89,24 +89,128 @@ const timeRangePointLimit: Record<TimeRange, number> = {
 
 const monitorChartMargin = { top: 12, right: 16, bottom: 4, left: 4 };
 const monitorChartHeight = 296;
-const pingChartHeight = 210;
+const pingChartHeight = 260;
 const dailyTrafficChartHeight = 256;
 
+interface CustomPingTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: unknown;
+    color?: string;
+    payload: Record<string, unknown>;
+  }>;
+  label?: unknown;
+  orderedSeries: PingTaskSeries[];
+  timeFormatter: (value: unknown) => string;
+  hoveredKey: string | null;
+  onHoverKey: (key: string | null) => void;
+}
+
+function CustomPingTooltip({
+  active,
+  payload,
+  label,
+  orderedSeries,
+  timeFormatter,
+  hoveredKey,
+  onHoverKey,
+}: CustomPingTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const row = payload[0]?.payload as Record<string, unknown> | undefined;
+  if (!row) return null;
+
+  const timeLabel = timeFormatter(label);
+
+  const items = orderedSeries.map((item) => {
+    const rawVal = row[item.task.key];
+    const isLoss = Boolean(row[`${item.task.key}_loss`]);
+    const numVal = typeof rawVal === 'number' && Number.isFinite(rawVal) ? rawVal : null;
+    return {
+      id: item.task.id,
+      key: item.task.key,
+      label: item.task.label,
+      color: item.task.color,
+      value: numVal,
+      isLoss: isLoss || (rawVal === null && row[item.task.key] !== undefined),
+      hasData: item.task.key in row,
+    };
+  }).filter((item) => item.hasData);
+
+  if (items.length === 0) return null;
+
+  const sortedItems = [...items].sort((a, b) => {
+    if (a.isLoss && !b.isLoss) return -1;
+    if (!a.isLoss && b.isLoss) return 1;
+    const valA = a.value ?? -1;
+    const valB = b.value ?? -1;
+    return valB - valA;
+  });
+
+  const isMulti = sortedItems.length > 4;
+
+  return (
+    <div className="custom-ping-tooltip">
+      <div className="custom-ping-tooltip-header">
+        <span>{timeLabel}</span>
+        <span className="custom-ping-tooltip-header-hint">
+          {sortedItems.some((i) => i.isLoss) ? '⚠️ 存在丢包 / 超时' : `${sortedItems.length} 线路数据`}
+        </span>
+      </div>
+      <div className={`custom-ping-tooltip-grid${isMulti ? ' is-multi' : ''}`}>
+        {sortedItems.map((item) => {
+          const isItemHovered = hoveredKey === item.key;
+          return (
+            <div
+              key={item.key}
+              className={`custom-ping-tooltip-item${item.isLoss ? ' is-loss' : ''}${isItemHovered ? ' is-hovered' : ''}`}
+              onMouseEnter={() => onHoverKey(item.key)}
+              onMouseLeave={() => onHoverKey(null)}
+            >
+              <div className="custom-ping-tooltip-name-wrap">
+                <span
+                  className="custom-ping-tooltip-dot"
+                  style={{
+                    backgroundColor: item.color,
+                    boxShadow: item.isLoss ? '0 0 6px var(--red-9)' : undefined,
+                  }}
+                />
+                <span className="custom-ping-tooltip-label" title={item.label}>
+                  {item.label}
+                </span>
+              </div>
+              <span className={`custom-ping-tooltip-value${item.isLoss ? ' is-loss' : ''}`}>
+                {item.isLoss ? '丢包 🔴' : item.value !== null ? formatPingMs(item.value) : '-'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 interface SortablePingCardProps {
   item: PingTaskSeries;
   isFocused: boolean;
   isDimmed: boolean;
+  isHovered?: boolean;
   canSort?: boolean;
   onFocusToggle: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
 function SortablePingCard({
   item,
   isFocused,
   isDimmed,
+  isHovered = false,
   canSort = false,
   onFocusToggle,
+  onMouseEnter,
+  onMouseLeave,
 }: SortablePingCardProps) {
   const {
     attributes,
@@ -138,9 +242,11 @@ function SortablePingCard({
   return (
     <div
       ref={setNodeRef}
-      className={`instance-ping-card${isFocused ? ' is-active' : ''}${isDimmed ? ' is-dimmed' : ''}${isDragging ? ' is-dragging' : ''}`}
+      className={`instance-ping-card${isFocused ? ' is-active' : ''}${isDimmed ? ' is-dimmed' : ''}${isHovered ? ' is-hovered' : ''}${isDragging ? ' is-dragging' : ''}`}
       style={style}
       onClick={onFocusToggle}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       title={`点击${isFocused ? '取消聚焦' : '聚焦查看'}此线路走势${sortHint}\n${item.task.type} ${item.task.target}\n探测 ${quality.totalPackets} 次，丢包 ${quality.lostPackets} 次\n延迟区间: ${quality.minLatency ?? '-'} ~ ${quality.maxLatency ?? '-'} ms (基准中位: ${quality.medianLatency ?? '-'} ms)`}
       {...(canSort ? attributes : {})}
       {...(canSort ? listeners : {})}
@@ -207,109 +313,6 @@ function SortablePingCard({
   );
 }
 
-interface PingTooltipContentProps {
-  active?: boolean;
-  payload?: Array<{
-    name?: string;
-    value?: unknown;
-    color?: string;
-    dataKey?: string | number;
-    payload?: Record<string, unknown>;
-  }>;
-  label?: unknown;
-  orderedPingSeries: PingTaskSeries[];
-  activePingTaskId: number | 'all';
-  hoveredPingTaskId: number | null;
-  timeFormatter: (val: unknown) => string;
-  onSelectTask: (id: number) => void;
-  onHoverTask: (id: number | null) => void;
-}
-
-function PingChartTooltipContent({
-  active,
-  payload,
-  label,
-  orderedPingSeries,
-  activePingTaskId,
-  hoveredPingTaskId,
-  timeFormatter,
-  onSelectTask,
-  onHoverTask,
-}: PingTooltipContentProps) {
-  if (!active || !payload || payload.length === 0) return null;
-
-  const focusedTaskId = hoveredPingTaskId ?? (activePingTaskId !== 'all' ? activePingTaskId : null);
-  const rowData = (payload[0]?.payload || {}) as Record<string, unknown>;
-
-  // 建立当前时刻各线路采样值映射
-  const payloadValueMap = new Map<string, unknown>();
-  for (const entry of payload) {
-    if (entry.dataKey && !payloadValueMap.has(String(entry.dataKey))) {
-      payloadValueMap.set(String(entry.dataKey), entry.value);
-    }
-  }
-
-  // 严格以 orderedPingSeries 为唯一真理源，绝无重复项，顺序与卡片一致
-  const displaySeries = activePingTaskId === 'all'
-    ? orderedPingSeries
-    : orderedPingSeries.filter((s) => s.task.id === activePingTaskId);
-
-  return (
-    <div className="instance-ping-custom-tooltip">
-      <div className="instance-ping-tooltip-header">
-        <span className="instance-ping-tooltip-time">{timeFormatter(label)}</span>
-        {focusedTaskId !== null && (
-          <span className="instance-ping-tooltip-focus-tag">
-            {activePingTaskId !== 'all' ? '单独显示中' : '高亮对应地区'}
-          </span>
-        )}
-      </div>
-      <div className="instance-ping-tooltip-list">
-        {displaySeries.map((taskItem) => {
-          const rawVal = payloadValueMap.has(taskItem.task.key)
-            ? payloadValueMap.get(taskItem.task.key)
-            : rowData[taskItem.task.key];
-          const isLoss = Boolean(rowData[`${taskItem.task.key}_loss`]);
-          const isCurrentFocused = focusedTaskId === taskItem.task.id;
-          const isDimmed = focusedTaskId !== null && !isCurrentFocused;
-
-          const valueDisplay = isLoss
-            ? '丢包 / 超时 🔴'
-            : (rawVal === null || rawVal === undefined || Number(rawVal) < 0)
-              ? '无采样'
-              : formatPingMs(Number(rawVal));
-
-          return (
-            <div
-              key={taskItem.task.key}
-              className={`instance-ping-tooltip-row${isCurrentFocused ? ' is-focused' : ''}${isDimmed ? ' is-dimmed' : ''}`}
-              style={{
-                ['--item-color' as string]: taskItem.task.color,
-              }}
-              onMouseEnter={() => onHoverTask(taskItem.task.id)}
-              onMouseLeave={() => onHoverTask(null)}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectTask(taskItem.task.id);
-              }}
-              title={`点击${isCurrentFocused && activePingTaskId === taskItem.task.id ? '恢复全网对比' : '单独高亮显示'}「${taskItem.task.label}」折线`}
-            >
-              <div className="instance-ping-tooltip-label-wrap">
-                <span
-                  className="instance-ping-tooltip-dot"
-                  style={{ backgroundColor: taskItem.task.color }}
-                />
-                <span className="instance-ping-tooltip-name">{taskItem.task.label}</span>
-              </div>
-              <span className="instance-ping-tooltip-val">{valueDisplay}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function historyQuery(params: Record<string, string | number | undefined>): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -336,7 +339,7 @@ export default function Instance() {
   const [pingError, setPingError] = useState<string | null>(null);
   const [pingTimeRange, setPingTimeRange] = useState<PingTimeRange>('1h');
   const [activePingTaskId, setActivePingTaskId] = useState<number | 'all'>('all');
-  const [hoveredPingTaskId, setHoveredPingTaskId] = useState<number | null>(null);
+  const [hoveredPingKey, setHoveredPingKey] = useState<string | null>(null);
   const [shouldLoadPing, setShouldLoadPing] = useState(false);
   const [gpuRecords, setGpuRecords] = useState<PublicGpuRecord[]>([]);
   const [trafficRangeDays, setTrafficRangeDays] = useState<TrafficRangeDays>(7);
@@ -521,7 +524,6 @@ export default function Instance() {
     setPingError(null);
     setPingLoading(false);
     setActivePingTaskId('all');
-    setHoveredPingTaskId(null);
   }, [uuid]);
 
   useEffect(() => {
@@ -1087,7 +1089,7 @@ export default function Instance() {
               <LineChart
                 data={pingChartRows}
                 margin={monitorChartMargin}
-                onMouseLeave={() => setHoveredPingTaskId(null)}
+                onMouseLeave={() => setHoveredPingKey(null)}
               >
                 <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
                 <XAxis
@@ -1108,50 +1110,32 @@ export default function Instance() {
                 />
                 <Tooltip
                   content={
-                    <PingChartTooltipContent
-                      orderedPingSeries={orderedPingSeries}
-                      activePingTaskId={activePingTaskId}
-                      hoveredPingTaskId={hoveredPingTaskId}
+                    <CustomPingTooltip
+                      orderedSeries={orderedPingSeries}
                       timeFormatter={pingChartTimeFormatter}
-                      onSelectTask={(id) => setActivePingTaskId(activePingTaskId === id ? 'all' : id)}
-                      onHoverTask={(id) => setHoveredPingTaskId(id)}
+                      hoveredKey={hoveredPingKey}
+                      onHoverKey={setHoveredPingKey}
                     />
                   }
-                  wrapperStyle={{ pointerEvents: 'auto' }}
                 />
                 {orderedPingSeries.map((item) => {
                   const isVisible = activePingTaskId === 'all' || activePingTaskId === item.task.id;
                   if (!isVisible) return null;
                   const isFocused = activePingTaskId === item.task.id;
-                  const isHovered = hoveredPingTaskId === item.task.id;
-
+                  const isHovered = hoveredPingKey === item.task.key;
+                  const isOtherHovered = hoveredPingKey !== null && !isHovered;
                   return (
                     <Line
                       key={item.task.key}
-                      type="monotone"
+                      type="linear"
                       dataKey={item.task.key}
                       name={item.task.label}
                       stroke={item.task.color}
-                      strokeWidth={isFocused ? 3.2 : (isHovered ? 2.8 : 2.0)}
-                      strokeOpacity={
-                        activePingTaskId === 'all'
-                          ? (hoveredPingTaskId !== null ? (isHovered ? 1 : 0.22) : 1)
-                          : 1
-                      }
+                      strokeWidth={isHovered ? 2.8 : isFocused ? 2.4 : 1.6}
+                      strokeOpacity={isOtherHovered ? 0.18 : 1}
                       dot={false}
-                      activeDot={false}
-                      connectNulls={true}
+                      connectNulls={false}
                       isAnimationActive={false}
-                      style={{
-                        cursor: 'pointer',
-                        pointerEvents: 'stroke',
-                        transition: 'stroke-width 0.15s ease, stroke-opacity 0.15s ease',
-                      }}
-                      onMouseEnter={() => setHoveredPingTaskId(item.task.id)}
-                      onMouseLeave={() => setHoveredPingTaskId((curr) => (curr === item.task.id ? null : curr))}
-                      onClick={() => {
-                        setActivePingTaskId((curr) => (curr === item.task.id ? 'all' : item.task.id));
-                      }}
                     />
                   );
                 })}
@@ -1183,7 +1167,10 @@ export default function Instance() {
                         item={item}
                         isFocused={isFocused}
                         isDimmed={isDimmed}
+                        isHovered={hoveredPingKey === item.task.key}
                         canSort={isAuthenticated}
+                        onMouseEnter={() => setHoveredPingKey(item.task.key)}
+                        onMouseLeave={() => setHoveredPingKey(null)}
                         onFocusToggle={() => {
                           if (isDraggingPingRef.current) return;
                           setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id);
