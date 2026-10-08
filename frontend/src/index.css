@@ -4419,6 +4419,43 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
   font-size: 11px;
 }
 
+/* 地区卡片自适应视口容器（防遮挡上方折线图） */
+.instance-ping-cards-scroll-wrap {
+  width: 100%;
+  position: relative;
+  transition: max-height 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.instance-ping-cards-scroll-wrap:not(.is-expanded) {
+  max-height: 246px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  padding-bottom: 2px;
+}
+
+.instance-ping-cards-scroll-wrap.is-expanded {
+  max-height: none;
+  overflow: visible;
+}
+
+.instance-ping-cards-scroll-wrap::-webkit-scrollbar {
+  width: 5px;
+}
+
+.instance-ping-cards-scroll-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.instance-ping-cards-scroll-wrap::-webkit-scrollbar-thumb {
+  background: var(--gray-a4);
+  border-radius: 999px;
+}
+
+.instance-ping-cards-scroll-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-a7);
+}
+
 .instance-ping-series-grid,
 .instance-ping-daily-grid {
   display: grid;
