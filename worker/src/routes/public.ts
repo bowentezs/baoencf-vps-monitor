@@ -1568,7 +1568,7 @@ publicRoutes.get('/records/gpu', async (c) => {
   const uuid = c.req.query('uuid');
   const start = c.req.query('start');
   const end = c.req.query('end');
-  const limit = readIntParam(c.req.query('limit'), 100, 500);
+  const limit = readIntParam(c.req.query('limit'), 100, 1000);
 
   if (!uuid) {
     return c.json({ error: '缺少 uuid 参数' }, 400);
@@ -1584,7 +1584,7 @@ publicRoutes.get('/records/gpu', async (c) => {
   if (prepared.response) return prepared.response;
   if (!prepared.visible) {
     if (wantsPagedResponse(c)) {
-      const params = readPublicHistoryPageParams(c, 100, 500);
+      const params = readPublicHistoryPageParams(c, 100, 1000);
       if ('response' in params) return params.response;
       return publicHistoryResult(c, prepared, emptyPagedResult(params.page, params.limit));
     }
@@ -1597,7 +1597,7 @@ publicRoutes.get('/records/gpu', async (c) => {
     if (cursorParam.cursor) {
       return publicHistoryResult(c, prepared, await db.getGPURecordsCursor(database, uuid, start, end, cursorParam.cursor, limit));
     }
-    const params = readPublicHistoryPageParams(c, 100, 500);
+    const params = readPublicHistoryPageParams(c, 100, 1000);
     if ('response' in params) return params.response;
     return publicHistoryResult(c, prepared, await db.getGPURecordsPaged(database, uuid, start, end, params.page, params.limit));
   }

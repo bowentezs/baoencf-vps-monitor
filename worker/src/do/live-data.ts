@@ -1602,7 +1602,7 @@ export class LiveDataDO {
 
   private websiteProbeResultsFromReport(report: JsonObject): JsonObject[] {
     const results = report.website_probe_results;
-    return Array.isArray(results) ? results.slice(0, 50).filter(isObjectPayload) : [];
+    return Array.isArray(results) ? results.slice(0, 256).filter(isObjectPayload) : [];
   }
 
   private async persistWebsiteProbeResultsFromReport(clientId: string, report: JsonObject, nowMs: number): Promise<void> {
