@@ -105,6 +105,7 @@ interface CustomPingTooltipProps {
   timeFormatter: (value: unknown) => string;
   hoveredKey: string | null;
   activeTaskId: number | 'all';
+  tooltipStyle?: 'capsule' | 'full';
   onHoverKey: (key: string | null) => void;
   onSelectTaskId?: (id: number) => void;
 }
@@ -117,6 +118,7 @@ function CustomPingTooltip({
   timeFormatter,
   hoveredKey,
   activeTaskId,
+  tooltipStyle = 'capsule',
   onHoverKey,
   onSelectTaskId,
 }: CustomPingTooltipProps) {
@@ -127,15 +129,7 @@ function CustomPingTooltip({
 
   const timeLabel = timeFormatter(label);
 
-  // 1. 若处于单线路聚焦状态（activeTaskId !== 'all'），严格仅展示该聚焦线路；
-  // 2. 否则全网对比模式下展示全量线路对比。
-  const targetSeries = activeTaskId !== 'all'
-    ? orderedSeries.filter((item) => item.task.id === activeTaskId)
-    : orderedSeries;
-
-  const effectiveSeries = targetSeries.length > 0 ? targetSeries : orderedSeries;
-
-  const items = effectiveSeries.map((item) => {
+  const items = orderedSeries.map((item) => {
     const rawVal = row[item.task.key];
     const isLoss = Boolean(row[`${item.task.key}_loss`]);
     const numVal = typeof rawVal === 'number' && Number.isFinite(rawVal) ? rawVal : null;
@@ -152,7 +146,7 @@ function CustomPingTooltip({
 
   if (items.length === 0) return null;
 
-  // 🛡️ 静态稳定排序：绝对禁止因 hover 动态调整元素索引，杜绝鼠标下方布局位移引发的死循环闪烁
+  // 🛡️ 静态稳定排序：丢包优先，然后按延迟降序排列（绝不因 hover 动态改动数组，根除闪烁）
   const sortedItems = [...items].sort((a, b) => {
     if (a.isLoss && !b.isLoss) return -1;
     if (!a.isLoss && b.isLoss) return 1;
@@ -161,31 +155,66 @@ function CustomPingTooltip({
     return valB - valA;
   });
 
-  const isSingle = sortedItems.length === 1;
+  const isCapsule = tooltipStyle === 'capsule' || activeTaskId !== 'all';
+
+  // 🍏 方案 1：极简单线微胶囊模式（顶部悬浮，彻底 0 遮挡折线波形）
+  if (isCapsule) {
+    const targetItem = (activeTaskId !== 'all'
+      ? sortedItems.find((i) => i.id === activeTaskId)
+      : (hoveredKey ? sortedItems.find((i) => i.key === hoveredKey) : null)) || sortedItems[0];
+
+    if (!targetItem) return null;
+
+    const lossCount = sortedItems.filter((i) => i.isLoss).length;
+    const extraLossCount = targetItem.isLoss ? lossCount - 1 : lossCount;
+
+    return (
+      <div className="custom-ping-capsule">
+        <span className="custom-ping-capsule-time">{timeLabel}</span>
+        <span className="custom-ping-capsule-divider">·</span>
+        <div className="custom-ping-capsule-target">
+          <span
+            className="custom-ping-tooltip-dot"
+            style={{
+              backgroundColor: targetItem.color,
+              boxShadow: targetItem.isLoss ? '0 0 8px var(--red-9)' : `0 0 6px ${targetItem.color}80`,
+            }}
+          />
+          <span className="custom-ping-capsule-name">{targetItem.label}</span>
+        </div>
+        <span className={`custom-ping-capsule-value${targetItem.isLoss ? ' is-loss' : ''}`}>
+          {targetItem.isLoss ? '丢包 🔴' : `${Math.round(targetItem.value ?? 0)} ms`}
+        </span>
+        {activeTaskId === 'all' && extraLossCount > 0 && (
+          <span className="custom-ping-capsule-loss-tag" title="此采样点还有其他线路丢包">
+            +{extraLossCount}丢包
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // 全网清单对比视图（固定展示，不遮挡时使用）
   const isMulti = sortedItems.length > 4;
 
   return (
-    <div className={`custom-ping-tooltip${isSingle ? ' is-single' : ''}`}>
+    <div className="custom-ping-tooltip">
       <div className="custom-ping-tooltip-header">
         <span>{timeLabel}</span>
         {sortedItems.some((i) => i.isLoss) ? (
           <span className="custom-ping-tooltip-header-hint" style={{ color: 'var(--red-10)', fontWeight: 600 }}>
-            ⚠️ 存在丢包
-          </span>
-        ) : isSingle && activeTaskId !== 'all' ? (
-          <span className="custom-ping-tooltip-header-hint">
-            聚焦单线
+            ⚠️ 存在丢包 · 点击线路可聚焦
           </span>
         ) : (
           <span className="custom-ping-tooltip-header-hint">
-            点击线路可聚焦
+            点击线路可单独聚焦
           </span>
         )}
       </div>
       <div className={`custom-ping-tooltip-grid${isMulti ? ' is-multi' : ''}`}>
         {sortedItems.map((item) => {
           const isItemHovered = hoveredKey === item.key;
-          const isItemFocused = activeTaskId === item.id;
+          const isItemFocused = typeof activeTaskId === 'number' && activeTaskId === item.id;
           return (
             <div
               key={item.key}
@@ -370,6 +399,15 @@ export default function Instance() {
   const [pingTimeRange, setPingTimeRange] = useState<PingTimeRange>('1h');
   const [activePingTaskId, setActivePingTaskId] = useState<number | 'all'>('all');
   const [hoveredPingKey, setHoveredPingKey] = useState<string | null>(null);
+  const [pingTooltipStyle, setPingTooltipStyle] = useState<'capsule' | 'full'>(() => {
+    const saved = getLocalStorageItem('instancePingTooltipStyle');
+    return saved === 'full' ? 'full' : 'capsule';
+  });
+
+  const handlePingTooltipStyleChange = (style: 'capsule' | 'full') => {
+    setPingTooltipStyle(style);
+    setLocalStorageItem('instancePingTooltipStyle', style);
+  };
   const [shouldLoadPing, setShouldLoadPing] = useState(false);
   const [gpuRecords, setGpuRecords] = useState<PublicGpuRecord[]>([]);
   const [trafficRangeDays, setTrafficRangeDays] = useState<TrafficRangeDays>(7);
@@ -1062,6 +1100,14 @@ export default function Instance() {
               <SegmentedControl.Item value="24h">24小时</SegmentedControl.Item>
               <SegmentedControl.Item value="3d">3天</SegmentedControl.Item>
             </SegmentedControl.Root>
+            <SegmentedControl.Root
+              size="1"
+              value={pingTooltipStyle}
+              onValueChange={(val) => handlePingTooltipStyleChange(val as 'capsule' | 'full')}
+            >
+              <SegmentedControl.Item value="capsule" title="智能微胶囊：顶部悬浮，彻底不遮挡折线波形">单线胶囊</SegmentedControl.Item>
+              <SegmentedControl.Item value="full" title="全网清单：展示全部地区完整对比列表">全网清单</SegmentedControl.Item>
+            </SegmentedControl.Root>
           </Flex>
           <Flex align="center" gap="3" wrap="wrap">
             {activePingTaskId !== 'all' && (
@@ -1141,13 +1187,15 @@ export default function Instance() {
                       tick={<PingYAxisTick />}
                     />
                     <Tooltip
-                      wrapperStyle={{ pointerEvents: 'auto' }}
+                      wrapperStyle={{ pointerEvents: pingTooltipStyle === 'capsule' ? 'none' : 'auto', zIndex: 100 }}
+                      position={pingTooltipStyle === 'capsule' || activePingTaskId !== 'all' ? { y: 2 } : undefined}
                       content={
                         <CustomPingTooltip
                           orderedSeries={orderedPingSeries}
                           timeFormatter={pingChartTimeFormatter}
                           hoveredKey={hoveredPingKey}
                           activeTaskId={activePingTaskId}
+                          tooltipStyle={pingTooltipStyle}
                           onHoverKey={setHoveredPingKey}
                           onSelectTaskId={(id) => setActivePingTaskId(id)}
                         />
