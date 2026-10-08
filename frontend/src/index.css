@@ -4419,41 +4419,73 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
   font-size: 11px;
 }
 
-/* 地区卡片自适应视口容器（防遮挡上方折线图） */
-.instance-ping-cards-scroll-wrap {
+/* Ping 延迟主布局：宽屏桌面端左右两栏并排，彻底根除折线图被下方多地区顶出视口遮挡 */
+.instance-ping-main-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
   width: 100%;
-  position: relative;
-  transition: max-height 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  align-items: start;
 }
 
-.instance-ping-cards-scroll-wrap:not(.is-expanded) {
-  max-height: 246px;
+@media (min-width: 1080px) {
+  .instance-ping-main-layout {
+    grid-template-columns: minmax(0, 1.45fr) minmax(360px, 1fr);
+    gap: 16px;
+  }
+}
+
+.instance-ping-chart-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.instance-ping-cards-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-height: 326px; /* 精确对应左侧折线图 (260px) + 心跳条 (45px) + 间距等高 */
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;
   padding-bottom: 2px;
 }
 
-.instance-ping-cards-scroll-wrap.is-expanded {
-  max-height: none;
-  overflow: visible;
-}
-
-.instance-ping-cards-scroll-wrap::-webkit-scrollbar {
+.instance-ping-cards-pane::-webkit-scrollbar {
   width: 5px;
 }
 
-.instance-ping-cards-scroll-wrap::-webkit-scrollbar-track {
+.instance-ping-cards-pane::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.instance-ping-cards-scroll-wrap::-webkit-scrollbar-thumb {
+.instance-ping-cards-pane::-webkit-scrollbar-thumb {
   background: var(--gray-a4);
   border-radius: 999px;
 }
 
-.instance-ping-cards-scroll-wrap::-webkit-scrollbar-thumb:hover {
+.instance-ping-cards-pane::-webkit-scrollbar-thumb:hover {
   background: var(--gray-a7);
+}
+
+@media (min-width: 1080px) {
+  .instance-ping-cards-pane .instance-ping-series-grid {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 8px;
+  }
+
+  .instance-ping-cards-pane .instance-ping-card {
+    padding: 10px 12px;
+    min-height: 96px;
+  }
+}
+
+@media (max-width: 1079px) {
+  .instance-ping-cards-pane {
+    max-height: 246px; /* 窄屏上下堆叠时限高 2 行 */
+  }
 }
 
 .instance-ping-series-grid,

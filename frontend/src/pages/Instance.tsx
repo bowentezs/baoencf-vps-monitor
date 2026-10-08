@@ -349,17 +349,6 @@ export default function Instance() {
     const saved = getLocalStorageItem('instancePingScaleMode');
     return saved === 'full' ? 'full' : 'normal';
   });
-  const [isPingCardsExpanded, setIsPingCardsExpanded] = useState<boolean>(() => {
-    return getLocalStorageItem('instancePingCardsExpanded') === 'true';
-  });
-
-  const togglePingCardsExpanded = () => {
-    setIsPingCardsExpanded((prev) => {
-      const next = !prev;
-      setLocalStorageItem('instancePingCardsExpanded', String(next));
-      return next;
-    });
-  };
   const [shouldLoadPing, setShouldLoadPing] = useState(false);
   const [gpuRecords, setGpuRecords] = useState<PublicGpuRecord[]>([]);
   const [trafficRangeDays, setTrafficRangeDays] = useState<TrafficRangeDays>(7);
@@ -1068,18 +1057,6 @@ export default function Instance() {
             >
               {pingScaleMode === 'normal' ? '🎯 聚焦常态' : '🔍 完整极值'}
             </Button>
-            {orderedPingSeries.length > 4 && (
-              <Button
-                size="1"
-                variant="soft"
-                color={isPingCardsExpanded ? 'indigo' : 'gray'}
-                onClick={togglePingCardsExpanded}
-                title={isPingCardsExpanded ? '点击收起为紧凑双行视口，防止遮挡上方折线图' : '点击展开全部地区卡片'}
-                style={{ cursor: 'pointer', fontSize: '11px', height: '24px', padding: '0 8px' }}
-              >
-                {isPingCardsExpanded ? '收起紧凑' : `展开全部 (${orderedPingSeries.length})`}
-              </Button>
-            )}
             {activePingTaskId !== 'all' && (
               <Button
                 size="1"
@@ -1131,107 +1108,111 @@ export default function Instance() {
           </Text>
         ) : (
           <>
-            <ResponsiveContainer width="100%" height={pingChartHeight}>
-              <LineChart
-                data={pingChartRows}
-                margin={monitorChartMargin}
-                onMouseLeave={() => setHoveredPingKey(null)}
-              >
-                <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
-                <XAxis
-                  dataKey="time"
-                  type="number"
-                  domain={pingXAxisDomain}
-                  tickFormatter={pingChartTimeFormatter}
-                  fontSize={12}
-                  minTickGap={28}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  {...pingYAxisProps}
-                  domain={pingYAxisDomain}
-                  allowDecimals={false}
-                  tick={<PingYAxisTick />}
-                />
-                <Tooltip
-                  wrapperStyle={{ pointerEvents: 'auto' }}
-                  content={
-                    <CustomPingTooltip
-                      orderedSeries={orderedPingSeries}
-                      timeFormatter={pingChartTimeFormatter}
-                      hoveredKey={hoveredPingKey}
-                      activeTaskId={activePingTaskId}
-                      onHoverKey={setHoveredPingKey}
+            <div className="instance-ping-main-layout">
+              <div className="instance-ping-chart-pane">
+                <ResponsiveContainer width="100%" height={pingChartHeight}>
+                  <LineChart
+                    data={pingChartRows}
+                    margin={monitorChartMargin}
+                    onMouseLeave={() => setHoveredPingKey(null)}
+                  >
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis
+                      dataKey="time"
+                      type="number"
+                      domain={pingXAxisDomain}
+                      tickFormatter={pingChartTimeFormatter}
+                      fontSize={12}
+                      minTickGap={28}
+                      tickLine={false}
+                      axisLine={false}
                     />
-                  }
-                />
-                {orderedPingSeries.map((item) => {
-                  const isVisible = activePingTaskId === 'all' || activePingTaskId === item.task.id;
-                  if (!isVisible) return null;
-                  const isFocused = activePingTaskId === item.task.id;
-                  const isHovered = hoveredPingKey === item.task.key;
-                  const isOtherHovered = hoveredPingKey !== null && !isHovered;
-                  return (
-                    <Line
-                      key={item.task.key}
-                      type="linear"
-                      dataKey={item.task.key}
-                      name={item.task.label}
-                      stroke={item.task.color}
-                      strokeWidth={isHovered ? 3.0 : isFocused ? 2.5 : 1.6}
-                      strokeOpacity={isOtherHovered ? 0.15 : 1}
-                      dot={false}
-                      activeDot={false}
-                      connectNulls={true}
-                      isAnimationActive={false}
+                    <YAxis
+                      {...pingYAxisProps}
+                      domain={pingYAxisDomain}
+                      allowDecimals={false}
+                      tick={<PingYAxisTick />}
                     />
-                  );
-                })}
-              </LineChart>
-            </ResponsiveContainer>
-
-            <PingHeartbeatBar
-              series={orderedPingSeries}
-              activeTaskId={activePingTaskId}
-              rangeHours={pingTimeRangeHours[pingTimeRange]}
-            />
-
-            <DndContext
-              sensors={pingSensors}
-              collisionDetection={closestCenter}
-              onDragStart={handlePingDragStart}
-              onDragEnd={handlePingDragEnd}
-              onDragCancel={handlePingDragCancel}
-            >
-              <div className={`instance-ping-cards-scroll-wrap${isPingCardsExpanded ? ' is-expanded' : ''}`}>
-                <SortableContext items={sortableTaskIds} strategy={rectSortingStrategy}>
-                  <div className="instance-ping-series-grid">
+                    <Tooltip
+                      wrapperStyle={{ pointerEvents: 'auto' }}
+                      content={
+                        <CustomPingTooltip
+                          orderedSeries={orderedPingSeries}
+                          timeFormatter={pingChartTimeFormatter}
+                          hoveredKey={hoveredPingKey}
+                          activeTaskId={activePingTaskId}
+                          onHoverKey={setHoveredPingKey}
+                        />
+                      }
+                    />
                     {orderedPingSeries.map((item) => {
+                      const isVisible = activePingTaskId === 'all' || activePingTaskId === item.task.id;
+                      if (!isVisible) return null;
                       const isFocused = activePingTaskId === item.task.id;
-                      const isDimmed = activePingTaskId !== 'all' && !isFocused;
-
+                      const isHovered = hoveredPingKey === item.task.key;
+                      const isOtherHovered = hoveredPingKey !== null && !isHovered;
                       return (
-                        <SortablePingCard
+                        <Line
                           key={item.task.key}
-                          item={item}
-                          isFocused={isFocused}
-                          isDimmed={isDimmed}
-                          isHovered={hoveredPingKey === item.task.key}
-                          canSort={isAuthenticated}
-                          onMouseEnter={() => setHoveredPingKey(item.task.key)}
-                          onMouseLeave={() => setHoveredPingKey(null)}
-                          onFocusToggle={() => {
-                            if (isDraggingPingRef.current) return;
-                            setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id);
-                          }}
+                          type="linear"
+                          dataKey={item.task.key}
+                          name={item.task.label}
+                          stroke={item.task.color}
+                          strokeWidth={isHovered ? 3.0 : isFocused ? 2.5 : 1.6}
+                          strokeOpacity={isOtherHovered ? 0.15 : 1}
+                          dot={false}
+                          activeDot={false}
+                          connectNulls={true}
+                          isAnimationActive={false}
                         />
                       );
                     })}
-                  </div>
-                </SortableContext>
+                  </LineChart>
+                </ResponsiveContainer>
+
+                <PingHeartbeatBar
+                  series={orderedPingSeries}
+                  activeTaskId={activePingTaskId}
+                  rangeHours={pingTimeRangeHours[pingTimeRange]}
+                />
               </div>
-            </DndContext>
+
+              <div className="instance-ping-cards-pane">
+                <DndContext
+                  sensors={pingSensors}
+                  collisionDetection={closestCenter}
+                  onDragStart={handlePingDragStart}
+                  onDragEnd={handlePingDragEnd}
+                  onDragCancel={handlePingDragCancel}
+                >
+                  <SortableContext items={sortableTaskIds} strategy={rectSortingStrategy}>
+                    <div className="instance-ping-series-grid">
+                      {orderedPingSeries.map((item) => {
+                        const isFocused = activePingTaskId === item.task.id;
+                        const isDimmed = activePingTaskId !== 'all' && !isFocused;
+
+                        return (
+                          <SortablePingCard
+                            key={item.task.key}
+                            item={item}
+                            isFocused={isFocused}
+                            isDimmed={isDimmed}
+                            isHovered={hoveredPingKey === item.task.key}
+                            canSort={isAuthenticated}
+                            onMouseEnter={() => setHoveredPingKey(item.task.key)}
+                            onMouseLeave={() => setHoveredPingKey(null)}
+                            onFocusToggle={() => {
+                              if (isDraggingPingRef.current) return;
+                              setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id);
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </div>
+            </div>
           </>
         )}
       </Card>
