@@ -104,7 +104,9 @@ interface CustomPingTooltipProps {
   orderedSeries: PingTaskSeries[];
   timeFormatter: (value: unknown) => string;
   hoveredKey: string | null;
+  activeTaskId: number | 'all';
   onHoverKey: (key: string | null) => void;
+  onSelectTask?: (id: number) => void;
 }
 
 function CustomPingTooltip({
@@ -114,7 +116,9 @@ function CustomPingTooltip({
   orderedSeries,
   timeFormatter,
   hoveredKey,
+  activeTaskId,
   onHoverKey,
+  onSelectTask,
 }: CustomPingTooltipProps) {
   if (!active || !payload || payload.length === 0) return null;
 
@@ -155,18 +159,24 @@ function CustomPingTooltip({
       <div className="custom-ping-tooltip-header">
         <span>{timeLabel}</span>
         <span className="custom-ping-tooltip-header-hint">
-          {sortedItems.some((i) => i.isLoss) ? '⚠️ 存在丢包 / 超时' : `${sortedItems.length} 线路数据`}
+          {sortedItems.some((i) => i.isLoss) ? '⚠️ 存在丢包 · 点击可锁定单线' : '点击线路可锁定单线'}
         </span>
       </div>
       <div className={`custom-ping-tooltip-grid${isMulti ? ' is-multi' : ''}`}>
         {sortedItems.map((item) => {
           const isItemHovered = hoveredKey === item.key;
+          const isItemFocused = activeTaskId === item.id;
           return (
             <div
               key={item.key}
-              className={`custom-ping-tooltip-item${item.isLoss ? ' is-loss' : ''}${isItemHovered ? ' is-hovered' : ''}`}
+              className={`custom-ping-tooltip-item${item.isLoss ? ' is-loss' : ''}${isItemHovered ? ' is-hovered' : ''}${isItemFocused ? ' is-active' : ''}`}
               onMouseEnter={() => onHoverKey(item.key)}
               onMouseLeave={() => onHoverKey(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onSelectTask) onSelectTask(item.id);
+              }}
+              title={`点击${isItemFocused ? '取消锁定，恢复全网对比' : '单独锁定查看此线路'}`}
             >
               <div className="custom-ping-tooltip-name-wrap">
                 <span
@@ -340,6 +350,10 @@ export default function Instance() {
   const [pingTimeRange, setPingTimeRange] = useState<PingTimeRange>('1h');
   const [activePingTaskId, setActivePingTaskId] = useState<number | 'all'>('all');
   const [hoveredPingKey, setHoveredPingKey] = useState<string | null>(null);
+  const [pingScaleMode, setPingScaleMode] = useState<'normal' | 'full'>(() => {
+    const saved = getLocalStorageItem('instancePingScaleMode');
+    return saved === 'full' ? 'full' : 'normal';
+  });
   const [shouldLoadPing, setShouldLoadPing] = useState(false);
   const [gpuRecords, setGpuRecords] = useState<PublicGpuRecord[]>([]);
   const [trafficRangeDays, setTrafficRangeDays] = useState<TrafficRangeDays>(7);
@@ -696,7 +710,7 @@ export default function Instance() {
     : orderedPingSeries.filter((item) => item.task.id === activePingTaskId);
   const activeSeriesForDomain = visiblePingSeries.length > 0 ? visiblePingSeries : orderedPingSeries;
   const pingChartRows = buildPingChartRows(orderedPingSeries);
-  const pingYAxisDomain = getPingYAxisDomain(activeSeriesForDomain);
+  const pingYAxisDomain = getPingYAxisDomain(activeSeriesForDomain, pingScaleMode);
   const pingXAxisDomain = getPingTimeDomain(orderedPingSeries, pingTimeRangeHours[pingTimeRange]);
   const pingChartTimeFormatter = (value: unknown) => {
     const dateInput = typeof value === 'string' || typeof value === 'number' || value instanceof Date ? value : '';
@@ -1034,6 +1048,20 @@ export default function Instance() {
             </SegmentedControl.Root>
           </Flex>
           <Flex align="center" gap="3" wrap="wrap">
+            <Button
+              size="1"
+              variant="soft"
+              color={pingScaleMode === 'normal' ? 'blue' : 'gray'}
+              onClick={() => {
+                const next = pingScaleMode === 'normal' ? 'full' : 'normal';
+                setPingScaleMode(next);
+                setLocalStorageItem('instancePingScaleMode', next);
+              }}
+              title={pingScaleMode === 'normal' ? '当前已自动平滑极端突刺（聚焦常态波形），点击展开全量极值' : '当前展示完整全局极值，点击聚焦常态波形'}
+              style={{ cursor: 'pointer', fontSize: '11px', height: '24px', padding: '0 8px' }}
+            >
+              {pingScaleMode === 'normal' ? '🎯 聚焦常态' : '🔍 完整极值'}
+            </Button>
             {activePingTaskId !== 'all' && (
               <Button
                 size="1"
@@ -1109,12 +1137,15 @@ export default function Instance() {
                   tick={<PingYAxisTick />}
                 />
                 <Tooltip
+                  wrapperStyle={{ pointerEvents: 'auto' }}
                   content={
                     <CustomPingTooltip
                       orderedSeries={orderedPingSeries}
                       timeFormatter={pingChartTimeFormatter}
                       hoveredKey={hoveredPingKey}
+                      activeTaskId={activePingTaskId}
                       onHoverKey={setHoveredPingKey}
+                      onSelectTask={(id) => setActivePingTaskId(activePingTaskId === id ? 'all' : id)}
                     />
                   }
                 />
@@ -1131,11 +1162,13 @@ export default function Instance() {
                       dataKey={item.task.key}
                       name={item.task.label}
                       stroke={item.task.color}
-                      strokeWidth={isHovered ? 2.8 : isFocused ? 2.4 : 1.6}
-                      strokeOpacity={isOtherHovered ? 0.18 : 1}
+                      strokeWidth={isHovered ? 3.0 : isFocused ? 2.5 : 1.6}
+                      strokeOpacity={isOtherHovered ? 0.15 : 1}
                       dot={false}
-                      connectNulls={false}
+                      connectNulls={true}
                       isAnimationActive={false}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setActivePingTaskId(activePingTaskId === item.task.id ? 'all' : item.task.id)}
                     />
                   );
                 })}

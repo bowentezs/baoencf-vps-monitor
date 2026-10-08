@@ -327,7 +327,10 @@ export function getPingSeriesWithRecords(series: PingTaskSeries[]) {
   return series.filter((item) => item.records.length > 0);
 }
 
-export function getPingYAxisDomain(series: PingTaskSeries[]): [number, number] {
+export function getPingYAxisDomain(
+  series: PingTaskSeries[],
+  scaleMode: 'normal' | 'full' = 'normal',
+): [number, number] {
   const values = getPingValues(series);
   if (values.length === 0) return [0, 100];
 
@@ -337,13 +340,15 @@ export function getPingYAxisDomain(series: PingTaskSeries[]): [number, number] {
   const min = Math.min(...validValues);
   const rawMax = Math.max(...validValues);
 
-  // 离群毛刺抑制：计算 95% 分位数，若偶发极端突刺远超常态水平，自适应收敛 Y 轴上限
   let effectiveMax = rawMax;
-  if (validValues.length >= 8) {
+  if (scaleMode === 'normal' && validValues.length >= 6) {
     const sorted = [...validValues].sort((a, b) => a - b);
-    const p95 = sorted[Math.floor(sorted.length * 0.95)];
-    if (rawMax > p95 * 2.2 && p95 >= 30) {
-      effectiveMax = Math.min(rawMax, Math.max(Math.ceil(p95 * 2.0), 120));
+    const p75 = sorted[Math.floor(sorted.length * 0.75)];
+    const p90 = sorted[Math.floor(sorted.length * 0.90)];
+    // 常态波形模式：以 P75 与 P90 作为基准，防止偶发突刺将绝大多数正常延迟压成地平线
+    const adaptiveCeil = Math.max(Math.ceil(p90 * 1.5), Math.ceil(p75 * 2.2), 300);
+    if (rawMax > adaptiveCeil) {
+      effectiveMax = Math.min(rawMax, adaptiveCeil);
     }
   }
 
