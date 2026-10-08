@@ -374,7 +374,7 @@ export async function fetchPingTaskSeries(
   uuid: string,
   {
     limit = 180,
-    maxTasks = 8,
+    maxTasks,
     rangeHours,
     cursor = new Date().toISOString(),
     includeHidden = false,
@@ -397,7 +397,9 @@ export async function fetchPingTaskSeries(
     .filter((task) => pingTaskAppliesToClient(task, uuid))
     .map((task, index) => normalizePingTask(task, index))
     .filter((task): task is NormalizedPingTask => Boolean(task));
-  const tasks = applicableTasks.slice(0, maxTasks);
+  const tasks = typeof maxTasks === 'number' && maxTasks > 0
+    ? applicableTasks.slice(0, maxTasks)
+    : applicableTasks;
 
   const requestLimitForTask = (task: NormalizedPingTask) => {
     if (rangeHours && rangeHours > 0) {

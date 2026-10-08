@@ -61,7 +61,6 @@ export default function MiniPingChart({
       try {
         const nextSeries = await fetchPingTaskSeries(uuid, {
           limit,
-          maxTasks: 8,
           rangeHours,
           includeHidden,
           signal: controller.signal,

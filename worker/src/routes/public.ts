@@ -1646,10 +1646,10 @@ publicRoutes.get('/records/ping', async (c) => {
 // 批量获取 Ping 记录。详情页用它一次读取多个任务，避免同一批 ping_snapshots 被重复扫描。
 publicRoutes.get('/records/ping/batch', async (c) => {
   const uuid = c.req.query('uuid');
-  const taskSpecs = readPingTaskHistorySpecs(c.req.query('task_specs'), 16);
+  const taskSpecs = readPingTaskHistorySpecs(c.req.query('task_specs'), 64);
   const taskIds = taskSpecs.length > 0
     ? taskSpecs.map(task => task.taskId)
-    : readIntListParam(c.req.query('task_ids'), 16);
+    : readIntListParam(c.req.query('task_ids'), 64);
   const limit = readIntParam(c.req.query('limit'), 120, 1000);
   const baseIntervalSec = readIntParam(c.req.query('base_interval'), 60, 86_400);
   const cursorParam = readTimeCursorParam(c.req.query('cursor'));
