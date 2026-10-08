@@ -1,6 +1,6 @@
 import type { PingTask } from '../db/queries';
 
-export const MAX_PING_RESULTS_PER_REPORT = 50;
+export const MAX_PING_RESULTS_PER_REPORT = 256;
 export const MAX_PING_VALUE_MS = 60_000;
 export const PING_LOSS_VALUE = -1;
 

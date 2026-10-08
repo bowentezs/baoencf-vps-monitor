@@ -57,27 +57,9 @@ import {
 } from '../utils/pingChart';
 import { buildMonitorChartData, getMonitorChartRenderData } from '../utils/monitorChartData';
 import { monitorYAxisProps, pingYAxisProps, wideYAxisProps } from '../utils/monitorChartAxis';
-import { formatBytes } from '../utils/format';
+import { formatBytes, formatSpeed, formatUptime } from '../utils/format';
 import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/browserStorage';
 import { normalizeDailyTrafficResponse, type DailyTrafficRow } from '../utils/dailyTraffic';
-
-const formatSpeed = (bytes: number): string => {
-  if (!bytes || bytes === 0) return '0 B/s';
-  const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${(bytes / Math.pow(1024, i)).toFixed(i >= 2 ? 1 : 0)} ${units[i]}`;
-};
-
-const formatUptime = (seconds: number): string => {
-  if (!seconds || seconds < 0) return '0s';
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (d > 0) return `${d}d ${h}h ${m}m`;
-  if (h > 0) return `${h}h ${m}m ${s}s`;
-  return `${m}m ${s}s`;
-};
 
 type TimeRange = '1h' | '4h' | '24h' | '3d';
 type PingTimeRange = '1h' | '6h' | '24h' | '3d';
@@ -494,7 +476,7 @@ export default function Instance() {
     const start = new Date(startTs).toISOString();
     const end = new Date(endTs).toISOString();
 
-    publicFetch(`/records/gpu?${historyQuery({ uuid, start, end, cursor: end, limit: 200, include_hidden: isAuthenticated ? 1 : undefined })}`)
+    publicFetch(`/records/gpu?${historyQuery({ uuid, start, end, cursor: end, limit: timeRangePointLimit[timeRange], include_hidden: isAuthenticated ? 1 : undefined })}`)
       .then((data) => setGpuRecords(normalizePublicGpuRecords(data)))
       .catch(() => {});
   }, [uuid, timeRange, client?.gpu_name, authLoading, isAuthenticated]);

@@ -91,6 +91,20 @@ const pingSeriesColors = [
   '#0d9488', // 松石青 (Teal 600)
   '#ea580c', // 柿橙 (Orange 600)
   '#65a30d', // 苔绿 (Lime 600)
+  '#e11d48', // 绯红 (Rose 600)
+  '#9333ea', // 魅紫 (Purple 600)
+  '#0284c7', // 天蓝 (Sky 600)
+  '#16a34a', // 葱绿 (Green 600)
+  '#c026d3', // 洋红 (Fuchsia 600)
+  '#ca8a04', // 暖黄 (Yellow 600)
+  '#475569', // 板岩灰 (Slate 600)
+  '#b91c1c', // 赤红 (Red 700)
+  '#1d4ed8', // 钴蓝 (Blue 700)
+  '#6d28d9', // 深紫 (Purple 700)
+  '#047857', // 深碧 (Emerald 700)
+  '#b45309', // 赭石 (Amber 700)
+  '#be185d', // 茜红 (Pink 700)
+  '#0e7490', // 墨青 (Cyan 700)
 ];
 
 const demoTaskColorOrder = [
@@ -136,7 +150,12 @@ function pingTaskFromRecord(record: Record<string, unknown>): PingTask {
 function getTaskColor(task: PingTask, index: number) {
   const demoIndex = demoTaskColorOrder.findIndex((name) => name === task.name);
   const colorIndex = demoIndex >= 0 ? demoIndex : index + demoTaskColorOrder.length;
-  return pingSeriesColors[colorIndex % pingSeriesColors.length];
+  if (colorIndex < pingSeriesColors.length) {
+    return pingSeriesColors[colorIndex];
+  }
+  const goldenRatio = 0.618033988749895;
+  const hue = Math.round(((colorIndex * goldenRatio) % 1) * 360);
+  return `hsl(${hue}, 75%, 45%)`;
 }
 
 function toClients(value: PingTask['clients']): string[] {
