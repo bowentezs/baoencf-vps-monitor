@@ -4319,6 +4319,106 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
   color: var(--gray-9);
 }
 
+/* 自定义高密度防截断 Ping Tooltip */
+.custom-ping-tooltip {
+  background: color-mix(in srgb, var(--color-panel-solid) 92%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--gray-4);
+  border-radius: var(--radius-3);
+  box-shadow: 0 10px 32px -4px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  padding: 8px 11px;
+  font-size: 12px;
+  pointer-events: auto;
+  z-index: 100;
+  max-width: 440px;
+}
+
+.custom-ping-tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 5px;
+  margin-bottom: 5px;
+  border-bottom: 1px solid var(--gray-3);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-11);
+}
+
+.custom-ping-tooltip-header-hint {
+  font-size: 10px;
+  color: var(--gray-9);
+  font-weight: normal;
+}
+
+.custom-ping-tooltip-grid {
+  display: grid;
+  gap: 3px 10px;
+}
+
+.custom-ping-tooltip-grid.is-multi {
+  grid-template-columns: repeat(2, minmax(136px, 1fr));
+}
+
+.custom-ping-tooltip-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2.5px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.custom-ping-tooltip-item:hover,
+.custom-ping-tooltip-item.is-hovered {
+  background: var(--accent-a2);
+}
+
+.custom-ping-tooltip-item.is-loss {
+  background: color-mix(in srgb, var(--red-9) 10%, transparent);
+}
+
+.custom-ping-tooltip-name-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.custom-ping-tooltip-dot {
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.custom-ping-tooltip-label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--gray-12);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.custom-ping-tooltip-value {
+  font-size: 11.5px;
+  font-family: var(--code-font-family, ui-monospace, monospace);
+  font-weight: 600;
+  color: var(--gray-12);
+  white-space: nowrap;
+}
+
+.custom-ping-tooltip-value.is-loss {
+  color: var(--red-10);
+  font-weight: 700;
+  font-size: 11px;
+}
+
 .instance-ping-series-grid,
 .instance-ping-daily-grid {
   display: grid;
@@ -4514,135 +4614,6 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
   font-family: var(--font-mono, monospace);
   color: var(--gray-11);
   font-weight: 500;
-}
-
-/* 自定义 Ping 图表浮窗：支持折线联动高亮与地区突出 */
-.instance-ping-custom-tooltip {
-  background: var(--color-panel-solid);
-  border: 1px solid var(--gray-4);
-  border-radius: var(--radius-3, 8px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.08);
-  padding: 8px 10px;
-  min-width: 170px;
-  max-height: 290px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  pointer-events: auto;
-  user-select: none;
-  backdrop-filter: blur(8px);
-}
-
-.instance-ping-custom-tooltip::-webkit-scrollbar {
-  width: 4px;
-}
-
-.instance-ping-custom-tooltip::-webkit-scrollbar-thumb {
-  background: var(--gray-6);
-  border-radius: 4px;
-}
-
-.instance-ping-tooltip-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-bottom: 5px;
-  margin-bottom: 6px;
-  border-bottom: 1px solid var(--gray-3);
-}
-
-.instance-ping-tooltip-time {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--gray-11);
-}
-
-.instance-ping-tooltip-focus-tag {
-  font-size: 10px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--accent-3);
-  color: var(--accent-11);
-  font-weight: 500;
-}
-
-.instance-ping-tooltip-list {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.instance-ping-tooltip-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 3px 6px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.16s ease;
-  border: 1px solid transparent;
-}
-
-.instance-ping-tooltip-label-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.instance-ping-tooltip-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  transition: transform 0.16s ease;
-}
-
-.instance-ping-tooltip-name {
-  font-size: 11.5px;
-  color: var(--item-color, var(--gray-12));
-  font-weight: 500;
-  transition: all 0.16s ease;
-}
-
-.instance-ping-tooltip-val {
-  font-size: 11.5px;
-  font-family: var(--font-mono, monospace);
-  font-weight: 600;
-  color: var(--gray-12);
-  white-space: nowrap;
-}
-
-/* 高亮选中态：与高亮折线完全呼应！ */
-.instance-ping-tooltip-row.is-focused {
-  background: color-mix(in srgb, var(--item-color, var(--accent-9)) 14%, var(--color-panel-solid));
-  border-color: var(--item-color, var(--accent-9));
-  box-shadow: 0 0 0 1px var(--item-color, var(--accent-9)), 0 2px 8px -2px rgba(0, 0, 0, 0.1);
-  transform: translateX(1.5px);
-}
-
-.instance-ping-tooltip-row.is-focused .instance-ping-tooltip-name {
-  font-weight: 700;
-}
-
-.instance-ping-tooltip-row.is-focused .instance-ping-tooltip-dot {
-  transform: scale(1.3);
-  box-shadow: 0 0 6px var(--item-color);
-}
-
-.instance-ping-tooltip-row.is-focused .instance-ping-tooltip-val {
-  font-weight: 700;
-  color: var(--item-color, var(--gray-12));
-}
-
-/* 淡化态：其他线路淡化，凸显当前高亮地区 */
-.instance-ping-tooltip-row.is-dimmed {
-  opacity: 0.35;
-}
-
-.instance-ping-tooltip-row:hover:not(.is-focused) {
-  background: color-mix(in srgb, var(--item-color, var(--gray-8)) 8%, transparent);
-  border-color: color-mix(in srgb, var(--item-color, var(--gray-8)) 30%, transparent);
 }
 
 .instance-top-summary {
