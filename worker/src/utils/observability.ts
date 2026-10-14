@@ -50,6 +50,19 @@ export function errorDetail(error: unknown): string {
   return truncateDetail(sanitizeSetupDiagnosticDetail(error));
 }
 
+const DO_DEGRADE_WARN_THROTTLE_MS = 60 * 1000;
+const durableObjectDegradeWarnAt = new Map<string, number>();
+
+// 公开/管理读取路径在 Durable Object 抖动时降级为纯数据库读取。
+// 这里按作用域节流地告警：既让降级可被观测，又避免高频请求刷屏日志。
+export function warnDurableObjectDegraded(scope: string, error?: unknown): void {
+  const nowMs = Date.now();
+  const lastWarnMs = durableObjectDegradeWarnAt.get(scope) || 0;
+  if (nowMs - lastWarnMs < DO_DEGRADE_WARN_THROTTLE_MS) return;
+  durableObjectDegradeWarnAt.set(scope, nowMs);
+  console.warn(`[durable-object] ${scope} unavailable, degrading to database-only path: ${errorDetail(error)}`);
+}
+
 function healthKey(component: string): string {
   return `${HEALTH_KEY_PREFIX}${component}`;
 }
