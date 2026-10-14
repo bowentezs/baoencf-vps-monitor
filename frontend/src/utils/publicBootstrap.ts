@@ -22,8 +22,8 @@ let bootstrapCache: PublicBootstrapPayload | null = null;
 let clientPatchCache: PublicBootstrapClientPatch | null = null;
 const PUBLIC_BOOTSTRAP_STORAGE_KEY = 'cf_monitor_public_bootstrap';
 const PUBLIC_BOOTSTRAP_CLIENT_PATCH_KEY = 'cf_monitor_public_bootstrap_client_patch';
-const PUBLIC_BOOTSTRAP_STORAGE_MAX_AGE_MS = 10 * 60_000;
-const PUBLIC_BOOTSTRAP_CLIENT_PATCH_MAX_AGE_MS = 10 * 60_000;
+const PUBLIC_BOOTSTRAP_STORAGE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
+const PUBLIC_BOOTSTRAP_CLIENT_PATCH_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
 
 type PublicBootstrapClientPatch = {
   version: 2;
@@ -236,6 +236,14 @@ export async function fetchPublicBootstrap(options: { cache?: RequestCache; cach
     .then((payload) => {
       const normalized = normalizePublicBootstrap(payload, { includeHidden });
       return includeHidden ? normalized : savePublicBootstrap(normalized);
+    })
+    .catch((err) => {
+      const cached = getCachedPublicBootstrap();
+      if (cached && Array.isArray(cached.clients) && cached.clients.length > 0) {
+        console.warn('[publicBootstrap] fetch failed, falling back to cached bootstrap:', err);
+        return cached;
+      }
+      throw err;
     })
     .finally(() => {
       if (bootstrapPromise === promise) bootstrapPromise = null;
