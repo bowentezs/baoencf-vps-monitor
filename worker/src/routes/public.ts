@@ -530,9 +530,16 @@ export async function hasAdminSession(c: PublicContext): Promise<boolean> {
 }
 
 async function readAdminClientsSnapshotOverlay(c: PublicContext): Promise<AdminClientsSnapshotOverlay | null> {
-  const response = await c.env.LIVE_DATA
-    .get(c.env.LIVE_DATA.idFromName('global'))
-    .fetch(new Request('https://do/admin-clients-snapshot'));
+  // Durable Object 抖动、重启或超时时，必须降级为纯数据库元数据，
+  // 而不是让公开元数据 API（clients/nodes/bootstrap 等）整体 500，否则会拖垮整个前台首屏。
+  let response: Response;
+  try {
+    response = await c.env.LIVE_DATA
+      .get(c.env.LIVE_DATA.idFromName('global'))
+      .fetch(new Request('https://do/admin-clients-snapshot'));
+  } catch {
+    return null;
+  }
   if (!response.ok) return null;
   const body = await response.json().catch(() => null);
   if (!body || typeof body !== 'object') return null;
@@ -1776,9 +1783,23 @@ publicRoutes.get('/live', async (c) => {
   forwardHeaders.delete('upgrade');
   forwardHeaders.delete('connection');
   const forwardRequest = new Request(doUrl.toString(), { ...c.req.raw, headers: forwardHeaders });
+
+  // Durable Object 不可用时降级为 503（可重试），而不是把 500 透传给前端。
+  let doResponse: Response | null = null;
+  try {
+    doResponse = await stub.fetch(forwardRequest);
+  } catch {
+    doResponse = null;
+  }
+  if (!doResponse || !doResponse.ok) {
+    c.header('Cache-Control', 'no-store');
+    c.header('Retry-After', '2');
+    return c.json({ error: 'Live data temporarily unavailable' }, 503);
+  }
+
   const response = includeHidden
-    ? privateJsonResponse(await (await stub.fetch(forwardRequest)).json())
-    : withPublicCacheHeader(c, await stub.fetch(forwardRequest), PUBLIC_LIVE_CACHE_SECONDS, 'miss');
+    ? privateJsonResponse(await doResponse.json().catch(() => ({})))
+    : withPublicCacheHeader(c, doResponse, PUBLIC_LIVE_CACHE_SECONDS, 'miss');
   if (!includeHidden) putPublicEdgeCache(c, response);
   return response;
 });
