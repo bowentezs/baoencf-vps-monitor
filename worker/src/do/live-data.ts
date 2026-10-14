@@ -421,7 +421,13 @@ export class LiveDataDO {
     this.sessionRoles = new Map();
     this.viewerExpiresAt = new Map();
     this.clients = new Map();
-    this.hydrateSessionsFromAcceptedWebSockets();
+    try {
+      this.hydrateSessionsFromAcceptedWebSockets();
+    } catch (error) {
+      // 构造函数抛出会导致该 DO 的所有请求被拒绝；hydration 失败必须降级为空会话，
+      // 让对象仍可服务，而不是整体不可用直到被重新实例化。
+      console.error('[live-data] failed to hydrate sessions from accepted WebSockets:', errorDetail(error));
+    }
   }
 
   private getQueryDatabase(): db.QueryDatabase | null {
@@ -501,33 +507,38 @@ export class LiveDataDO {
   private hydrateSessionsFromAcceptedWebSockets(): void {
     const now = Date.now();
     for (const ws of this.state.getWebSockets()) {
-      const attachment = this.getSessionAttachment(ws);
-      if (!attachment) continue;
-      if (attachment.role === 'viewer' && attachment.viewerExpiresAt && attachment.viewerExpiresAt <= now) {
-        this.expireViewer(attachment.clientId, ws, now);
-        continue;
-      }
-      this.sessions.set(attachment.clientId, ws);
-      this.sessionRoles.set(attachment.clientId, attachment.role);
-      if (attachment.role === 'viewer' && attachment.viewerExpiresAt) {
-        this.viewerExpiresAt.set(attachment.clientId, attachment.viewerExpiresAt);
-      } else {
-        this.viewerExpiresAt.delete(attachment.clientId);
-      }
-      if (
-        attachment.role === 'agent' &&
-        attachment.lastReport &&
-        typeof attachment.lastReportTime === 'number' &&
-        (!attachment.expiresAt || attachment.expiresAt > now)
-      ) {
-        this.clients.set(attachment.clientId, {
-          uuid: attachment.clientId,
-          name: attachment.clientName,
-          hidden: attachment.hidden,
-          lastReportTime: attachment.lastReportTime,
-          lastReport: attachment.lastReport,
-          expiresAt: attachment.expiresAt,
-        });
+      // 单个损坏的 WebSocket 附件不得中断整批会话恢复（否则会拖垮整个对象）。
+      try {
+        const attachment = this.getSessionAttachment(ws);
+        if (!attachment) continue;
+        if (attachment.role === 'viewer' && attachment.viewerExpiresAt && attachment.viewerExpiresAt <= now) {
+          this.expireViewer(attachment.clientId, ws, now);
+          continue;
+        }
+        this.sessions.set(attachment.clientId, ws);
+        this.sessionRoles.set(attachment.clientId, attachment.role);
+        if (attachment.role === 'viewer' && attachment.viewerExpiresAt) {
+          this.viewerExpiresAt.set(attachment.clientId, attachment.viewerExpiresAt);
+        } else {
+          this.viewerExpiresAt.delete(attachment.clientId);
+        }
+        if (
+          attachment.role === 'agent' &&
+          attachment.lastReport &&
+          typeof attachment.lastReportTime === 'number' &&
+          (!attachment.expiresAt || attachment.expiresAt > now)
+        ) {
+          this.clients.set(attachment.clientId, {
+            uuid: attachment.clientId,
+            name: attachment.clientName,
+            hidden: attachment.hidden,
+            lastReportTime: attachment.lastReportTime,
+            lastReport: attachment.lastReport,
+            expiresAt: attachment.expiresAt,
+          });
+        }
+      } catch (error) {
+        console.error('[live-data] skipped a corrupt WebSocket session during hydration:', errorDetail(error));
       }
     }
   }
@@ -1675,6 +1686,17 @@ export class LiveDataDO {
 
   // HTTP 请求处理（用于 Agent 上报数据）
   async fetch(request: Request): Promise<Response> {
+    // 未捕获异常会被平台转成 500 并可能让对象进入不稳定状态；
+    // 这里统一兜底为 500 JSON，绝不把异常抛回运行时。
+    try {
+      return await this.handleRequest(request);
+    } catch (error) {
+      console.error('[live-data] fetch handler failed:', errorDetail(error));
+      return Response.json({ error: 'Durable Object request failed' }, { status: 500 });
+    }
+  }
+
+  private async handleRequest(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === 'POST' && url.pathname === '/client-meta') {
@@ -1885,58 +1907,74 @@ export class LiveDataDO {
   }
 
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
-    const attachment = this.getSessionAttachment(ws);
-    if (!attachment || attachment.role !== 'agent') return;
-    const messageBytes = typeof message === 'string'
-      ? new TextEncoder().encode(message).byteLength
-      : message.byteLength;
-    if (messageBytes > AGENT_WS_MAX_MESSAGE_BYTES) {
-      try {
-        ws.close(1009, 'Message too large');
-      } catch {
-        // Ignore close errors.
-      }
-      return;
-    }
     try {
+      const attachment = this.getSessionAttachment(ws);
+      if (!attachment || attachment.role !== 'agent') return;
+      const messageBytes = typeof message === 'string'
+        ? new TextEncoder().encode(message).byteLength
+        : message.byteLength;
+      if (messageBytes > AGENT_WS_MAX_MESSAGE_BYTES) {
+        try {
+          ws.close(1009, 'Message too large');
+        } catch {
+          // Ignore close errors.
+        }
+        return;
+      }
       const data = JSON.parse(typeof message === 'string' ? message : new TextDecoder().decode(message));
       if (!isObjectPayload(data)) return;
       await this.handleMessage(attachment.clientId, attachment.clientName, attachment.hidden, data, ws);
     } catch {
-      // Ignore malformed agent messages.
+      // 忽略畸形 Agent 消息与损坏的会话附件，绝不让异常抛回运行时。
     }
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
-    const attachment = this.getSessionAttachment(ws);
-    if (attachment) {
-      const wasViewer = attachment.role === 'viewer';
-      const activeViewersBefore = this.activeViewerCount(Date.now());
-      this.cleanupSession(ws, attachment);
-      if (wasViewer && activeViewersBefore > 0) {
-        await this.broadcastAgentPolicy(Date.now(), false);
+    // 关闭回调里的未捕获异常会污染对象状态；broadcastAgentPolicy 依赖数据库，
+    // 必须整体兜底，绝不让异常抛回运行时。
+    try {
+      const attachment = this.getSessionAttachment(ws);
+      if (attachment) {
+        const wasViewer = attachment.role === 'viewer';
+        const activeViewersBefore = this.activeViewerCount(Date.now());
+        this.cleanupSession(ws, attachment);
+        if (wasViewer && activeViewersBefore > 0) {
+          await this.broadcastAgentPolicy(Date.now(), false);
+        }
       }
+    } catch (error) {
+      console.error('[live-data] webSocketClose failed:', errorDetail(error));
     }
   }
 
   async webSocketError(ws: WebSocket): Promise<void> {
-    const attachment = this.getSessionAttachment(ws);
-    if (attachment) {
-      const wasViewer = attachment.role === 'viewer';
-      const activeViewersBefore = this.activeViewerCount(Date.now());
-      this.cleanupSession(ws, attachment);
-      if (wasViewer && activeViewersBefore > 0) {
-        await this.broadcastAgentPolicy(Date.now(), false);
+    try {
+      const attachment = this.getSessionAttachment(ws);
+      if (attachment) {
+        const wasViewer = attachment.role === 'viewer';
+        const activeViewersBefore = this.activeViewerCount(Date.now());
+        this.cleanupSession(ws, attachment);
+        if (wasViewer && activeViewersBefore > 0) {
+          await this.broadcastAgentPolicy(Date.now(), false);
+        }
       }
+    } catch (error) {
+      console.error('[live-data] webSocketError failed:', errorDetail(error));
     }
   }
 
   async alarm(): Promise<void> {
     const now = Date.now();
-    this.removeExpiredClients(now);
-    this.removeExpiredViewers(now);
-    await this.broadcastAgentPolicy(now, false);
-    await this.scheduleExpiryAlarm(now);
+    try {
+      this.removeExpiredClients(now);
+      this.removeExpiredViewers(now);
+      await this.broadcastAgentPolicy(now, false);
+    } catch (error) {
+      console.error('[live-data] alarm maintenance failed:', errorDetail(error));
+    } finally {
+      // 无论维护步骤是否失败，都必须重新排程，避免告警停摆导致离线节点清理停滞。
+      await this.scheduleExpiryAlarm(now);
+    }
   }
 
   private async isPersistDue(clientId: string, now: number): Promise<boolean> {
