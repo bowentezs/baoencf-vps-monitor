@@ -49,3 +49,20 @@ test('DO 降级告警是可观测且按作用域节流的', () => {
   assert.match(observabilitySource, /console\.warn\(/);
   assert.match(observabilitySource, /DO_DEGRADE_WARN_THROTTLE_MS/);
 });
+
+test('getPublicClientsSnapshot 在数据库查询异常时优雅降级为旧快照或 DO 叠加层', () => {
+  const fn = sliceBetween(publicSource, 'async function getPublicClientsSnapshot', 'function boundedPublicPingIntervalSec');
+  assert.match(fn, /try\s*\{[^]*?db\.listPublicClientRows[^]*?\}\s*catch/);
+  assert.match(fn, /publicClientsSnapshotCache\.clients\.length > 0/);
+  assert.match(fn, /overlay\.clients\.length > 0/);
+});
+
+test('getPublicSettings 与 getPublicPingTasks 在数据库异常时兜底，绝不抛出 500', () => {
+  const settingsFn = sliceBetween(publicSource, 'async function getPublicSettings', 'function privateJsonResponse');
+  assert.match(settingsFn, /try\s*\{[^]*?db\.getSettingsByKeys[^]*?\}\s*catch/);
+  assert.match(settingsFn, /buildPublicSettings\(\{\}\)/);
+
+  const pingFn = sliceBetween(publicSource, 'async function getPublicPingTasks', 'function toPublicPingTask');
+  assert.match(pingFn, /try\s*\{[^]*?db\.listPingTasks[^]*?\}\s*catch/);
+});
+

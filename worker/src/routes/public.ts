@@ -501,9 +501,15 @@ async function getPublicSettings(database: db.QueryDatabase, force = false): Pro
   const now = Date.now();
   if (!force && cacheIsFresh(publicSettingsCache, now)) return publicSettingsCache!.value;
 
-  const settings = buildPublicSettings(await db.getSettingsByKeys(database, PUBLIC_SETTING_KEYS, force));
-  publicSettingsCache = { value: settings, expiresAt: now + PUBLIC_METADATA_CACHE_MS };
-  return settings;
+  try {
+    const settings = buildPublicSettings(await db.getSettingsByKeys(database, PUBLIC_SETTING_KEYS, force));
+    publicSettingsCache = { value: settings, expiresAt: now + PUBLIC_METADATA_CACHE_MS };
+    return settings;
+  } catch (error) {
+    console.error('[public] getPublicSettings database error:', error);
+    if (publicSettingsCache) return publicSettingsCache.value;
+    return buildPublicSettings({});
+  }
 }
 
 function privateJsonResponse(value: unknown): Response {
@@ -592,17 +598,55 @@ async function getPublicClientsSnapshot(c: PublicContext, database: db.QueryData
   const now = Date.now();
   if (!includeHidden && !force && cacheIsFresh(publicClientsSnapshotCache, now)) return publicClientsSnapshotCache!;
 
-  const clients = await db.listPublicClientRows(database, force);
+  let clients: Awaited<ReturnType<typeof db.listPublicClientRows>> = [];
+  let dbFailed = false;
+  try {
+    clients = await db.listPublicClientRows(database, force);
+  } catch (error) {
+    dbFailed = true;
+    console.error('[public] db.listPublicClientRows failed:', error);
+  }
+
+  // 1. 如果数据库查询失败，且内存中已有快照（即使过期），执行 Stale-While-Revalidate 兜底
+  if (dbFailed && publicClientsSnapshotCache && publicClientsSnapshotCache.clients.length > 0) {
+    console.warn('[public] using stale publicClientsSnapshotCache due to db failure');
+    return publicClientsSnapshotCache;
+  }
+
+  const overlay = await readAdminClientsSnapshotOverlay(c);
+
+  // 2. 如果数据库查询失败且没有内存快照，尝试从 DO 持久化叠加层恢复客户端列表
+  if (dbFailed && overlay && overlay.clients.length > 0) {
+    console.warn('[public] recovering public clients from DO overlay due to db failure');
+    const recoveredClients = overlay.clients
+      .map(raw => toPublicClient(raw as Parameters<typeof toPublicClient>[0]))
+      .filter(client => Boolean(client.uuid) && (includeHidden || !client.hidden));
+    const publicClientIds = new Set(recoveredClients.map(client => client.uuid));
+    const nodes = recoveredClients.map((client) => ({
+      ...client,
+      tags: client.tags ? client.tags.split(';').filter(Boolean) : [],
+    }));
+    const expiresAt = now + 10_000;
+    const recoveredSnapshot = {
+      clients: recoveredClients,
+      nodes,
+      publicClientIds,
+      expiresAt,
+    };
+    if (!includeHidden) publicClientsSnapshotCache = recoveredSnapshot;
+    return recoveredSnapshot;
+  }
+
   let publicClients = clients
     .filter(client => includeHidden || !client.hidden)
     .map(toPublicClient);
-  publicClients = applyPublicClientsOverlay(publicClients, await readAdminClientsSnapshotOverlay(c), includeHidden);
+  publicClients = applyPublicClientsOverlay(publicClients, overlay, includeHidden);
   const publicClientIds = new Set(publicClients.map(client => client.uuid));
   const nodes = publicClients.map((client) => ({
     ...client,
     tags: client.tags ? client.tags.split(';').filter(Boolean) : [],
   }));
-  const expiresAt = now + PUBLIC_METADATA_CACHE_MS;
+  const expiresAt = now + (dbFailed ? 5_000 : PUBLIC_METADATA_CACHE_MS);
   for (const client of clients) {
     publicClientVisibilityCache.set(client.uuid, { value: !client.hidden, expiresAt });
   }
@@ -612,7 +656,7 @@ async function getPublicClientsSnapshot(c: PublicContext, database: db.QueryData
     publicClientIds,
     expiresAt,
   };
-  if (!includeHidden) publicClientsSnapshotCache = snapshot;
+  if (!includeHidden && (clients.length > 0 || !dbFailed)) publicClientsSnapshotCache = snapshot;
   return snapshot;
 }
 
@@ -631,10 +675,17 @@ async function getPublicPingTasks(
 ): Promise<db.PingTask[]> {
   const now = Date.now();
   if (force || !cacheIsFresh(publicPingTasksCache, now)) {
-    publicPingTasksCache = {
-      value: await db.listPingTasks(database, force),
-      expiresAt: now + PUBLIC_METADATA_CACHE_MS,
-    };
+    try {
+      publicPingTasksCache = {
+        value: await db.listPingTasks(database, force),
+        expiresAt: now + PUBLIC_METADATA_CACHE_MS,
+      };
+    } catch (error) {
+      console.error('[public] getPublicPingTasks database error:', error);
+      if (!publicPingTasksCache) {
+        publicPingTasksCache = { value: [], expiresAt: now + 5000 };
+      }
+    }
   }
   const tasks = publicPingTasksCache?.value || [];
   return tasks

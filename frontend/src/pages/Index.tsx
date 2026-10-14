@@ -315,6 +315,11 @@ export default function Index() {
         })
         .catch((loadError: unknown) => {
           if (!cancelled) {
+            setClients((current) => {
+              if (current.length > 0) return current;
+              const cached = getCachedPublicBootstrap();
+              return cached?.clients && cached.clients.length > 0 ? cached.clients : current;
+            });
             setClientsError(loadError instanceof Error ? loadError.message : '客户端列表加载失败');
           }
         })
@@ -435,7 +440,15 @@ export default function Index() {
     };
   }, [liveData]);
 
-  const displayClients = clients.length > 0 ? mergeLiveClientMetadata(clients, liveMap.clients) : liveClientsAsPublicClients(liveMap.clients);
+  const effectiveClients = useMemo(() => {
+    if (clients.length > 0) return clients;
+    const cached = getCachedPublicBootstrap();
+    return cached?.clients && cached.clients.length > 0 ? cached.clients : clients;
+  }, [clients]);
+
+  const displayClients = effectiveClients.length > 0
+    ? mergeLiveClientMetadata(effectiveClients, liveMap.clients)
+    : liveClientsAsPublicClients(liveMap.clients);
 
   const stats = useMemo(() => {
     return getNodeStatsSummary(displayClients, liveMap);
