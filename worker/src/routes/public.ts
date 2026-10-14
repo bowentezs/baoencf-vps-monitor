@@ -33,6 +33,7 @@ import { base64ToBytes } from '../utils/theme-package';
 import { buildDailyTrafficResponse, normalizeDailyTrafficSnapshot } from '../utils/daily-traffic';
 import { dailyTrafficPublicCacheIdentity, parseDailyTrafficQuery } from '../utils/daily-traffic-query';
 import { recordVisitorSafely } from '../utils/visitor-logger';
+import { warnDurableObjectDegraded } from '../utils/observability';
 
 const publicRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 type PublicContext = Context<{ Bindings: Bindings; Variables: Variables }>;
@@ -537,7 +538,8 @@ async function readAdminClientsSnapshotOverlay(c: PublicContext): Promise<AdminC
     response = await c.env.LIVE_DATA
       .get(c.env.LIVE_DATA.idFromName('global'))
       .fetch(new Request('https://do/admin-clients-snapshot'));
-  } catch {
+  } catch (error) {
+    warnDurableObjectDegraded('public admin-clients-snapshot overlay', error);
     return null;
   }
   if (!response.ok) return null;
@@ -1788,7 +1790,8 @@ publicRoutes.get('/live', async (c) => {
   let doResponse: Response | null = null;
   try {
     doResponse = await stub.fetch(forwardRequest);
-  } catch {
+  } catch (error) {
+    warnDurableObjectDegraded('public live snapshot', error);
     doResponse = null;
   }
   if (!doResponse || !doResponse.ok) {

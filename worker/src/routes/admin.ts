@@ -66,6 +66,7 @@ import {
   bestEffortRecordHealthEvent,
   errorDetail,
   readHealthEvents,
+  warnDurableObjectDegraded,
   type HealthEvent,
 } from '../utils/observability';
 import { readScheduledDatabaseStartupHealth } from '../utils/scheduled-observability';
@@ -417,7 +418,14 @@ function liveDataStub(c: AdminContext) {
 }
 
 async function readAdminClientsSnapshot(c: AdminContext): Promise<AdminClientsSnapshot | null> {
-  const response = await liveDataStub(c).fetch(new Request('https://do/admin-clients-snapshot'));
+  // Durable Object 抖动时降级为纯数据库读取，避免管理端读取整体 500。
+  let response: Response;
+  try {
+    response = await liveDataStub(c).fetch(new Request('https://do/admin-clients-snapshot'));
+  } catch (error) {
+    warnDurableObjectDegraded('admin admin-clients-snapshot', error);
+    return null;
+  }
   if (!response.ok) return null;
   const body = await response.json().catch(() => null);
   const clients = body && typeof body === 'object' && Array.isArray((body as { clients?: unknown }).clients)
