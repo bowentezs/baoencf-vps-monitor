@@ -46,7 +46,7 @@ html[data-monitor-theme='next'] {
   --monitor-accent: #0891b2;
   --monitor-accent-soft: color-mix(in srgb, var(--monitor-accent) 13%, transparent);
   --monitor-ring-track: color-mix(in srgb, #0e7490 8%, transparent);
-  --monitor-secondary: #10b981;
+  --monitor-secondary: #0284c7;
   --monitor-success: #10b981;
   --monitor-warning: #d97706;
   --monitor-danger: #e11d48;
@@ -94,7 +94,7 @@ html[data-theme-appearance='dark'][data-monitor-theme='next'] {
   --monitor-accent: #22d3ee;
   --monitor-accent-soft: color-mix(in srgb, var(--monitor-accent) 16%, transparent);
   --monitor-ring-track: color-mix(in srgb, #cffafe 9%, transparent);
-  --monitor-secondary: #34d399;
+  --monitor-secondary: #38bdf8;
   --monitor-success: #34d399;
   --monitor-warning: #f59e0b;
   --monitor-danger: #f43f5e;
@@ -143,7 +143,7 @@ html[data-theme-appearance='dark'][data-monitor-theme='next'] {
     --monitor-accent: #22d3ee;
     --monitor-accent-soft: color-mix(in srgb, var(--monitor-accent) 16%, transparent);
     --monitor-ring-track: color-mix(in srgb, #cffafe 9%, transparent);
-    --monitor-secondary: #34d399;
+    --monitor-secondary: #38bdf8;
     --monitor-success: #34d399;
     --monitor-warning: #f59e0b;
     --monitor-danger: #f43f5e;
@@ -597,20 +597,20 @@ body {
 }
 
 .node-card .rt-CardInner {
-  padding: 7px !important;
+  padding: 9px 10px !important;
   height: 100%;
 }
 
 .node-card:hover {
   border-color: color-mix(in srgb, var(--monitor-accent) 38%, var(--monitor-border)) !important;
   box-shadow: var(--monitor-shadow-hover) !important;
-  transform: translateY(-2px);
+  transform: translateY(-3px);
 }
 
 .node-card-grid {
   display: grid;
   grid-template-columns: var(--node-card-grid-template-columns);
-  gap: 6px;
+  gap: 10px;
   width: 100%;
   box-sizing: border-box;
   align-items: stretch;
@@ -4541,6 +4541,170 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
   padding: 0;
 }
 
+/* 延迟卡片顶部微晶药丸分类控制条 */
+.instance-ping-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.instance-ping-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.instance-ping-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-11);
+  background: var(--gray-a2);
+  border: 1px solid var(--gray-a4);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  outline: none;
+}
+
+.instance-ping-pill-btn:hover {
+  background: var(--gray-a3);
+  border-color: var(--gray-a6);
+  color: var(--gray-12);
+  transform: translateY(-0.5px);
+}
+
+.instance-ping-pill-btn.is-active {
+  background: var(--accent-a3);
+  border-color: var(--accent-8);
+  color: var(--accent-11);
+  box-shadow: 0 0 10px var(--accent-a3);
+}
+
+.instance-ping-pill-btn.is-ct.is-active {
+  background: rgba(0, 91, 172, 0.12);
+  border-color: #005BAC;
+  color: #0080FF;
+  box-shadow: 0 0 10px rgba(0, 91, 172, 0.2);
+}
+
+.instance-ping-pill-btn.is-cu.is-active {
+  background: rgba(222, 4, 34, 0.12);
+  border-color: #DE0422;
+  color: #FF4D4F;
+  box-shadow: 0 0 10px rgba(222, 4, 34, 0.2);
+}
+
+.instance-ping-pill-btn.is-cm.is-active {
+  background: rgba(0, 133, 208, 0.12);
+  border-color: #0085D0;
+  color: #00A0E9;
+  box-shadow: 0 0 10px rgba(0, 133, 208, 0.2);
+}
+
+.instance-ping-pill-btn.is-intl.is-active {
+  background: rgba(138, 43, 226, 0.12);
+  border-color: #8A2BE2;
+  color: #B37FEB;
+  box-shadow: 0 0 10px rgba(138, 43, 226, 0.2);
+}
+
+.instance-ping-pill-btn.is-loss {
+  border-color: var(--red-a5);
+}
+
+.instance-ping-pill-btn.is-loss.is-active {
+  background: var(--red-a3);
+  border-color: var(--red-8);
+  color: var(--red-11);
+  box-shadow: 0 0 10px var(--red-a3);
+}
+
+.instance-ping-pill-btn .carrier-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.instance-ping-pill-btn .carrier-dot.ct { background: #005BAC; }
+.instance-ping-pill-btn .carrier-dot.cu { background: #DE0422; }
+.instance-ping-pill-btn .carrier-dot.cm { background: #0085D0; }
+.instance-ping-pill-btn .carrier-dot.intl { background: #8A2BE2; }
+.instance-ping-pill-btn .carrier-dot.loss {
+  background: var(--red-9);
+  box-shadow: 0 0 6px var(--red-9);
+  animation: pulse-loss 2s infinite ease-in-out;
+}
+
+@keyframes pulse-loss {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.instance-ping-pill-num {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--gray-a4);
+  color: var(--gray-11);
+  line-height: 1.2;
+}
+
+.instance-ping-pill-btn.is-active .instance-ping-pill-num {
+  background: currentColor;
+  color: var(--color-background);
+}
+
+.instance-ping-pill-num.is-loss {
+  background: var(--red-a4);
+  color: var(--red-11);
+}
+
+.instance-ping-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.instance-ping-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--gray-10);
+  background: var(--gray-a3);
+  border: 1px solid var(--gray-a4);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.instance-ping-action-btn:hover {
+  background: var(--gray-a4);
+  color: var(--gray-12);
+}
+
+.instance-ping-action-btn.is-clear {
+  color: var(--accent-11);
+  border-color: var(--accent-a5);
+  background: var(--accent-a2);
+}
+
+.instance-ping-action-btn.is-clear:hover {
+  background: var(--accent-a3);
+  color: var(--accent-12);
+}
+
 .instance-ping-cards-pane .instance-ping-series-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
@@ -4967,46 +5131,50 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
 .instance-sidebar-group {
   position: sticky;
   top: 0;
-  z-index: 1;
-  padding: 5px 8px;
-  margin: 4px 0;
+  z-index: 2;
+  padding: 4px 8px;
+  margin: 6px 0 3px;
   border-radius: 6px;
-  background: var(--accent-2);
-  color: var(--accent-11);
-  font-size: 12px;
+  background: var(--gray-a3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--gray-11);
+  font-size: 11px;
   font-weight: 700;
+  letter-spacing: 0.3px;
 }
 
 .instance-sidebar-node {
   width: 100%;
-  min-height: 44px;
-  border: 0;
-  border-left: 3px solid transparent;
-  border-radius: 7px;
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   background: transparent;
   color: var(--gray-12);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 8px;
+  padding: 6px 9px;
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .instance-sidebar-node:hover {
-  background: var(--accent-2);
+  background: var(--gray-a3);
+  transform: translateX(2px);
 }
 
 .instance-sidebar-node.is-active {
-  background: var(--accent-3);
-  border-left-color: var(--accent-9);
-  color: var(--accent-12);
+  background: var(--accent-a3);
+  border-color: var(--accent-7);
+  box-shadow: 0 2px 10px rgba(56, 189, 248, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.6);
+  color: var(--accent-11);
 }
 
 .instance-sidebar-status {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
   flex-shrink: 0;
   background: var(--gray-7);
@@ -5014,6 +5182,7 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
 
 .instance-sidebar-status.is-online {
   background: var(--green-9);
+  box-shadow: 0 0 6px var(--green-9);
 }
 
 .instance-sidebar-status.is-offline {
@@ -5041,14 +5210,308 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 11px;
-  color: var(--gray-10);
+  color: var(--gray-11);
+  font-weight: 550;
+  font-family: var(--font-mono, monospace);
 }
+
+/* 🍎 返回节点大厅微晶毛玻璃药丸按钮 */
+.instance-back-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  color: var(--gray-12);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.instance-back-pill:hover {
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 0 12px rgba(56, 189, 248, 0.25);
+  color: var(--accent-11);
+}
+
+.dark .instance-back-pill,
+html[data-theme-appearance='dark'] .instance-back-pill {
+  background: rgba(15, 23, 42, 0.75);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  color: var(--gray-12);
+}
+
+.dark .instance-back-pill:hover,
+html[data-theme-appearance='dark'] .instance-back-pill:hover {
+  background: rgba(30, 41, 59, 0.90);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 16px rgba(139, 92, 246, 0.35);
+}
+
+/* 🍎 硬件规格折叠微晶按钮与旋转动效 */
+.instance-collapse-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border-radius: 99px;
+  background: var(--gray-a3);
+  border: 1px solid var(--gray-a5);
+  color: var(--gray-12);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.instance-collapse-toggle-btn:hover {
+  background: var(--accent-a3);
+  border-color: var(--accent-7);
+  color: var(--accent-11);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.instance-toggle-icon {
+  display: inline-flex;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: rotate(180deg);
+}
+
+.instance-toggle-icon.is-collapsed {
+  transform: rotate(0deg);
+}
+
+/* 🍎 DetailsGrid compact 规格紧凑优化 */
+.DetailsGrid-compact .DetailsGrid-item,
+.DetailsGrid-compact .DetailsGrid-fixed-row > .DetailsGrid-item,
+.DetailsGrid-compact .DetailsGrid-meta-row > .DetailsGrid-item {
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: 6px 9px !important;
+  gap: 7px !important;
+}
+
+.DetailsGrid-compact .DetailsGrid-icon {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 7px !important;
+}
+
+.DetailsGrid-compact .DetailsGrid-icon svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
 
 .instance-detail-panel {
   min-width: 0;
   width: min(100%, calc(50% + 460px));
   justify-self: center;
 }
+
+/* ========== 详情页：高资源消耗进程、Docker 容器、解锁矩阵与三网雷达高级卡片 ========== */
+.instance-top-processes-card,
+.instance-docker-card,
+.instance-unlock-card,
+.instance-carrier-radar-card {
+  border-radius: 14px !important;
+  border: 1px solid var(--gray-a4) !important;
+  transition: all 0.25s ease;
+}
+
+.instance-process-tile,
+.instance-unlock-tile,
+.instance-carrier-tile {
+  position: relative;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--gray-a2);
+  border: 1px solid var(--gray-a4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.instance-process-tile:hover,
+.instance-unlock-tile:hover,
+.instance-carrier-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-7);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);
+}
+
+.instance-docker-row {
+  position: relative;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: var(--gray-a2);
+  border: 1px solid var(--gray-a4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.instance-docker-row:hover {
+  background: var(--gray-a3);
+  border-color: var(--blue-7);
+}
+
+.instance-metric-track {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--gray-a4);
+  overflow: hidden;
+  margin-top: 3px;
+}
+
+.instance-metric-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* 🍎 详情页运维 Bento Box 双列并排与紧凑布局 */
+.instance-ops-bento-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 14px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
+.instance-ops-bento-grid > div,
+.instance-ops-bento-grid > .rt-Card {
+  margin-bottom: 0 !important;
+  height: 100%;
+}
+
+/* 🍎 极速锚点胶囊与导航栏（流式优雅排版，绝不遮挡全局导航栏） */
+.instance-view-nav-bar {
+  position: relative;
+  margin-bottom: 16px;
+  z-index: 5;
+  padding: 6px 14px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s ease;
+}
+
+.dark .instance-view-nav-bar,
+html[data-theme-appearance='dark'] .instance-view-nav-bar {
+  background: rgba(15, 20, 32, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.instance-anchor-btn {
+  background: var(--gray-a2);
+  border: 1px solid var(--gray-a4);
+  border-radius: 99px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 550;
+  color: var(--gray-11);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.instance-anchor-btn:hover {
+  background: var(--accent-a3);
+  border-color: var(--accent-7);
+  color: var(--accent-11);
+  transform: translateY(-1px);
+}
+
+/* 🍎 悬浮回顶晶体按钮 (Scroll-to-top FAB) */
+.instance-back-to-top {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  z-index: 99;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  background: var(--accent-9);
+  color: #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), 0 0 14px var(--accent-a7);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fadeInScale 0.25s ease forwards;
+}
+
+.instance-back-to-top:hover {
+  transform: translateY(-3px) scale(1.08);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35), 0 0 20px var(--accent-9);
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* 🍎 Docker 容器状态快速过滤胶囊 */
+.instance-docker-filter-btn {
+  border: 1px solid var(--gray-a4);
+  background: var(--gray-a2);
+  color: var(--gray-11);
+  border-radius: 99px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.instance-docker-filter-btn.is-active {
+  background: var(--blue-9);
+  color: #ffffff;
+  border-color: var(--blue-9);
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.35);
+}
+
+/* 🍎 机型配置智能折叠过渡 */
+.instance-details-collapsible {
+  transition: max-height 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.24s ease;
+  overflow: hidden;
+  max-height: 800px;
+  opacity: 1;
+}
+
+.instance-details-collapsible.collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  pointer-events: none;
+}
+
+#sec-traffic,
+#sec-metrics,
+#sec-network,
+#sec-ops {
+  scroll-margin-top: 68px;
+}
+
 
 /* ========== Login Page ========== */
 .login-page {
@@ -7102,32 +7565,38 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg::before {
 }
 
 :root:not(.dark) .layout.has-custom-bg .nav-bar {
-  background: linear-gradient(105deg, rgba(255, 255, 255, 0.85), rgba(240, 249, 255, 0.80) 42%, rgba(253, 242, 255, 0.82)) !important;
+  background: linear-gradient(105deg, rgba(255, 255, 255, 0.90), rgba(240, 249, 255, 0.86) 42%, rgba(253, 242, 255, 0.88)) !important;
+  backdrop-filter: blur(28px) saturate(190%) contrast(105%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(105%) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.8) !important;
-  box-shadow: 0 4px 20px rgba(100, 116, 139, 0.06) !important;
+  box-shadow: 0 4px 20px rgba(100, 116, 139, 0.08) !important;
 }
 
 .dark .layout.has-custom-bg .nav-bar,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .nav-bar {
-  background: rgba(10, 14, 26, 0.75) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background: rgba(10, 14, 26, 0.86) !important;
+  backdrop-filter: blur(28px) saturate(190%) contrast(105%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(105%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 -1px 0 rgba(255, 255, 255, 0.12) !important;
 }
 
-/* 🍎 节点卡片与概览卡片毛玻璃拟态 (苹果液态晶体架构) */
-.layout.has-custom-bg .node-card,
-.layout.has-custom-bg .monitor-stat-card,
-.layout.has-custom-bg .monitor-overview,
 /* 🍎 节点卡片、概览卡片与筛选工具栏毛玻璃拟态 (苹果液态晶体架构：支持微晶饱和度与对比度动态物理加成) */
 .layout.has-custom-bg .node-card,
 .layout.has-custom-bg .monitor-stat-card,
 .layout.has-custom-bg .monitor-overview,
 .layout.has-custom-bg .website-monitor-card,
-.layout.has-custom-bg .node-filter-panel {
+.layout.has-custom-bg .node-filter-panel,
+.layout.has-custom-bg .instance-top-processes-card,
+.layout.has-custom-bg .instance-docker-card,
+.layout.has-custom-bg .instance-unlock-card,
+.layout.has-custom-bg .instance-carrier-radar-card,
+.layout.has-custom-bg .instance-node-sidebar-card,
+.layout.has-custom-bg .instance-top-summary {
   position: relative !important;
   border-radius: 16px !important;
-  backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-saturate, 180%)) contrast(var(--glass-contrast, 108%)) !important;
-  -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-saturate, 180%)) contrast(var(--glass-contrast, 108%)) !important;
+  backdrop-filter: blur(var(--glass-blur, 28px)) saturate(var(--glass-saturate, 180%)) contrast(var(--glass-contrast, 108%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(var(--glass-saturate, 180%)) contrast(var(--glass-contrast, 108%)) !important;
   overflow: hidden !important;
   contain: paint;
   transform: translateZ(0);
@@ -7140,11 +7609,15 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .nav-bar {
 .dark .layout.has-custom-bg .node-network-panel,
 .dark .layout.has-custom-bg .monitor-stat-tile,
 .dark .layout.has-custom-bg .website-monitor-tile,
+.dark .layout.has-custom-bg .instance-process-tile,
+.dark .layout.has-custom-bg .instance-docker-row,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .node-card-system-line,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .node-metric-tile,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .node-network-panel,
 html[data-theme-appearance='dark'] .layout.has-custom-bg .monitor-stat-tile,
-html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-tile {
+html[data-theme-appearance='dark'] .layout.has-custom-bg .website-monitor-tile,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .instance-process-tile,
+html[data-theme-appearance='dark'] .layout.has-custom-bg .instance-docker-row {
   background: rgba(255, 255, 255, 0.05) !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
@@ -7184,10 +7657,12 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-network-value {
 :root:not(.dark) .layout.has-custom-bg .node-metric-tile,
 :root:not(.dark) .layout.has-custom-bg .node-network-panel,
 :root:not(.dark) .layout.has-custom-bg .monitor-stat-tile,
-:root:not(.dark) .layout.has-custom-bg .website-monitor-tile {
-  background: rgba(255, 255, 255, 0.35) !important;
-  border: 1px solid rgba(255, 255, 255, 0.65) !important;
-  box-shadow: inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.8), 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+:root:not(.dark) .layout.has-custom-bg .website-monitor-tile,
+:root:not(.dark) .layout.has-custom-bg .instance-process-tile,
+:root:not(.dark) .layout.has-custom-bg .instance-docker-row {
+  background: rgba(255, 255, 255, 0.52) !important;
+  border: 1px solid rgba(255, 255, 255, 0.80) !important;
+  box-shadow: inset 0 1.5px 1.5px 0 rgba(255, 255, 255, 0.9), 0 2px 6px rgba(0, 0, 0, 0.03) !important;
 }
 
 /* -------------------------------------------------------------
@@ -7201,12 +7676,20 @@ html[data-theme-appearance='dark'] .layout.has-custom-bg .node-network-value {
 .dark:not([data-card-material='liquid']) .layout.has-custom-bg .monitor-overview,
 .dark:not([data-card-material='liquid']) .layout.has-custom-bg .website-monitor-card,
 .dark:not([data-card-material='liquid']) .layout.has-custom-bg .node-filter-panel,
+.dark:not([data-card-material='liquid']) .layout.has-custom-bg .instance-top-processes-card,
+.dark:not([data-card-material='liquid']) .layout.has-custom-bg .instance-docker-card,
+.dark:not([data-card-material='liquid']) .layout.has-custom-bg .instance-node-sidebar-card,
+.dark:not([data-card-material='liquid']) .layout.has-custom-bg .instance-top-summary,
 html[data-theme-appearance='dark']:not([data-card-material='liquid']) .layout.has-custom-bg .node-card,
 html[data-theme-appearance='dark']:not([data-card-material='liquid']) .layout.has-custom-bg .monitor-stat-card,
 html[data-theme-appearance='dark']:not([data-card-material='liquid']) .layout.has-custom-bg .monitor-overview,
 html[data-theme-appearance='dark']:not([data-card-material='liquid']) .layout.has-custom-bg .website-monitor-card,
-html[data-theme-appearance='dark']:not([data-card-material='liquid']) .layout.has-custom-bg .node-filter-panel {
-  background-color: rgba(15, 23, 42, var(--glass-opacity, 0.70)) !important;
+html[data-theme-appearance='dark']:not([data-card-material='liquid']) .layout.has-custom-bg .node-filter-panel,
+html[data-theme-appearance='dark']:not([data-card-material='liquid']) .layout.has-custom-bg .instance-top-processes-card,
+html[data-theme-appearance='dark']:not([data-card-material='liquid']) .layout.has-custom-bg .instance-docker-card,
+html[data-theme-appearance='dark']:not([data-card-material='liquid']) .layout.has-custom-bg .instance-node-sidebar-card,
+html[data-theme-appearance='dark']:not([data-card-material='liquid']) .layout.has-custom-bg .instance-top-summary {
+  background-color: rgba(15, 23, 42, var(--glass-opacity, 0.78)) !important;
   background-image: none !important;
   border: 1px solid rgba(255, 255, 255, 0.13) !important;
   box-shadow: 0 10px 32px 0 rgba(0, 0, 0, 0.38) !important;
@@ -7218,12 +7701,24 @@ html[data-theme-appearance='dark']:not([data-card-material='liquid']) .layout.ha
 :root:not(.dark):not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .monitor-overview,
 :root:not(.dark):not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .website-monitor-card,
 :root:not(.dark):not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .node-filter-panel,
+:root:not(.dark):not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .instance-top-processes-card,
+:root:not(.dark):not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .instance-docker-card,
+:root:not(.dark):not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .instance-unlock-card,
+:root:not(.dark):not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .instance-carrier-radar-card,
+:root:not(.dark):not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .instance-node-sidebar-card,
+:root:not(.dark):not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .instance-top-summary,
 html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .node-card,
 html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .monitor-stat-card,
 html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .monitor-overview,
 html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .website-monitor-card,
-html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .node-filter-panel {
-  background-color: rgba(255, 255, 255, var(--glass-opacity, 0.70)) !important;
+html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .node-filter-panel,
+html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .instance-top-processes-card,
+html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .instance-docker-card,
+html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .instance-unlock-card,
+html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .instance-carrier-radar-card,
+html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .instance-node-sidebar-card,
+html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .instance-top-summary {
+  background-color: rgba(255, 255, 255, var(--glass-opacity, 0.82)) !important;
   background-image: none !important;
   border: 1px solid rgba(0, 0, 0, 0.08) !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06) !important;
@@ -7234,7 +7729,11 @@ html:not([data-card-material='liquid']) .layout.has-custom-bg .node-card::before
 html:not([data-card-material='liquid']) .layout.has-custom-bg .monitor-stat-card::before,
 html:not([data-card-material='liquid']) .layout.has-custom-bg .monitor-overview::before,
 html:not([data-card-material='liquid']) .layout.has-custom-bg .website-monitor-card::before,
-html:not([data-card-material='liquid']) .layout.has-custom-bg .node-filter-panel::before {
+html:not([data-card-material='liquid']) .layout.has-custom-bg .node-filter-panel::before,
+html:not([data-card-material='liquid']) .layout.has-custom-bg .instance-top-processes-card::before,
+html:not([data-card-material='liquid']) .layout.has-custom-bg .instance-docker-card::before,
+html:not([data-card-material='liquid']) .layout.has-custom-bg .instance-unlock-card::before,
+html:not([data-card-material='liquid']) .layout.has-custom-bg .instance-carrier-radar-card::before {
   display: var(--glass-glow-display, block) !important;
   content: "" !important;
   position: absolute !important;
@@ -7263,19 +7762,19 @@ html:not([data-card-material='liquid']) .layout.has-custom-bg .website-monitor-t
 html:not([data-card-material='liquid']) .layout.has-custom-bg .node-card:hover,
 html:not([data-card-material='liquid']) .layout.has-custom-bg .monitor-stat-card:hover,
 html:not([data-card-material='liquid']) .layout.has-custom-bg .website-monitor-card:hover {
-  transform: translateY(-3px) !important;
+  transform: translateY(-4px) !important;
 }
 
 .dark:not([data-card-material='liquid']) .layout.has-custom-bg .node-card:hover,
 html[data-theme-appearance='dark']:not([data-card-material='liquid']) .layout.has-custom-bg .node-card:hover {
-  border-color: rgba(255, 255, 255, 0.30) !important;
-  box-shadow: 0 16px 44px -4px rgba(0, 0, 0, 0.55) !important;
+  border-color: rgba(255, 255, 255, 0.40) !important;
+  box-shadow: 0 20px 48px -4px rgba(0, 0, 0, 0.65), 0 0 16px rgba(139, 92, 246, 0.25) !important;
 }
 
 :root:not(.dark):not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .node-card:hover,
 html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .layout.has-custom-bg .node-card:hover {
-  border-color: rgba(0, 0, 0, 0.16) !important;
-  box-shadow: 0 14px 36px -4px rgba(0, 0, 0, 0.10) !important;
+  border-color: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 18px 40px -4px rgba(0, 0, 0, 0.12), 0 0 20px rgba(56, 189, 248, 0.20) !important;
 }
 
 /* -------------------------------------------------------------
@@ -7289,12 +7788,24 @@ html:not([data-theme-appearance='dark']):not([data-card-material='liquid']) .lay
 .dark[data-card-material='liquid'] .layout.has-custom-bg .monitor-overview,
 .dark[data-card-material='liquid'] .layout.has-custom-bg .website-monitor-card,
 .dark[data-card-material='liquid'] .layout.has-custom-bg .node-filter-panel,
+.dark[data-card-material='liquid'] .layout.has-custom-bg .instance-top-processes-card,
+.dark[data-card-material='liquid'] .layout.has-custom-bg .instance-docker-card,
+.dark[data-card-material='liquid'] .layout.has-custom-bg .instance-unlock-card,
+.dark[data-card-material='liquid'] .layout.has-custom-bg .instance-carrier-radar-card,
+.dark[data-card-material='liquid'] .layout.has-custom-bg .instance-node-sidebar-card,
+.dark[data-card-material='liquid'] .layout.has-custom-bg .instance-top-summary,
 html[data-theme-appearance='dark'][data-card-material='liquid'] .layout.has-custom-bg .node-card,
 html[data-theme-appearance='dark'][data-card-material='liquid'] .layout.has-custom-bg .monitor-stat-card,
 html[data-theme-appearance='dark'][data-card-material='liquid'] .layout.has-custom-bg .monitor-overview,
 html[data-theme-appearance='dark'][data-card-material='liquid'] .layout.has-custom-bg .website-monitor-card,
-html[data-theme-appearance='dark'][data-card-material='liquid'] .layout.has-custom-bg .node-filter-panel {
-  background-color: rgba(12, 16, 28, var(--glass-opacity, 0.70)) !important;
+html[data-theme-appearance='dark'][data-card-material='liquid'] .layout.has-custom-bg .node-filter-panel,
+html[data-theme-appearance='dark'][data-card-material='liquid'] .layout.has-custom-bg .instance-top-processes-card,
+html[data-theme-appearance='dark'][data-card-material='liquid'] .layout.has-custom-bg .instance-docker-card,
+html[data-theme-appearance='dark'][data-card-material='liquid'] .layout.has-custom-bg .instance-unlock-card,
+html[data-theme-appearance='dark'][data-card-material='liquid'] .layout.has-custom-bg .instance-carrier-radar-card,
+html[data-theme-appearance='dark'][data-card-material='liquid'] .layout.has-custom-bg .instance-node-sidebar-card,
+html[data-theme-appearance='dark'][data-card-material='liquid'] .layout.has-custom-bg .instance-top-summary {
+  background-color: rgba(12, 16, 28, var(--glass-opacity, 0.78)) !important;
   background-image: 
     linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.00) 100%),
     radial-gradient(circle at 10% 10%, rgba(139, 92, 246, 0.12), transparent 45%),
@@ -7317,12 +7828,24 @@ html[data-theme-appearance='dark'][data-card-material='liquid'] .layout.has-cust
 :root:not(.dark):not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .monitor-overview,
 :root:not(.dark):not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .website-monitor-card,
 :root:not(.dark):not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .node-filter-panel,
+:root:not(.dark):not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .instance-top-processes-card,
+:root:not(.dark):not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .instance-docker-card,
+:root:not(.dark):not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .instance-unlock-card,
+:root:not(.dark):not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .instance-carrier-radar-card,
+:root:not(.dark):not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .instance-node-sidebar-card,
+:root:not(.dark):not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .instance-top-summary,
 html:not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .node-card,
 html:not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .monitor-stat-card,
 html:not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .monitor-overview,
 html:not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .website-monitor-card,
-html:not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .node-filter-panel {
-  background-color: rgba(255, 255, 255, var(--glass-opacity, 0.70)) !important;
+html:not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .node-filter-panel,
+html:not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .instance-top-processes-card,
+html:not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .instance-docker-card,
+html:not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .instance-unlock-card,
+html:not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .instance-carrier-radar-card,
+html:not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .instance-node-sidebar-card,
+html:not([data-theme-appearance='dark'])[data-card-material='liquid'] .layout.has-custom-bg .instance-top-summary {
+  background-color: rgba(255, 255, 255, var(--glass-opacity, 0.82)) !important;
   background-image: 
     linear-gradient(135deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.01) 100%),
     radial-gradient(circle at 15% 15%, rgba(224, 242, 254, 0.25), transparent 50%),
@@ -7358,7 +7881,11 @@ html[data-card-material='liquid'] .layout.has-custom-bg .node-card::before,
 html[data-card-material='liquid'] .layout.has-custom-bg .monitor-stat-card::before,
 html[data-card-material='liquid'] .layout.has-custom-bg .monitor-overview::before,
 html[data-card-material='liquid'] .layout.has-custom-bg .website-monitor-card::before,
-html[data-card-material='liquid'] .layout.has-custom-bg .node-filter-panel::before {
+html[data-card-material='liquid'] .layout.has-custom-bg .node-filter-panel::before,
+html[data-card-material='liquid'] .layout.has-custom-bg .instance-top-processes-card::before,
+html[data-card-material='liquid'] .layout.has-custom-bg .instance-docker-card::before,
+html[data-card-material='liquid'] .layout.has-custom-bg .instance-unlock-card::before,
+html[data-card-material='liquid'] .layout.has-custom-bg .instance-carrier-radar-card::before {
   display: var(--glass-glow-display, block) !important;
   content: "" !important;
   position: absolute !important;

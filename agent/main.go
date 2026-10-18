@@ -37,7 +37,7 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
-var Version = "v2.0.4"
+var Version = "v2.1.0-custom"
 
 const basicInfoRefreshInterval = 30 * time.Minute
 const defaultPingIntervalSec = 120
@@ -135,6 +135,29 @@ type BasicInfo struct {
 	Uptime         int64  `json:"uptime"`
 }
 
+type ProcessInfo struct {
+	PID  int32   `json:"pid"`
+	Name string  `json:"name"`
+	CPU  float64 `json:"cpu"`
+	RAM  float32 `json:"ram"`
+}
+
+type DockerContainerInfo struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Image   string `json:"image"`
+	State   string `json:"state"`
+	Status  string `json:"status"`
+	Created int64  `json:"created"`
+}
+
+type UnlockItem struct {
+	Platform string `json:"platform"`
+	Status   string `json:"status"`
+	Region   string `json:"region,omitempty"`
+	Detail   string `json:"detail,omitempty"`
+}
+
 type Report struct {
 	CPU                 float64              `json:"cpu"`
 	GPU                 float64              `json:"gpu"`
@@ -164,6 +187,9 @@ type Report struct {
 	BasicInfo           *BasicInfo           `json:"basic_info,omitempty"`
 	PingResults         []PingResult         `json:"ping_results,omitempty"`
 	WebsiteProbeResults []WebsiteProbeResult `json:"website_probe_results,omitempty"`
+	TopProcesses        []ProcessInfo        `json:"top_processes,omitempty"`
+	DockerContainers    []DockerContainerInfo `json:"docker_containers,omitempty"`
+	UnlockItems         []UnlockItem         `json:"unlock_items,omitempty"`
 
 	hasRawNetTotals bool
 	rawNetTotalUp   int64
@@ -437,6 +463,9 @@ func main() {
 	logFilter("disk exclude", mountExclude)
 	logFilter("network include", nicInclude)
 	logFilter("network exclude", nicExclude)
+
+	go refreshTopProcesses()
+	go refreshUnlockItems()
 
 	switch reportMode {
 	case "websocket", "ws":
@@ -2679,6 +2708,268 @@ func (s *cpuUsageSampler) usage() float64 {
 	return usage
 }
 
+var (
+	topProcessesCache   []ProcessInfo
+	topProcessesMu      sync.RWMutex
+	topProcessesLastRun time.Time
+	topProcessesRunning bool
+
+	dockerContainersCache   []DockerContainerInfo
+	dockerContainersMu      sync.RWMutex
+	dockerContainersLastRun time.Time
+	dockerContainersRunning bool
+
+	unlockItemsCache   []UnlockItem
+	unlockItemsMu      sync.RWMutex
+	unlockItemsLastRun time.Time
+	unlockItemsRunning bool
+)
+
+func getCachedTopProcesses() []ProcessInfo {
+	topProcessesMu.RLock()
+	if time.Since(topProcessesLastRun) < 15*time.Second && len(topProcessesCache) > 0 {
+		res := make([]ProcessInfo, len(topProcessesCache))
+		copy(res, topProcessesCache)
+		topProcessesMu.RUnlock()
+		return res
+	}
+	topProcessesMu.RUnlock()
+
+	go refreshTopProcesses()
+
+	topProcessesMu.RLock()
+	defer topProcessesMu.RUnlock()
+	res := make([]ProcessInfo, len(topProcessesCache))
+	copy(res, topProcessesCache)
+	return res
+}
+
+func refreshTopProcesses() {
+	topProcessesMu.Lock()
+	if topProcessesRunning || (time.Since(topProcessesLastRun) < 15*time.Second && len(topProcessesCache) > 0) {
+		topProcessesMu.Unlock()
+		return
+	}
+	topProcessesRunning = true
+	topProcessesLastRun = time.Now()
+	topProcessesMu.Unlock()
+
+	defer func() {
+		topProcessesMu.Lock()
+		topProcessesRunning = false
+		topProcessesMu.Unlock()
+	}()
+
+	procs, err := process.Processes()
+	if err != nil {
+		return
+	}
+
+	type procItem struct {
+		pid  int32
+		name string
+		cpu  float64
+		ram  float32
+	}
+
+	var list []procItem
+	for _, p := range procs {
+		c, err := p.CPUPercent()
+		if err != nil {
+			c = 0
+		}
+		m, _ := p.MemoryPercent()
+		name, _ := p.Name()
+		if name == "" {
+			continue
+		}
+		// 安全脱敏：去除可执行文件路径前缀（如 /usr/bin/python3 归一为 python3），防止暴露系统内部绝对路径
+		name = filepath.Base(strings.TrimSpace(name))
+		if name == "" || name == "." || name == "/" {
+			continue
+		}
+		if len(name) > 64 {
+			name = name[:64]
+		}
+		list = append(list, procItem{
+			pid:  p.Pid,
+			name: name,
+			cpu:  math.Round(c*10) / 10,
+			ram:  float32(math.Round(float64(m)*10) / 10),
+		})
+	}
+
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].cpu == list[j].cpu {
+			return list[i].ram > list[j].ram
+		}
+		return list[i].cpu > list[j].cpu
+	})
+
+	limit := 10
+	if len(list) < limit {
+		limit = len(list)
+	}
+
+	result := make([]ProcessInfo, 0, limit)
+	for i := 0; i < limit; i++ {
+		result = append(result, ProcessInfo{
+			PID:  list[i].pid,
+			Name: list[i].name,
+			CPU:  list[i].cpu,
+			RAM:  list[i].ram,
+		})
+	}
+
+	topProcessesMu.Lock()
+	topProcessesCache = result
+	topProcessesMu.Unlock()
+}
+
+func getCachedDockerContainers() []DockerContainerInfo {
+	return nil
+}
+
+func refreshDockerContainers() {}
+
+func getCachedUnlockItems() []UnlockItem {
+	unlockItemsMu.RLock()
+	if time.Since(unlockItemsLastRun) < 30*time.Minute && len(unlockItemsCache) > 0 {
+		res := make([]UnlockItem, len(unlockItemsCache))
+		copy(res, unlockItemsCache)
+		unlockItemsMu.RUnlock()
+		return res
+	}
+	unlockItemsMu.RUnlock()
+
+	go refreshUnlockItems()
+
+	unlockItemsMu.RLock()
+	defer unlockItemsMu.RUnlock()
+	res := make([]UnlockItem, len(unlockItemsCache))
+	copy(res, unlockItemsCache)
+	return res
+}
+
+func refreshUnlockItems() {
+	unlockItemsMu.Lock()
+	if unlockItemsRunning || (time.Since(unlockItemsLastRun) < 30*time.Minute && len(unlockItemsCache) > 0) {
+		unlockItemsMu.Unlock()
+		return
+	}
+	unlockItemsRunning = true
+	unlockItemsLastRun = time.Now()
+	unlockItemsMu.Unlock()
+
+	defer func() {
+		unlockItemsMu.Lock()
+		unlockItemsRunning = false
+		unlockItemsMu.Unlock()
+	}()
+
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+		Transport: &http.Transport{
+			TLSHandshakeTimeout: 3 * time.Second,
+		},
+	}
+
+	var items []UnlockItem
+
+	// 1. ChatGPT
+	chatGptItem := UnlockItem{Platform: "ChatGPT", Status: "no"}
+	req, _ := http.NewRequest("GET", "https://chatgpt.com/cdn-cgi/trace", nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	if resp, err := client.Do(req); err == nil {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		resp.Body.Close()
+		text := string(body)
+		if strings.Contains(text, "loc=") {
+			for _, line := range strings.Split(text, "\n") {
+				if strings.HasPrefix(line, "loc=") {
+					loc := strings.TrimPrefix(line, "loc=")
+					if loc == "CN" || loc == "RU" || loc == "IR" {
+						chatGptItem.Status = "no"
+					} else {
+						chatGptItem.Status = "yes"
+						chatGptItem.Region = loc
+					}
+					break
+				}
+			}
+		}
+	}
+	items = append(items, chatGptItem)
+
+	// 2. Claude
+	claudeItem := UnlockItem{Platform: "Claude", Status: "no"}
+	reqClaude, _ := http.NewRequest("GET", "https://claude.ai/api/auth/current_account", nil)
+	reqClaude.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	if resp, err := client.Do(reqClaude); err == nil {
+		resp.Body.Close()
+		if resp.StatusCode == 200 || resp.StatusCode == 401 {
+			claudeItem.Status = "yes"
+		} else if resp.StatusCode == 403 {
+			claudeItem.Status = "no"
+			claudeItem.Detail = "Cloudflare Block"
+		}
+	}
+	items = append(items, claudeItem)
+
+	// 3. Google Gemini
+	geminiItem := UnlockItem{Platform: "Gemini", Status: "no"}
+	reqGemini, _ := http.NewRequest("GET", "https://gemini.google.com/", nil)
+	reqGemini.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+	if resp, err := client.Do(reqGemini); err == nil {
+		resp.Body.Close()
+		if resp.StatusCode == 200 {
+			geminiItem.Status = "yes"
+		}
+	}
+	items = append(items, geminiItem)
+
+	// 4. Netflix
+	netflixItem := UnlockItem{Platform: "Netflix", Status: "no"}
+	reqNf, _ := http.NewRequest("GET", "https://www.netflix.com/title/70143836", nil)
+	reqNf.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+	if resp, err := client.Do(reqNf); err == nil {
+		resp.Body.Close()
+		if resp.StatusCode == 200 {
+			netflixItem.Status = "full"
+		} else {
+			reqOrig, _ := http.NewRequest("GET", "https://www.netflix.com/title/80018499", nil)
+			reqOrig.Header.Set("User-Agent", "Mozilla/5.0")
+			if respOrig, errOrig := client.Do(reqOrig); errOrig == nil {
+				respOrig.Body.Close()
+				if respOrig.StatusCode == 200 {
+					netflixItem.Status = "original_only"
+				}
+			}
+		}
+	}
+	items = append(items, netflixItem)
+
+	// 5. YouTube Premium
+	ytItem := UnlockItem{Platform: "YouTube", Status: "yes"}
+	reqYt, _ := http.NewRequest("GET", "https://www.youtube.com/premium", nil)
+	reqYt.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+	if resp, err := client.Do(reqYt); err == nil {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 10240))
+		resp.Body.Close()
+		content := string(body)
+		if strings.Contains(content, "Premium is not available in your country") || strings.Contains(content, "目前在您所在的国家/地区尚未推出") {
+			ytItem.Status = "no"
+		} else {
+			ytItem.Status = "yes"
+		}
+	}
+	items = append(items, ytItem)
+
+	unlockItemsMu.Lock()
+	unlockItemsCache = items
+	unlockItemsMu.Unlock()
+}
+
 func collectReportWithInterval(intervalSec int) Report {
 	now := time.Now()
 	r := Report{Version: Version, ReportInterval: intervalSec, Timestamp: now.UnixMilli()}
@@ -2730,6 +3021,10 @@ func collectReportWithInterval(intervalSec int) Report {
 		}
 	}
 	gpuDetailsMu.Unlock()
+
+	r.TopProcesses = getCachedTopProcesses()
+	r.DockerContainers = getCachedDockerContainers()
+	r.UnlockItems = getCachedUnlockItems()
 
 	return r
 }

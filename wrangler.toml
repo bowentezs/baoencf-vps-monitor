@@ -46,4 +46,4 @@ SUPABASE_URL = "https://PROJECT_REF.supabase.co"
 [assets]
 directory = "frontend/dist"
 not_found_handling = "single-page-application"
-run_worker_first = ["/api/*", "/ping", "/agent/*"]
+run_worker_first = ["/api/*", "/ping", "/agent/*", "/download/SHA256SUMS"]

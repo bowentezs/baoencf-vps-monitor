@@ -273,6 +273,7 @@ function publicJsonResponse(c: PublicContext, value: unknown, maxAgeSeconds: num
       'Content-Type': 'application/json; charset=UTF-8',
       'Cache-Control': `public, max-age=${maxAgeSeconds}, s-maxage=${maxAgeSeconds}, stale-while-revalidate=${maxAgeSeconds * 2}`,
       'X-CF-VPS-Monitor-Public-Cache': cacheState,
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
     },
   });
 }
@@ -283,6 +284,7 @@ function withPublicCacheHeader(c: PublicContext, response: Response, maxAgeSecon
   const headers = new Headers(response.headers);
   headers.set('Cache-Control', `public, max-age=${maxAgeSeconds}, s-maxage=${maxAgeSeconds}, stale-while-revalidate=${maxAgeSeconds * 2}`);
   headers.set('X-CF-VPS-Monitor-Public-Cache', cacheState);
+  headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -517,6 +519,7 @@ function privateJsonResponse(value: unknown): Response {
     headers: {
       'Content-Type': 'application/json; charset=UTF-8',
       'Cache-Control': 'no-store',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
     },
   });
 }

@@ -25,6 +25,29 @@ import { notifyPublicDataUpdated, subscribePublicDataUpdated } from '../utils/pu
 import { notifyWebsiteMonitorsUpdated, type WebsiteMonitorsUpdateDetail } from '../utils/websiteMonitorEvents';
 import { useAuth } from './AuthContext';
 
+export interface ProcessInfo {
+  pid: number;
+  name: string;
+  cpu: number;
+  ram: number;
+}
+
+export interface DockerContainerInfo {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+  created: number;
+}
+
+export interface UnlockItem {
+  platform: string;
+  status: string;
+  region?: string;
+  detail?: string;
+}
+
 export interface LiveRecord {
   cpu: number;
   gpu?: number;
@@ -45,6 +68,9 @@ export interface LiveRecord {
   connections: number;
   connections_udp: number;
   message?: string;
+  top_processes?: ProcessInfo[];
+  docker_containers?: DockerContainerInfo[];
+  unlock_items?: UnlockItem[];
 }
 
 export interface LiveDataResponse {

@@ -7,7 +7,8 @@ import {
 import {
   ArrowLeft,
   Server, Globe, Activity,
-  Layers, RotateCcw
+  Layers, RotateCcw, Cpu, Boxes,
+  ChevronDown, ArrowUp
 } from 'lucide-react';
 import {
   DndContext,
@@ -30,6 +31,8 @@ import DetailsGrid from '../components/DetailsGrid';
 import Flag from '../components/Flag';
 import PingYAxisTick from '../components/PingYAxisTick';
 import PingHeartbeatBar from '../components/PingHeartbeatBar';
+import UnlockMatrix from '../components/UnlockMatrix';
+import CarrierRadar, { matchTaskCarrier, type CarrierKey } from '../components/CarrierRadar';
 import { useLiveData } from '../contexts/LiveDataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { publicFetch } from '../utils/api';
@@ -66,6 +69,7 @@ type TimeRange = '1h' | '4h' | '24h' | '3d';
 type PingTimeRange = '1h' | '6h' | '24h' | '3d';
 type ChartTab = 'cpu' | 'ram' | 'disk' | 'network' | 'connections' | 'process' | 'temp' | 'gpu';
 type TrafficRangeDays = 7 | 30;
+type InstanceViewTab = 'all' | 'ops' | 'network' | 'metrics';
 
 const pingTimeRangeHours: Record<PingTimeRange, number> = {
   '1h': 1,
@@ -381,6 +385,8 @@ function historyQuery(params: Record<string, string | number | undefined>): stri
   return query.toString();
 }
 
+
+
 export default function Instance() {
   const { uuid } = useParams<{ uuid: string }>();
   const navigate = useNavigate();
@@ -399,6 +405,48 @@ export default function Instance() {
   const [pingError, setPingError] = useState<string | null>(null);
   const [pingTimeRange, setPingTimeRange] = useState<PingTimeRange>('1h');
   const [activePingTaskId, setActivePingTaskId] = useState<number | 'all'>('all');
+  const [activeCarrier, setActiveCarrier] = useState<CarrierKey>('all');
+  const [pingFilterCarrier, setPingFilterCarrier] = useState<CarrierKey | 'loss'>('all');
+
+  const handleSelectCarrier = (carrier: CarrierKey, taskIds: number[]) => {
+    if (carrier === 'all' || activeCarrier === carrier) {
+      setActiveCarrier('all');
+      setPingFilterCarrier('all');
+    } else {
+      setActiveCarrier(carrier);
+      setPingFilterCarrier(carrier);
+    }
+    // 保持多线对比，不强行裁切为单线
+    if (typeof activePingTaskId === 'number' && !taskIds.includes(activePingTaskId)) {
+      setActivePingTaskId('all');
+    }
+  };
+
+  const handleFilterCarrierChange = (filter: CarrierKey | 'loss') => {
+    setPingFilterCarrier(filter);
+    if (filter === 'loss' || filter === 'all') {
+      setActiveCarrier('all');
+    } else {
+      setActiveCarrier(filter);
+    }
+    if (typeof activePingTaskId === 'number') {
+      const currentItem = orderedPingSeries.find((item) => item.task.id === activePingTaskId);
+      if (currentItem) {
+        if (filter === 'loss') {
+          const q = getPingSeriesQuality(currentItem.records);
+          if (q.packetLossPercent === 0 && q.lostPackets === 0) {
+            setActivePingTaskId('all');
+          }
+        } else if (filter !== 'all') {
+          const c = matchTaskCarrier(currentItem.task.label, currentItem.task.target);
+          if (c !== filter) {
+            setActivePingTaskId('all');
+          }
+        }
+      }
+    }
+  };
+
   const [hoveredPingKey, setHoveredPingKey] = useState<string | null>(null);
   const [pingTooltipStyle, setPingTooltipStyle] = useState<'capsule' | 'full'>(() => {
     const saved = getLocalStorageItem('instancePingTooltipStyle');
@@ -425,6 +473,41 @@ export default function Instance() {
     setDailyTrafficChartType(next);
     setLocalStorageItem('dailyTrafficChartType', next);
   };
+
+  const [activeViewTab, setActiveViewTab] = useState<InstanceViewTab>(() => {
+    const saved = getLocalStorageItem('instanceActiveViewTab');
+    return saved === 'ops' || saved === 'network' || saved === 'metrics' || saved === 'all'
+      ? saved
+      : 'all';
+  });
+
+  const handleViewTabChange = (value: string) => {
+    const next = value as InstanceViewTab;
+    setActiveViewTab(next);
+    setLocalStorageItem('instanceActiveViewTab', next);
+  };
+
+  const [isDetailsCollapsed, setIsDetailsCollapsed] = useState<boolean>(() => {
+    return getLocalStorageItem('instanceDetailsCollapsed') === 'true';
+  });
+
+  const toggleDetailsCollapse = () => {
+    setIsDetailsCollapsed((prev) => {
+      const next = !prev;
+      setLocalStorageItem('instanceDetailsCollapsed', String(next));
+      return next;
+    });
+  };
+
+  const [showBackToTop, setShowBackToTop] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 350);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   const pingSectionRef = useRef<HTMLDivElement | null>(null);
   const scrollPosRef = useRef<number | null>(null);
   const isDraggingPingRef = useRef(false);
@@ -532,7 +615,13 @@ export default function Instance() {
   // Load history records
   useEffect(() => {
     let cancelled = false;
-    if (!uuid || authLoading) return;
+    if (!uuid) {
+      setRecords([]);
+      setRecordsLoading(false);
+      return () => { cancelled = true; };
+    }
+    if (authLoading) return () => { cancelled = true; };
+
     setRecordsLoading(true);
     const endTs = Date.now();
     const startTs = endTs - timeRangeMs[timeRange];
@@ -541,7 +630,13 @@ export default function Instance() {
     const limit = timeRangePointLimit[timeRange];
     setRecordsRangeEnd(endTs);
 
-    publicFetch(`/records/load?${historyQuery({ uuid, start, end, cursor: end, limit, include_hidden: isAuthenticated ? 1 : undefined })}`)
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
+
+    publicFetch(
+      `/records/load?${historyQuery({ uuid, start, end, cursor: end, limit, include_hidden: isAuthenticated ? 1 : undefined })}`,
+      { signal: controller.signal },
+    )
       .then((data) => {
         if (!cancelled) {
           setRecords(normalizePublicMonitorRecords(data));
@@ -549,35 +644,60 @@ export default function Instance() {
       })
       .catch(() => {})
       .finally(() => {
+        window.clearTimeout(timeoutId);
         if (!cancelled) setRecordsLoading(false);
       });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timeoutId);
+      controller.abort();
     };
   }, [uuid, authLoading, isAuthenticated, timeRange]);
 
   useEffect(() => {
     let cancelled = false;
-    if (!uuid || authLoading) return () => { cancelled = true; };
+    if (!uuid) {
+      setDailyTraffic([]);
+      setDailyTrafficLoading(false);
+      return () => { cancelled = true; };
+    }
+    if (authLoading) return () => { cancelled = true; };
+
     setDailyTrafficLoading(true);
     setDailyTrafficError(false);
-    publicFetch(`/traffic/daily?days=${trafficRangeDays}${isAuthenticated ? '&include_hidden=1' : ''}`)
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
+
+    publicFetch(
+      `/traffic/daily?days=${trafficRangeDays}${isAuthenticated ? '&include_hidden=1' : ''}`,
+      { signal: controller.signal },
+    )
       .then((payload) => {
         const normalized = normalizeDailyTrafficResponse(payload);
         if (!normalized) throw new Error('Invalid daily traffic response');
-        if (!cancelled) setDailyTraffic(normalized.data.filter((row) => row.client === uuid));
+        if (!cancelled) {
+          setDailyTraffic(normalized.data.filter((row) => row.client === uuid));
+          setDailyTrafficError(false);
+        }
       })
       .catch(() => {
-        if (!cancelled) {
+        if (!cancelled && !controller.signal.aborted) {
           setDailyTraffic([]);
           setDailyTrafficError(true);
         }
       })
       .finally(() => {
+        window.clearTimeout(timeoutId);
         if (!cancelled) setDailyTrafficLoading(false);
       });
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [uuid, trafficRangeDays, authLoading, isAuthenticated]);
 
   useEffect(() => {
@@ -593,6 +713,10 @@ export default function Instance() {
     setPingError(null);
     setPingLoading(false);
     setActivePingTaskId('all');
+    setActiveCarrier('all');
+    setPingFilterCarrier('all');
+    setDailyTraffic([]);
+    setDailyTrafficError(false);
   }, [uuid]);
 
   useEffect(() => {
@@ -610,12 +734,20 @@ export default function Instance() {
     }, { rootMargin: '240px 0px' });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [shouldLoadPing, uuid]);
+  }, [shouldLoadPing, uuid, client]);
 
   // Load ping tasks and records only when the Ping card is near the viewport.
   useEffect(() => {
-    if (!uuid || authLoading || !shouldLoadPing) return;
+    let cancelled = false;
+    if (!uuid || !shouldLoadPing) {
+      setPingLoading(false);
+      return () => { cancelled = true; };
+    }
+    if (authLoading) return () => { cancelled = true; };
+
     const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
+
     setPingSeries([]);
     setPingError(null);
     setPingLoading(true);
@@ -629,19 +761,27 @@ export default function Instance() {
       signal: controller.signal,
     })
       .then((series) => {
-        if (!controller.signal.aborted) setPingSeries(series);
+        if (!cancelled) {
+          setPingSeries(series);
+          setPingError(null);
+        }
       })
       .catch(() => {
-        if (!controller.signal.aborted) {
+        if (!cancelled && !controller.signal.aborted) {
           setPingError('加载 Ping 数据失败');
           setPingSeries([]);
         }
       })
       .finally(() => {
-        if (!controller.signal.aborted) setPingLoading(false);
+        window.clearTimeout(timeoutId);
+        if (!cancelled) setPingLoading(false);
       });
 
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [shouldLoadPing, pingTimeRange, uuid, authLoading, isAuthenticated]);
 
   // Load GPU records (only for GPU-capable clients)
@@ -675,6 +815,34 @@ export default function Instance() {
       time: latestRecordTime,
     } as PublicMonitorRecord)
     : latestHistory;
+
+  const aggregatedProcesses = useMemo(() => {
+    // 权限门禁：仅管理员登录可见活跃进程，未登录外部访客完全绝缘，防止资产刺探
+    if (!isAuthenticated || !latest?.top_processes || latest.top_processes.length === 0) return [];
+    const map = new Map<string, { pid: number; name: string; cpu: number; ram: number; count: number }>();
+    for (const proc of latest.top_processes) {
+      // 路径脱敏：彻底剔除父路径（如 /usr/bin/python3 归一为 python3），避免泄露系统绝对目录结构
+      const rawName = String(proc.name || '').trim();
+      const sanitizedName = rawName.replace(/^.*[\\/]/, '') || rawName || 'unknown';
+      const existing = map.get(sanitizedName);
+      if (!existing) {
+        map.set(sanitizedName, {
+          pid: proc.pid,
+          name: sanitizedName,
+          cpu: proc.cpu,
+          ram: proc.ram,
+          count: 1,
+        });
+      } else {
+        existing.cpu = Math.round((existing.cpu + proc.cpu) * 10) / 10;
+        existing.ram = Math.round((existing.ram + proc.ram) * 10) / 10;
+        existing.count += 1;
+      }
+    }
+    return Array.from(map.values())
+      .sort((a, b) => (b.cpu === a.cpu ? b.ram - a.ram : b.cpu - a.cpu))
+      .slice(0, 5);
+  }, [isAuthenticated, latest?.top_processes]);
 
   const chartTimeFormatter = (value: unknown) => {
     const dateInput = typeof value === 'string' || typeof value === 'number' || value instanceof Date ? value : '';
@@ -711,7 +879,45 @@ export default function Instance() {
     });
   }, [pingSeriesWithRecords, pingTaskOrder, isAuthenticated]);
 
-  const sortableTaskIds = useMemo(() => orderedPingSeries.map((item) => item.task.id), [orderedPingSeries]);
+  const carrierCounts = useMemo(() => {
+    const counts = {
+      all: orderedPingSeries.length,
+      ct: 0,
+      cu: 0,
+      cm: 0,
+      intl: 0,
+      loss: 0,
+    };
+    for (const item of orderedPingSeries) {
+      const carrier = matchTaskCarrier(item.task.label, item.task.target);
+      if (carrier in counts) {
+        counts[carrier as keyof typeof counts] += 1;
+      }
+      const quality = getPingSeriesQuality(item.records);
+      if (quality.packetLossPercent > 0 || quality.lostPackets > 0) {
+        counts.loss += 1;
+      }
+    }
+    return counts;
+  }, [orderedPingSeries]);
+
+  const displayPingSeries = useMemo(() => {
+    if (pingFilterCarrier === 'all') return orderedPingSeries;
+    if (pingFilterCarrier === 'loss') {
+      return orderedPingSeries.filter((item) => {
+        const q = getPingSeriesQuality(item.records);
+        return q.packetLossPercent > 0 || q.lostPackets > 0;
+      });
+    }
+    return orderedPingSeries.filter((item) => {
+      return matchTaskCarrier(item.task.label, item.task.target) === pingFilterCarrier;
+    });
+  }, [orderedPingSeries, pingFilterCarrier]);
+
+  const displaySortableTaskIds = useMemo(
+    () => displayPingSeries.map((item) => item.task.id),
+    [displayPingSeries]
+  );
 
   const hasCustomPingOrder = useMemo(() => {
     if (!isAuthenticated || pingTaskOrder.length === 0 || pingSeriesWithRecords.length === 0) return false;
@@ -805,6 +1011,13 @@ export default function Instance() {
     label: row.day.slice(5).replace('-', '/'),
   }));
   const todayTraffic = dailyTraffic[dailyTraffic.length - 1];
+  const showMetrics = activeViewTab === 'all' || activeViewTab === 'metrics';
+  const showNetwork = activeViewTab === 'all' || activeViewTab === 'network';
+  const hasOpsData = Boolean(
+    (isAuthenticated && latest?.top_processes && latest.top_processes.length > 0) ||
+    (latest?.unlock_items && latest.unlock_items.length > 0)
+  );
+  const showOps = activeViewTab === 'ops' || (activeViewTab === 'all' && hasOpsData);
 
   if (!client && clientLoading) return <Loading />;
   if (error || !client) return <Text color="red" align="center" style={{ padding: 40 }}>{error || '未找到'}</Text>;
@@ -826,29 +1039,125 @@ export default function Instance() {
 
         <section className="instance-detail-panel">
       {/* Top bar */}
-      <Flex justify="between" align="center" mb="4">
-        <Button variant="ghost" onClick={() => navigate('/')}>
-          <ArrowLeft size={16} /> 返回
-        </Button>
+      <Flex justify="between" align="center" mb="3">
+        <button
+          type="button"
+          className="instance-back-pill"
+          onClick={() => navigate('/')}
+        >
+          <ArrowLeft size={15} />
+          <span>返回节点大厅</span>
+        </button>
       </Flex>
 
       {/* Header + compact details */}
       <Card className="instance-top-summary" mb="3">
-        <Flex align="center" gap="3" wrap="wrap" className="instance-top-summary-header">
-          <Server size={26} color="var(--accent-9)" />
-          <Heading size="5">{client.name}</Heading>
-          {client.region && <Badge color="gray"><Globe size={12} /> {client.region}</Badge>}
-          {client.group && <Badge color="purple"><Layers size={12} /> {client.group}</Badge>}
-          {latest && (
-            <Badge color="green" variant="solid">
-              <Activity size={12} /> 已运行 {formatUptime(latest.uptime)}
-            </Badge>
-          )}
+        <Flex justify="between" align="center" gap="3" wrap="wrap" className="instance-top-summary-header">
+          <Flex align="center" gap="3" wrap="wrap">
+            <Server size={24} color="var(--accent-9)" />
+            <Heading size="5">{client.name}</Heading>
+            {client.region && <Badge color="gray"><Globe size={12} /> {client.region}</Badge>}
+            {client.group && <Badge color="purple"><Layers size={12} /> {client.group}</Badge>}
+            {latest && (
+              <Badge color="green" variant="solid">
+                <Activity size={12} /> 已运行 {formatUptime(latest.uptime)}
+              </Badge>
+            )}
+          </Flex>
+          <button
+            type="button"
+            className="instance-collapse-toggle-btn"
+            onClick={toggleDetailsCollapse}
+            title={isDetailsCollapsed ? '展开硬件规格' : '折叠硬件规格'}
+          >
+            <span className={`instance-toggle-icon ${isDetailsCollapsed ? 'is-collapsed' : ''}`}>
+              <ChevronDown size={13} />
+            </span>
+            <span>{isDetailsCollapsed ? '展开硬件规格' : '折叠规格'}</span>
+          </button>
         </Flex>
-        <DetailsGrid client={client} live={latest} compact remark={client.public_remark} />
+        <div className={`instance-details-collapsible ${isDetailsCollapsed ? 'collapsed' : ''}`} style={{ marginTop: isDetailsCollapsed ? 0 : 8 }}>
+          <DetailsGrid client={client} live={latest} compact remark={client.public_remark} />
+        </div>
       </Card>
 
-      <Card className="instance-daily-traffic-card" mb="4">
+      {/* 🚀 视图切换胶囊导航与快捷直达锚点 */}
+      <Flex justify="between" align="center" mb="3" wrap="wrap" gap="2" className="instance-view-nav-bar">
+        <SegmentedControl.Root
+          size="2"
+          value={activeViewTab}
+          onValueChange={handleViewTabChange}
+          style={{ borderRadius: 99, background: 'var(--gray-a3)' }}
+        >
+          <SegmentedControl.Item value="all">
+            <Flex align="center" gap="1">
+              <Layers size={13} />
+              <span>全部总览</span>
+            </Flex>
+          </SegmentedControl.Item>
+          <SegmentedControl.Item value="ops">
+            <Flex align="center" gap="1">
+              <Boxes size={13} />
+              <span>系统负载与解锁</span>
+            </Flex>
+          </SegmentedControl.Item>
+          <SegmentedControl.Item value="network">
+            <Flex align="center" gap="1">
+              <Activity size={13} />
+              <span>三网骨干与Ping</span>
+            </Flex>
+          </SegmentedControl.Item>
+          <SegmentedControl.Item value="metrics">
+            <Flex align="center" gap="1">
+              <Cpu size={13} />
+              <span>性能监控与流量</span>
+            </Flex>
+          </SegmentedControl.Item>
+        </SegmentedControl.Root>
+
+        {activeViewTab === 'all' && (
+          <Flex align="center" gap="1" wrap="wrap" className="instance-quick-anchor-pills">
+            <Text size="1" color="gray" style={{ fontSize: 11, marginRight: 2 }}>
+              直达:
+            </Text>
+            <button
+              type="button"
+              className="instance-anchor-btn"
+              onClick={() => document.getElementById('sec-traffic')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              📶 每日流量
+            </button>
+            <button
+              type="button"
+              className="instance-anchor-btn"
+              onClick={() => document.getElementById('sec-metrics')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              📈 性能折线
+            </button>
+            <button
+              type="button"
+              className="instance-anchor-btn"
+              onClick={() => document.getElementById('sec-network')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              🌐 三网雷达
+            </button>
+            {hasOpsData && (
+              <button
+                type="button"
+                className="instance-anchor-btn"
+                onClick={() => document.getElementById('sec-ops')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                🚀 负载与解锁
+              </button>
+            )}
+          </Flex>
+        )}
+      </Flex>
+
+      {/* 模块 A：每日流量统计 */}
+      {showMetrics && (
+        <div id="sec-traffic">
+          <Card className="instance-daily-traffic-card" mb="4">
         <Flex justify="between" align="center" mb="3" gap="3" wrap="wrap">
           <Box>
             <Text weight="bold" as="p">每日流量</Text>
@@ -908,7 +1217,7 @@ export default function Instance() {
                     stroke="var(--blue-9)"
                     strokeWidth={2}
                     dot={false}
-                    activeDot={{ r: 5 }}
+                    activeDot={false}
                     isAnimationActive={false}
                   />
                   <Line
@@ -918,7 +1227,7 @@ export default function Instance() {
                     stroke="var(--green-9)"
                     strokeWidth={2}
                     dot={false}
-                    activeDot={{ r: 5 }}
+                    activeDot={false}
                     isAnimationActive={false}
                   />
                 </LineChart>
@@ -945,8 +1254,12 @@ export default function Instance() {
           )}
         </Box>
       </Card>
+      </div>
+      )}
 
-      {/* Chart section */}
+      {/* 模块 B：性能历史监控图表 */}
+      {showMetrics && (
+      <div id="sec-metrics">
       <Card mb="4">
         <Flex justify="between" align="center" mb="3" gap="3" wrap="wrap">
           <Text weight="bold">监控图表 · {timeRange === '1h' ? '最近1小时' : timeRange === '4h' ? '最近4小时' : timeRange === '24h' ? '最近24小时' : '最近3天'}</Text>
@@ -1112,13 +1425,24 @@ export default function Instance() {
           </Box>
         </Tabs.Root>
       </Card>
+      </div>
+      )}
 
-      {/* Ping chart */}
-      <div ref={pingSectionRef}>
-      <Card mb="4">
+      {/* 模块 C：三网骨干雷达与 Ping 测速 */}
+      {showNetwork && (
+      <div ref={pingSectionRef} id="sec-network">
+        {orderedPingSeries.length > 0 && (
+          <CarrierRadar
+            series={orderedPingSeries}
+            activeCarrier={activeCarrier}
+            onSelectCarrier={handleSelectCarrier}
+            activePingTaskId={activePingTaskId}
+          />
+        )}
+        <Card mb="4">
         <Flex justify="between" align="center" mb="3" gap="3" wrap="wrap">
           <Flex align="center" gap="3" wrap="wrap">
-            <Text weight="bold">Ping 延迟</Text>
+            <Text weight="bold">Ping 延迟折线走势</Text>
             <SegmentedControl.Root size="1" value={pingTimeRange} onValueChange={(v) => setPingTimeRange(v as PingTimeRange)}>
               <SegmentedControl.Item value="1h">1小时</SegmentedControl.Item>
               <SegmentedControl.Item value="6h">6小时</SegmentedControl.Item>
@@ -1140,7 +1464,10 @@ export default function Instance() {
                 size="1"
                 variant="soft"
                 color="gray"
-                onClick={() => setActivePingTaskId('all')}
+                onClick={() => {
+                  setActivePingTaskId('all');
+                  setActiveCarrier('all');
+                }}
                 style={{ cursor: 'pointer', fontSize: '11px', height: '24px', padding: '0 8px' }}
               >
                 ✕ 恢复全网对比
@@ -1230,9 +1557,34 @@ export default function Instance() {
                     {orderedPingSeries.map((item) => {
                       const isVisible = activePingTaskId === 'all' || activePingTaskId === item.task.id;
                       if (!isVisible) return null;
-                      const isFocused = activePingTaskId === item.task.id;
+
+                      const carrier = matchTaskCarrier(item.task.label, item.task.target);
+                      const isCarrierMatched =
+                        pingFilterCarrier === 'all' ||
+                        (pingFilterCarrier === 'loss'
+                          ? (() => {
+                              const q = getPingSeriesQuality(item.records);
+                              return q.packetLossPercent > 0 || q.lostPackets > 0;
+                            })()
+                          : carrier === pingFilterCarrier);
+
+                      const isSingleFocused = activePingTaskId === item.task.id;
                       const isHovered = hoveredPingKey === item.task.key;
-                      const isOtherHovered = hoveredPingKey !== null && !isHovered;
+
+                      let strokeOpacity = 1;
+                      let strokeWidth = 1.6;
+
+                      if (hoveredPingKey !== null) {
+                        strokeOpacity = isHovered ? 1 : 0.15;
+                        strokeWidth = isHovered ? 3.0 : 1.2;
+                      } else if (isSingleFocused) {
+                        strokeOpacity = 1;
+                        strokeWidth = 2.6;
+                      } else if (pingFilterCarrier !== 'all') {
+                        strokeOpacity = isCarrierMatched ? 1 : 0.12;
+                        strokeWidth = isCarrierMatched ? 2.2 : 1.2;
+                      }
+
                       return (
                         <Line
                           key={item.task.key}
@@ -1240,11 +1592,11 @@ export default function Instance() {
                           dataKey={item.task.key}
                           name={item.task.label}
                           stroke={item.task.color}
-                          strokeWidth={isHovered ? 3.0 : isFocused ? 2.5 : 1.6}
-                          strokeOpacity={isOtherHovered ? 0.15 : 1}
+                          strokeWidth={strokeWidth}
+                          strokeOpacity={strokeOpacity}
                           dot={false}
                           activeDot={
-                            isFocused || isHovered
+                            isSingleFocused || isHovered
                               ? { r: 4.5, strokeWidth: 1.5, stroke: '#fff' }
                               : false
                           }
@@ -1266,6 +1618,92 @@ export default function Instance() {
               </div>
 
               <div className="instance-ping-cards-pane">
+                {/* 顶层微晶药丸分类控制条 */}
+                <div className="instance-ping-filter-bar">
+                  <div className="instance-ping-filter-pills">
+                    <button
+                      type="button"
+                      className={`instance-ping-pill-btn${pingFilterCarrier === 'all' ? ' is-active' : ''}`}
+                      onClick={() => handleFilterCarrierChange('all')}
+                    >
+                      全部骨干 <span className="instance-ping-pill-num">{carrierCounts.all}</span>
+                    </button>
+                    {carrierCounts.ct > 0 && (
+                      <button
+                        type="button"
+                        className={`instance-ping-pill-btn is-ct${pingFilterCarrier === 'ct' ? ' is-active' : ''}`}
+                        onClick={() => handleFilterCarrierChange('ct')}
+                      >
+                        <span className="carrier-dot ct" /> 中国电信
+                        <span className="instance-ping-pill-num">{carrierCounts.ct}</span>
+                      </button>
+                    )}
+                    {carrierCounts.cu > 0 && (
+                      <button
+                        type="button"
+                        className={`instance-ping-pill-btn is-cu${pingFilterCarrier === 'cu' ? ' is-active' : ''}`}
+                        onClick={() => handleFilterCarrierChange('cu')}
+                      >
+                        <span className="carrier-dot cu" /> 中国联通
+                        <span className="instance-ping-pill-num">{carrierCounts.cu}</span>
+                      </button>
+                    )}
+                    {carrierCounts.cm > 0 && (
+                      <button
+                        type="button"
+                        className={`instance-ping-pill-btn is-cm${pingFilterCarrier === 'cm' ? ' is-active' : ''}`}
+                        onClick={() => handleFilterCarrierChange('cm')}
+                      >
+                        <span className="carrier-dot cm" /> 中国移动
+                        <span className="instance-ping-pill-num">{carrierCounts.cm}</span>
+                      </button>
+                    )}
+                    {carrierCounts.intl > 0 && (
+                      <button
+                        type="button"
+                        className={`instance-ping-pill-btn is-intl${pingFilterCarrier === 'intl' ? ' is-active' : ''}`}
+                        onClick={() => handleFilterCarrierChange('intl')}
+                      >
+                        <span className="carrier-dot intl" /> 国际/海外
+                        <span className="instance-ping-pill-num">{carrierCounts.intl}</span>
+                      </button>
+                    )}
+                    {carrierCounts.loss > 0 && (
+                      <button
+                        type="button"
+                        className={`instance-ping-pill-btn is-loss${pingFilterCarrier === 'loss' ? ' is-active' : ''}`}
+                        onClick={() => handleFilterCarrierChange('loss')}
+                      >
+                        <span className="carrier-dot loss" /> 异常丢包
+                        <span className="instance-ping-pill-num is-loss">{carrierCounts.loss}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="instance-ping-filter-actions">
+                    {activePingTaskId !== 'all' && (
+                      <button
+                        type="button"
+                        className="instance-ping-action-btn is-clear"
+                        onClick={() => setActivePingTaskId('all')}
+                        title="取消聚焦，查看多线对比"
+                      >
+                        ✕ 取消单线聚焦
+                      </button>
+                    )}
+                    {pingFilterCarrier !== 'all' && (
+                      <button
+                        type="button"
+                        className="instance-ping-action-btn"
+                        onClick={() => handleFilterCarrierChange('all')}
+                        title="恢复全部运营商"
+                      >
+                        重置分类
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 <DndContext
                   sensors={pingSensors}
                   collisionDetection={closestCenter}
@@ -1273,9 +1711,9 @@ export default function Instance() {
                   onDragEnd={handlePingDragEnd}
                   onDragCancel={handlePingDragCancel}
                 >
-                  <SortableContext items={sortableTaskIds} strategy={rectSortingStrategy}>
+                  <SortableContext items={displaySortableTaskIds} strategy={rectSortingStrategy}>
                     <div className="instance-ping-series-grid">
-                      {orderedPingSeries.map((item) => {
+                      {displayPingSeries.map((item) => {
                         const isFocused = activePingTaskId === item.task.id;
                         const isDimmed = activePingTaskId !== 'all' && !isFocused;
 
@@ -1286,7 +1724,7 @@ export default function Instance() {
                             isFocused={isFocused}
                             isDimmed={isDimmed}
                             isHovered={hoveredPingKey === item.task.key}
-                            canSort={isAuthenticated}
+                            canSort={isAuthenticated && pingFilterCarrier === 'all'}
                             onMouseEnter={() => setHoveredPingKey(item.task.key)}
                             onMouseLeave={() => setHoveredPingKey(null)}
                             onFocusToggle={() => {
@@ -1305,9 +1743,144 @@ export default function Instance() {
         )}
       </Card>
       </div>
+      )}
+
+      {/* 模块 D：容器运行与运维态势 */}
+      {showOps && (
+        <div id="sec-ops">
+          {/* Top 5 进程 与 AI/流媒体原生解锁矩阵 双列 Bento Box 并排 */}
+          {((latest?.top_processes && latest.top_processes.length > 0) ||
+            (latest?.unlock_items && latest.unlock_items.length > 0)) && (
+            <div className="instance-ops-bento-grid">
+              {aggregatedProcesses.length > 0 && (
+                <Card className="instance-top-processes-card">
+                  <Flex justify="between" align="center" mb="3" wrap="wrap" gap="2">
+                    <Flex align="center" gap="2">
+                      <Cpu size={18} color="var(--accent-9)" />
+                      <Heading size="3" weight="bold">活跃负载进程 (Top 5)</Heading>
+                      <Badge size="1" color="green" variant="soft">仅管理员可见</Badge>
+                    </Flex>
+                    <Text size="1" color="gray">
+                      同名进程智能聚合 · 实时动态采样
+                    </Text>
+                  </Flex>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+                    {aggregatedProcesses.map((proc) => {
+                      const cpuPercent = Math.min(proc.cpu, 100);
+                      const ramPercent = Math.min(proc.ram, 100);
+                      const cpuColor = proc.cpu > 50 ? 'var(--red-9)' : proc.cpu > 20 ? 'var(--amber-9)' : 'var(--accent-9)';
+                      return (
+                        <div key={proc.pid} className="instance-process-tile">
+                          <Flex justify="between" align="center" mb="2" gap="2" style={{ minWidth: 0 }}>
+                            <Flex align="center" gap="1" style={{ flex: 1, minWidth: 0 }}>
+                              <Text
+                                size="2"
+                                weight="bold"
+                                style={{
+                                  minWidth: 0,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                                }}
+                                title={proc.name}
+                              >
+                                {proc.name}
+                              </Text>
+                              {proc.count > 1 && (
+                                <span
+                                  style={{
+                                    flexShrink: 0,
+                                    fontSize: 10,
+                                    padding: '0 4px',
+                                    borderRadius: 4,
+                                    background: 'var(--accent-a3)',
+                                    color: 'var(--accent-11)',
+                                    fontWeight: 600,
+                                  }}
+                                  title={`包含 ${proc.count} 个聚合进程实例`}
+                                >
+                                  ×{proc.count}
+                                </span>
+                              )}
+                            </Flex>
+                          </Flex>
+
+                          {/* CPU Metric & Micro Bar */}
+                          <div style={{ marginBottom: 6 }}>
+                            <Flex justify="between" align="center" style={{ fontSize: 11 }}>
+                              <Text size="1" color="gray">CPU 占用</Text>
+                              <span style={{ fontWeight: 600, color: cpuColor, fontFamily: 'monospace' }}>
+                                {proc.cpu.toFixed(1)}%
+                              </span>
+                            </Flex>
+                            <div className="instance-metric-track">
+                              <div
+                                className="instance-metric-fill"
+                                style={{ width: `${Math.max(cpuPercent, 2)}%`, background: cpuColor }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* RAM Metric & Micro Bar */}
+                          <div>
+                            <Flex justify="between" align="center" style={{ fontSize: 11 }}>
+                              <Text size="1" color="gray">内存占比</Text>
+                              <span style={{ fontWeight: 600, color: 'var(--blue-9)', fontFamily: 'monospace' }}>
+                                {proc.ram.toFixed(1)}%
+                              </span>
+                            </Flex>
+                            <div className="instance-metric-track">
+                              <div
+                                className="instance-metric-fill"
+                                style={{ width: `${Math.max(ramPercent, 2)}%`, background: 'var(--blue-9)' }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
+
+              {latest?.unlock_items && latest.unlock_items.length > 0 && (
+                <UnlockMatrix items={latest.unlock_items} />
+              )}
+            </div>
+          )}
+
+          {!hasOpsData && (
+            <Card mb="4" className="instance-ops-empty-card" style={{ textAlign: 'center', padding: '48px 20px', borderRadius: 16 }}>
+              <Flex direction="column" align="center" gap="2">
+                <Boxes size={32} color="var(--gray-8)" style={{ opacity: 0.6 }} />
+                <Text size="2" weight="bold" color="gray">
+                  {isAuthenticated ? '该节点暂未上报活跃负载进程或流媒体解锁数据' : '该节点暂未上报流媒体解锁数据'}
+                </Text>
+                <Text size="1" color="gray" style={{ opacity: 0.8, maxWidth: 460 }}>
+                  {isAuthenticated ? '系统每 15 秒动态采样 Top 5 负载进程（仅管理端呈现），每 30 分钟刷新一次流媒体与 AI 原生解锁矩阵。' : '系统每 30 分钟自动刷新一次该节点的流媒体与 AI 原生网络解锁矩阵。'}
+                </Text>
+              </Flex>
+            </Card>
+          )}
+        </div>
+      )}
 
         </section>
       </div>
+
+      {showBackToTop && (
+        <button
+          type="button"
+          className="instance-back-to-top"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          title="返回顶部"
+          aria-label="返回顶部"
+        >
+          <ArrowUp size={20} strokeWidth={2.5} />
+        </button>
+      )}
     </div>
   );
 }

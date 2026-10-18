@@ -139,6 +139,7 @@ function NetworkSummary({
   totalUp,
   totalDown,
   uptimeLabel,
+  online,
 }: {
   uploadSpeed: string;
   downloadSpeed: string;
@@ -147,6 +148,7 @@ function NetworkSummary({
   totalUp: number;
   totalDown: number;
   uptimeLabel: string;
+  online?: boolean;
 }) {
   return (
     <div className="node-network-panel" data-monitor-role="network-panel">
@@ -213,7 +215,12 @@ function NetworkSummary({
           在线时长
         </Text>
         <div className="node-network-summary-values node-network-uptime-values">
-          <span className="node-network-value node-network-uptime-value">
+          <span className="node-network-value node-network-uptime-value" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            {online ? (
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green-9)', display: 'inline-block', flexShrink: 0, boxShadow: '0 0 6px var(--green-9)' }} />
+            ) : (
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--gray-8)', display: 'inline-block', flexShrink: 0 }} />
+            )}
             <strong className="node-uptime-nowrap" title={uptimeLabel}>{uptimeLabel}</strong>
           </span>
         </div>
@@ -431,6 +438,7 @@ export default function NodeCard({ client, live, online, statusKnown = true, tod
                 totalUp={totalUp}
                 totalDown={totalDown}
                 uptimeLabel={uptimeFooterLabel}
+                online={online}
               />
             </div>
 
@@ -449,6 +457,7 @@ export default function NodeCard({ client, live, online, statusKnown = true, tod
                 totalUp={totalUp}
                 totalDown={totalDown}
                 uptimeLabel={uptimeFooterLabel}
+                online={online}
               />
             </div>
           </Flex>

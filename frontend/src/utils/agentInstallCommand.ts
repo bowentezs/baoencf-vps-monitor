@@ -207,7 +207,12 @@ export function buildAgentInstallCommand({
       if (effectiveNodeName) args.push('-n', effectiveNodeName);
       args.push('-i', effectiveInstanceId);
       if (installMode) args.push('--install-mode', installMode);
-      if (binaryUrl) args.push('--binary-url', binaryUrl);
+      if (binaryUrl) {
+        args.push('--binary-url', binaryUrl);
+      } else {
+        const cleanServer = serverUrl.replace(/\/+$/, '');
+        args.push('--binary-base-url', `${cleanServer}/download`);
+      }
       if (checksumUrl) args.push('--checksum-url', checksumUrl);
       if (releaseTag && !binaryUrl) args.push('--release-tag', releaseTag);
       if (ghproxy) args.push('--install-ghproxy', ghproxy);
