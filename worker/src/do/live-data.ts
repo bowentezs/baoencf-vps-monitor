@@ -587,11 +587,12 @@ export class LiveDataDO {
       .map(c => {
         const report = { ...(c.lastReport || {}) };
         if (!includeHidden) {
-          // 公开快照隐藏节点公网 IP，与元数据接口 toPublicClient 的 has_ipv4/has_ipv6 设计一致。
+          // 公开快照隐藏节点公网 IP 与敏感进程，与元数据接口 toPublicClient 的 has_ipv4/has_ipv6 设计一致。
           const hasIpv4 = typeof report.ipv4 === 'string' && isPublicIpAddress(report.ipv4);
           const hasIpv6 = typeof report.ipv6 === 'string' && isPublicIpAddress(report.ipv6);
           delete report.ipv4;
           delete report.ipv6;
+          delete report.top_processes;
           report.has_ipv4 = hasIpv4;
           report.has_ipv6 = hasIpv6;
         }
@@ -1092,7 +1093,8 @@ export class LiveDataDO {
   }
 
   private broadcastToViewers(message: JsonObject, audience: 'all' | 'public' | 'admin' = 'all') {
-    let payload = '';
+    let adminPayload = '';
+    let publicPayload = '';
     for (const [id, session] of this.sessions) {
       if (this.sessionRoles.get(id) !== 'viewer' || session.readyState !== WebSocket.READY_STATE_OPEN) {
         continue;
@@ -1101,8 +1103,27 @@ export class LiveDataDO {
       if (audience === 'admin' && !includeHidden) continue;
       if (audience === 'public' && includeHidden) continue;
       try {
-        payload ||= JSON.stringify(message);
-        session.send(payload);
+        if (includeHidden) {
+          adminPayload ||= JSON.stringify(message);
+          session.send(adminPayload);
+        } else {
+          if (!publicPayload) {
+            let publicMessage = message;
+            if (message.type === 'update' && message.data && typeof message.data === 'object') {
+              const safeData = { ...(message.data as Record<string, unknown>) };
+              const hasIpv4 = typeof safeData.ipv4 === 'string' && isPublicIpAddress(safeData.ipv4);
+              const hasIpv6 = typeof safeData.ipv6 === 'string' && isPublicIpAddress(safeData.ipv6);
+              delete safeData.ipv4;
+              delete safeData.ipv6;
+              delete safeData.top_processes;
+              safeData.has_ipv4 = hasIpv4;
+              safeData.has_ipv6 = hasIpv6;
+              publicMessage = { ...message, data: safeData };
+            }
+            publicPayload = JSON.stringify(publicMessage);
+          }
+          session.send(publicPayload);
+        }
       } catch {
         // Close/error handlers clean up broken viewer sockets.
       }
@@ -1377,7 +1398,14 @@ export class LiveDataDO {
   private sanitizeAdminClientSnapshotItem(client: JsonObject): JsonObject | null {
     const uuid = typeof client.uuid === 'string' ? client.uuid.trim() : '';
     if (!uuid) return null;
-    const { token: _token, token_hash: _tokenHash, ...safe } = client;
+    const {
+      token: _token,
+      token_hash: _tokenHash,
+      token_last_used_ip: _tokenLastUsedIp,
+      token_last_used_at: _tokenLastUsedAt,
+      token_rotated_at: _tokenRotatedAt,
+      ...safe
+    } = client;
     for (const field of ['ipv4', 'ipv6'] as const) {
       const value = safe[field];
       if (typeof value === 'string' && value.trim() !== '' && !isPublicIpAddress(value)) {
@@ -1394,6 +1422,9 @@ export class LiveDataDO {
     const broadcastClient: JsonObject = safe ? { ...safe } : {};
     delete broadcastClient.ipv4;
     delete broadcastClient.ipv6;
+    delete broadcastClient.token_last_used_ip;
+    delete broadcastClient.token_last_used_at;
+    delete broadcastClient.token_rotated_at;
     return broadcastClient;
   }
 

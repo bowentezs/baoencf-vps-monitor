@@ -426,8 +426,8 @@ export async function fetchPingTaskSeries(
     signal?: AbortSignal;
   } = {},
 ): Promise<PingTaskSeries[]> {
-  const hiddenQuery = includeHidden ? '&include_hidden=1' : '';
-  const taskResponse = await fetchWithBootstrapRetry(`/api/task/ping?${hiddenQuery.slice(1)}`, { signal });
+  const taskUrl = includeHidden ? '/api/task/ping?include_hidden=1' : '/api/task/ping';
+  const taskResponse = await fetchWithBootstrapRetry(taskUrl, { signal });
   if (!taskResponse.ok) throw new Error(`HTTP ${taskResponse.status}`);
 
   const taskData = await taskResponse.json();
@@ -446,6 +446,8 @@ export async function fetchPingTaskSeries(
     }
     return Math.min(1000, Math.max(1, limit));
   };
+
+  const hiddenQuery = includeHidden ? '&include_hidden=1' : '';
 
   if (tasks.length > 0) {
     const batchLimit = Math.max(...tasks.map(requestLimitForTask));
@@ -466,7 +468,10 @@ export async function fetchPingTaskSeries(
         }));
         return limitPingSeriesToRecentRange(series, rangeHours);
       }
-    } catch {
+    } catch (err: unknown) {
+      if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+        throw err;
+      }
       // Fall back to the legacy per-task endpoint below.
     }
   }
@@ -485,7 +490,10 @@ export async function fetchPingTaskSeries(
           task,
           records: normalizePingRecords(records),
         };
-      } catch {
+      } catch (err: unknown) {
+        if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+          throw err;
+        }
         return { task, records: [] };
       }
     }),

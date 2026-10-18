@@ -21,8 +21,9 @@ import {
 } from '@radix-ui/themes';
 import {
   Plus, Pencil, Trash2, Copy, Search,
-  GripVertical, RefreshCw, Download, EyeOff, Server, Wifi, Layers, KeyRound
+  GripVertical, RefreshCw, Download, EyeOff, Server, Wifi, Layers, KeyRound, Wallet
 } from 'lucide-react';
+import BillingOverviewCard from '../../components/admin/BillingOverviewCard';
 import { toast } from 'sonner';
 import Loading from '../../components/Loading';
 import { useApi } from '../../contexts/AuthContext';
@@ -32,7 +33,7 @@ import PriceTags from '../../components/PriceTags';
 import { BillingCycleSelect, CurrencySymbols, ExpiryDateInput } from '../../components/admin/BillingControls';
 import { TrafficLimitEditor } from '../../components/admin/TrafficLimitEditor';
 import { formatBytes } from '../../utils/format';
-import { isValidDisplayPrice, toDateInputValue } from '../../utils/billing';
+import { isValidDisplayPrice, toDateInputValue, computeBillingSummary } from '../../utils/billing';
 import {
   createTrafficLimitFormValue,
   serializeTrafficLimitFormValue,
@@ -898,6 +899,8 @@ export default function AdminDashboard() {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteClient, setDeleteClient] = useState<AdminClient | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [showBillingOverview, setShowBillingOverview] = useState(false);
+  const [billingCurrency, setBillingCurrency] = useState('¥');
   const [rotateTokenClient, setRotateTokenClient] = useState<AdminClient | null>(null);
   const [rotateTokenOpen, setRotateTokenOpen] = useState(false);
   const [detailClient, setDetailClient] = useState<AdminClient | null>(null);
@@ -1047,6 +1050,10 @@ export default function AdminDashboard() {
   }, [filtered, selectedNodes]);
 
   const allFilteredSelected = filtered.length > 0 && selectedVisibleCount === filtered.length;
+  const billingSummary = useMemo(() => {
+    return computeBillingSummary(clients, billingCurrency);
+  }, [clients, billingCurrency]);
+
   const overviewCards = useMemo(() => {
     const onlineCount = clients.filter((client) => liveData.online.includes(client.uuid)).length;
     const hiddenCount = clients.filter((client) => client.hidden).length;
@@ -1076,8 +1083,16 @@ export default function AdminDashboard() {
         detail: '不会出现在游客前台',
         icon: <EyeOff size={18} />,
       },
+      {
+        label: '月度开销',
+        value: `${billingCurrency} ${billingSummary.monthlyTotal.toFixed(1)}`,
+        detail: `年预算约 ${billingCurrency} ${billingSummary.annualTotal.toFixed(0)} · 点击${showBillingOverview ? '收起' : '展开'}财务与续费日历`,
+        icon: <Wallet size={18} />,
+        clickable: true,
+        onClick: () => setShowBillingOverview((prev) => !prev),
+      },
     ];
-  }, [clients, filtered.length, groups, liveData.online]);
+  }, [clients, filtered.length, groups, liveData.online, billingCurrency, billingSummary, showBillingOverview]);
 
   if (loading) return <Loading />;
 
@@ -1091,7 +1106,13 @@ export default function AdminDashboard() {
         <section className="admin-page-hero admin-server-overview-hero">
           <div className="admin-overview-strip">
             {overviewCards.map((card) => (
-              <div className="admin-overview-item" key={card.label} title={card.detail}>
+              <div
+                className={`admin-overview-item ${card.clickable ? 'admin-overview-clickable' : ''}`}
+                key={card.label}
+                title={card.detail}
+                onClick={card.onClick}
+                style={card.clickable ? { cursor: 'pointer', border: showBillingOverview ? '1px solid var(--accent-8)' : undefined } : undefined}
+              >
                 <Flex align="center" gap="2" className="admin-overview-line">
                   <span className="admin-overview-icon" aria-hidden="true">{card.icon}</span>
                   <Text className="admin-overview-label" size="2">{card.label}</Text>
@@ -1102,6 +1123,15 @@ export default function AdminDashboard() {
           </div>
         </section>
       </Flex>
+
+      {showBillingOverview && (
+        <BillingOverviewCard
+          summary={billingSummary}
+          currency={billingCurrency}
+          onCurrencyChange={setBillingCurrency}
+          onClose={() => setShowBillingOverview(false)}
+        />
+      )}
 
       <Card className="admin-filter-card">
         <Flex className="admin-filter-toolbar" direction="column" gap="2">

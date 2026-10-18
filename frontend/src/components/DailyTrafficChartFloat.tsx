@@ -194,7 +194,7 @@ export default function DailyTrafficChartFloat({
                     stroke="var(--blue-9)"
                     strokeWidth={2}
                     dot={false}
-                    activeDot={{ r: 5 }}
+                    activeDot={false}
                     isAnimationActive={false}
                   />
                   <Line
@@ -204,7 +204,7 @@ export default function DailyTrafficChartFloat({
                     stroke="var(--green-9)"
                     strokeWidth={2}
                     dot={false}
-                    activeDot={{ r: 5 }}
+                    activeDot={false}
                     isAnimationActive={false}
                   />
                 </LineChart>

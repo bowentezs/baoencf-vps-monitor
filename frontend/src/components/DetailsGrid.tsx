@@ -127,6 +127,8 @@ export default function DetailsGrid({ client, box, align, compact, remark }: Det
     icon: <Network size={16} />,
   };
 
+  const hasGpu = Boolean(client.gpu_name && client.gpu_name.trim() !== '-' && client.gpu_name.trim() !== '');
+
   const items = [
     {
       label: 'CPU',
@@ -153,11 +155,15 @@ export default function DetailsGrid({ client, box, align, compact, remark }: Det
       value: client.kernel_version || '-',
       icon: <Network size={16} />,
     },
-    {
-      label: 'GPU',
-      value: client.gpu_name || '-',
-      icon: <Cpu size={16} />,
-    },
+    ...(hasGpu
+      ? [
+          {
+            label: 'GPU',
+            value: client.gpu_name,
+            icon: <Cpu size={16} />,
+          },
+        ]
+      : []),
     {
       label: '内存容量',
       value: formatBytes(client.mem_total || 0),
@@ -178,11 +184,15 @@ export default function DetailsGrid({ client, box, align, compact, remark }: Det
       value: ipValue,
       icon: <Wifi size={16} />,
     },
-    {
-      label: '地区',
-      value: client.region || '-',
-      icon: <Globe size={16} />,
-    },
+    ...(!compact
+      ? [
+          {
+            label: '地区',
+            value: client.region || '-',
+            icon: <Globe size={16} />,
+          },
+        ]
+      : []),
     agentItem,
   ];
   const firstRowItems = normalizedRemark ? items.slice(0, 5) : [];

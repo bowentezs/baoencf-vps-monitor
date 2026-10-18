@@ -1,3 +1,5 @@
+import type { ProcessInfo, DockerContainerInfo, UnlockItem } from '../contexts/LiveDataContext';
+
 export interface PublicMonitorRecord {
   time: string;
   cpu: number;
@@ -17,6 +19,9 @@ export interface PublicMonitorRecord {
   connections: number;
   connections_udp: number;
   uptime: number;
+  top_processes?: ProcessInfo[];
+  docker_containers?: DockerContainerInfo[];
+  unlock_items?: UnlockItem[];
 }
 
 export interface PublicGpuRecord {
