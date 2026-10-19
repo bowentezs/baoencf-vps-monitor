@@ -5091,12 +5091,17 @@ html[data-theme-appearance='dark'] .mini-ping-chart-legend-item.is-active {
 /* ========== Instance Detail Sidebar ========== */
 .instance-page {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: clip;
   padding: 0 16px 24px 8px;
 }
 
 .instance-shell {
   width: 100%;
-  max-width: none;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: clip;
   margin: 0;
   display: grid;
   grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
@@ -5314,6 +5319,8 @@ html[data-theme-appearance='dark'] .instance-back-pill:hover {
 
 .instance-detail-panel {
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   width: min(100%, calc(50% + 460px));
   justify-self: center;
 }
@@ -5326,6 +5333,10 @@ html[data-theme-appearance='dark'] .instance-back-pill:hover {
   border-radius: 14px !important;
   border: 1px solid var(--gray-a4) !important;
   transition: all 0.25s ease;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
 }
 
 .instance-process-tile,
@@ -5338,6 +5349,9 @@ html[data-theme-appearance='dark'] .instance-back-pill:hover {
   border: 1px solid var(--gray-a4);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .instance-process-tile:hover,
@@ -5359,6 +5373,9 @@ html[data-theme-appearance='dark'] .instance-back-pill:hover {
   justify-content: space-between;
   gap: 12px;
   transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .instance-docker-row:hover {
@@ -5384,16 +5401,28 @@ html[data-theme-appearance='dark'] .instance-back-pill:hover {
 /* 🍎 详情页运维 Bento Box 双列并排与紧凑布局 */
 .instance-ops-bento-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   gap: 14px;
   align-items: stretch;
   margin-bottom: 16px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 860px) {
+  .instance-ops-bento-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 .instance-ops-bento-grid > div,
 .instance-ops-bento-grid > .rt-Card {
   margin-bottom: 0 !important;
   height: 100%;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 /* 🍎 极速锚点胶囊与导航栏（流式优雅排版，绝不遮挡全局导航栏） */
@@ -5409,6 +5438,22 @@ html[data-theme-appearance='dark'] .instance-back-pill:hover {
   border: 1px solid rgba(255, 255, 255, 0.65);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
   transition: all 0.25s ease;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.instance-view-nav-bar .rt-SegmentedControlRoot,
+.instance-view-nav-bar [data-radix-segmented-control-root] {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.instance-view-nav-bar .rt-SegmentedControlRoot::-webkit-scrollbar,
+.instance-view-nav-bar [data-radix-segmented-control-root]::-webkit-scrollbar {
+  display: none;
 }
 
 .dark .instance-view-nav-bar,
@@ -6273,11 +6318,28 @@ html[data-theme-appearance='dark'] .instance-view-nav-bar {
 
   .instance-node-sidebar { display: none; }
 
-  .instance-page { padding: 0 8px 16px; }
+  .instance-page {
+    padding: 0 8px 16px;
+    max-width: 100%;
+    overflow-x: clip;
+    box-sizing: border-box;
+  }
 
   .instance-shell {
     display: block;
-    max-width: 920px;
+    max-width: 100%;
+    overflow-x: clip;
+    box-sizing: border-box;
+  }
+
+  .instance-detail-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .instance-view-nav-bar {
+    border-radius: 16px;
+    padding: 6px 8px;
   }
 
   .control-bar { margin: 0 8px 8px; padding: 8px 12px; }

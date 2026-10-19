@@ -128,8 +128,8 @@ export default function CarrierRadar({
   return (
     <RCard className="instance-carrier-radar-card" mb="4">
       {/* 头部标题与晚高峰状态看板 */}
-      <RFlex justify="between" align="center" mb="3" wrap="wrap" gap="2">
-        <RFlex align="center" gap="2">
+      <RFlex justify="between" align="center" mb="3" wrap="wrap" gap="2" style={{ minWidth: 0, width: '100%' }}>
+        <RFlex align="center" gap="2" wrap="wrap" style={{ minWidth: 0, flex: '1 1 auto' }}>
           <div
             style={{
               display: 'flex',
@@ -141,25 +141,26 @@ export default function CarrierRadar({
               background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
               border: '1px solid rgba(37, 99, 235, 0.35)',
               boxShadow: '0 0 10px rgba(37, 99, 235, 0.2)',
+              flexShrink: 0,
             }}
           >
             <Radio size={16} color="var(--blue-9)" />
           </div>
-          <RHeading size="3" weight="bold">
+          <RHeading size="3" weight="bold" style={{ wordBreak: 'break-word' }}>
             三网骨干晚高峰回程质量与丢包雷达
           </RHeading>
           <RBadge
             size="2"
             color={overallHealth >= 95 ? 'green' : overallHealth >= 80 ? 'blue' : 'amber'}
             variant="surface"
-            style={{ borderRadius: 99, padding: '2px 10px', fontWeight: 700 }}
+            style={{ borderRadius: 99, padding: '2px 10px', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}
           >
             晚高峰健康度: {overallHealth}%
           </RBadge>
         </RFlex>
 
-        <RFlex align="center" gap="2">
-          <RBadge size="1" color="gray" variant="soft" style={{ fontSize: 11 }}>
+        <RFlex align="center" gap="2" style={{ flexShrink: 0 }}>
+          <RBadge size="1" color="gray" variant="soft" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
             晚高峰时段: 20:00 - 24:00 CST · 点击卡片过滤折线
           </RBadge>
           {activeCarrier !== 'all' && (
@@ -173,6 +174,7 @@ export default function CarrierRadar({
                 padding: '2px 8px',
                 fontSize: 11,
                 color: 'var(--gray-11)',
+                whiteSpace: 'nowrap',
               }}
             >
               ✕ 恢复全网
@@ -185,8 +187,10 @@ export default function CarrierRadar({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
           gap: 12,
+          minWidth: 0,
+          width: '100%',
         }}
       >
         {displayStats.map((stat) => {
@@ -225,17 +229,21 @@ export default function CarrierRadar({
                   : '0 2px 6px rgba(0, 0, 0, 0.02)',
                 transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                 opacity: hasTasks ? 1 : 0.65,
+                minWidth: 0,
+                maxWidth: '100%',
+                boxSizing: 'border-box',
+                overflow: 'hidden',
               }}
             >
               {/* 顶部：Logo、名称与综合评级徽章 */}
-              <RFlex justify="between" align="center" mb="2">
-                <RFlex align="center" gap="2">
+              <RFlex justify="between" align="center" mb="2" wrap="wrap" gap="2" style={{ minWidth: 0, width: '100%' }}>
+                <RFlex align="center" gap="2" style={{ minWidth: 0, flex: '1 1 auto' }}>
                   {Logo && <Logo size={24} />}
-                  <div>
-                    <RText size="2" weight="bold" style={{ letterSpacing: -0.2 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <RText size="2" weight="bold" style={{ letterSpacing: -0.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
                       {stat.name}
                     </RText>
-                    <RText size="1" color="gray" style={{ fontSize: 10, display: 'block', opacity: 0.8 }}>
+                    <RText size="1" color="gray" style={{ fontSize: 10, display: 'block', opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {stat.enName}
                     </RText>
                   </div>
@@ -251,6 +259,8 @@ export default function CarrierRadar({
                       fontSize: 13,
                       padding: '2px 8px',
                       borderRadius: 8,
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
                       boxShadow: stat.rating === 'S' || stat.rating === 'A+'
                         ? `0 0 8px ${stat.brandColor}40`
                         : undefined,
@@ -259,7 +269,7 @@ export default function CarrierRadar({
                     {stat.rating} 级
                   </RBadge>
                 ) : (
-                  <RBadge size="1" color="gray" variant="soft">
+                  <RBadge size="1" color="gray" variant="soft" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
                     无探针
                   </RBadge>
                 )}

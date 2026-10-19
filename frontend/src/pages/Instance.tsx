@@ -1754,18 +1754,18 @@ export default function Instance() {
             <div className="instance-ops-bento-grid">
               {aggregatedProcesses.length > 0 && (
                 <Card className="instance-top-processes-card">
-                  <Flex justify="between" align="center" mb="3" wrap="wrap" gap="2">
-                    <Flex align="center" gap="2">
-                      <Cpu size={18} color="var(--accent-9)" />
-                      <Heading size="3" weight="bold">活跃负载进程 (Top 5)</Heading>
-                      <Badge size="1" color="green" variant="soft">仅管理员可见</Badge>
+                  <Flex justify="between" align="center" mb="3" wrap="wrap" gap="2" style={{ minWidth: 0, width: '100%' }}>
+                    <Flex align="center" gap="2" wrap="wrap" style={{ minWidth: 0, flex: '1 1 auto' }}>
+                      <Cpu size={18} color="var(--accent-9)" style={{ flexShrink: 0 }} />
+                      <Heading size="3" weight="bold" style={{ wordBreak: 'break-word' }}>活跃负载进程 (Top 5)</Heading>
+                      <Badge size="1" color="green" variant="soft" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>仅管理员可见</Badge>
                     </Flex>
-                    <Text size="1" color="gray">
+                    <Text size="1" color="gray" style={{ whiteSpace: 'nowrap' }}>
                       同名进程智能聚合 · 实时动态采样
                     </Text>
                   </Flex>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: 10, minWidth: 0, width: '100%' }}>
                     {aggregatedProcesses.map((proc) => {
                       const cpuPercent = Math.min(proc.cpu, 100);
                       const ramPercent = Math.min(proc.ram, 100);
