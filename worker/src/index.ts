@@ -60,6 +60,7 @@ type RuntimeBindings = {
   ADMIN_BOOTSTRAP_TOKEN?: string;
   SETUP_DIAGNOSTICS_ENABLED?: string;
   CURRENT_GIT_COMMIT?: string;
+  DEBUG_SERVER_TIMING?: string;
 };
 
 // Wrangler owns configured bindings; this adds runtime-only optional values.

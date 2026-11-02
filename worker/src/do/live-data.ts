@@ -17,7 +17,7 @@ import {
   isRecordPersistenceEnabled as normalizeRecordPersistenceEnabled,
 } from '../settings/schema';
 import { bestEffortRecordHealthEvent, errorDetail } from '../utils/observability';
-import { isPublicIpAddress } from '../utils/request-ip';
+import { isPublicIpAddress, normalizeIpSubnetKey } from '../utils/request-ip';
 import { unwrapMonitorReportEnvelope } from '../utils/report-envelope';
 import { checkWebsiteMonitorHttp } from '../utils/website-monitor';
 
@@ -1142,6 +1142,7 @@ export class LiveDataDO {
     let total = 0;
     let sameIp = 0;
     const now = Date.now();
+    const targetKey = viewerIp ? normalizeIpSubnetKey(viewerIp) : '';
     for (const ws of this.sessions.values()) {
       const attachment = this.getSessionAttachment(ws);
       if (!attachment || attachment.role !== 'viewer') continue;
@@ -1149,7 +1150,7 @@ export class LiveDataDO {
       const expiresAt = this.viewerExpiresAt.get(attachment.clientId) ?? attachment.viewerExpiresAt;
       if (expiresAt && expiresAt <= now) continue;
       total += 1;
-      if (viewerIp && attachment.viewerIp === viewerIp) {
+      if (targetKey && attachment.viewerIp && normalizeIpSubnetKey(attachment.viewerIp) === targetKey) {
         sameIp += 1;
       }
     }

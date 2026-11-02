@@ -8,6 +8,7 @@ import {
 } from '../db/provider';
 import * as db from '../db/queries';
 import { sanitizeSetupDiagnosticDetail } from '../utils/setup-diagnostics';
+import { readJsonWithLimit } from '../utils/request-body';
 import { getCloudflareClientIp } from '../utils/request-ip';
 import { readLiveSnapshot, readRateLimitResult } from '../utils/do-response';
 import { BUNDLED_SUPABASE_MIGRATIONS, type BundledMigration } from '../generated/supabase-migrations';
@@ -482,12 +483,16 @@ setupRoutes.post('/database/init', async (c) => {
     return c.json({ error: 'SUPABASE_URL is not configured as a Supabase project URL.' }, 503);
   }
 
-  let payload: { accessToken?: unknown };
-  try {
-    payload = await c.req.json() as { accessToken?: unknown };
-  } catch {
+  const parsed = await readJsonWithLimit(c.req.raw, 64 * 1024);
+  if (!parsed.ok) {
+    if (parsed.reason === 'too_large') {
+      return c.json({ error: 'Request body too large.' }, 413);
+    }
     return c.json({ error: 'Invalid JSON body.' }, 400);
   }
+  const payload = (parsed.body && typeof parsed.body === 'object' && !Array.isArray(parsed.body)
+    ? parsed.body
+    : {}) as { accessToken?: unknown };
 
   const accessToken = typeof payload.accessToken === 'string' ? payload.accessToken.trim() : '';
   if (!accessToken || accessToken.length > 4096) {
