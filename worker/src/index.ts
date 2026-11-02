@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { APP_VERSION } from './utils/app-version';
 import { shortGitSha } from './utils/update-check';
+import { AGENT_SHA256SUMS } from './generated/agent-shasums';
 
 // 路由模块
 import { publicRoutes } from './routes/public';
@@ -89,7 +90,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'X-Frame-Options': 'DENY',
-  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'same-origin',
   'Permissions-Policy': 'camera=(), geolocation=(), microphone=()',
@@ -326,12 +327,7 @@ app.get('/agent/install.sh', (c) => redirectToAgentSourceAsset(c, 'install.sh'))
 app.get('/agent/install-linux.sh', (c) => redirectToAgentSourceAsset(c, 'install-linux.sh'));
 app.get('/agent/install-windows.ps1', (c) => redirectToAgentSourceAsset(c, 'install-windows.ps1'));
 app.get('/download/SHA256SUMS', (c) => {
-  const content = [
-    '2e85a47caf504420ae74e447b790353106f44a39150524608c87754ea89a7076  cf-vps-monitor-agent-linux-amd64',
-    '06e334ce18b7d1a4176232ba1922716c021e98f82eff97c334f37a987ec5e473  cf-vps-monitor-agent-linux-arm64',
-    '2e85a47caf504420ae74e447b790353106f44a39150524608c87754ea89a7076  agent-linux-amd64',
-    '06e334ce18b7d1a4176232ba1922716c021e98f82eff97c334f37a987ec5e473  agent-linux-arm64',
-  ].join('\n') + '\n';
+  const content = `${AGENT_SHA256SUMS.join('\n')}\n`;
   return c.text(content, 200, {
     'Content-Type': 'text/plain; charset=utf-8',
     'Cache-Control': 'no-cache, no-store, must-revalidate',

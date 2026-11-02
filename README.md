@@ -175,6 +175,11 @@ cd agent && go test ./...
 - Supabase 迁移启用 RLS，并对 RPC 函数显式 `revoke` / `grant`；需要 `security definer` 的函数固定 `search_path`。
 - 忘记密码重置需要输入当前部署的 Supabase Secret key；该 key 只用于本次请求校验，不会被保存。
 
+### 自托管 Agent 二进制
+
+- 面板仓库内自托管的二进制只覆盖 `linux amd64` / `linux arm64`；其它平台由安装脚本自动回退到源码编译。
+- 校验和唯一的真相来源是 `frontend/public/download/` 下的文件：`npm run sync:agent-sums` 会同时生成 `SHA256SUMS` 与 `worker/src/generated/agent-shasums.ts`，CI 与发布流水线都会校验一致性。
+
 ## 许可证
 
 本项目使用 [MIT License](LICENSE)。

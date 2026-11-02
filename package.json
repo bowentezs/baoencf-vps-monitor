@@ -19,7 +19,8 @@
     "verify:cloudflare": "node scripts/deploy-cloudflare.mjs --dry-run --outdir worker/.tmp/wrangler-dry-run --metafile worker/.tmp/wrangler-dry-run/metafile.json",
     "deploy": "npm run build && node scripts/deploy-cloudflare.mjs",
     "dev:worker": "npm --prefix worker run dev",
-    "dev:frontend": "npm --prefix frontend run dev"
+    "dev:frontend": "npm --prefix frontend run dev",
+    "sync:agent-sums": "node scripts/sync-agent-sums.mjs"
   },
   "cloudflare": {
     "bindings": {
