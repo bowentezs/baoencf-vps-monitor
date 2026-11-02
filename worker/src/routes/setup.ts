@@ -465,13 +465,27 @@ setupRoutes.get('/status', async (c) => {
   }, ok ? 200 : 503);
 });
 
-setupRoutes.get('/database/init', (c) => {
+setupRoutes.get('/database/init', async (c) => {
   const projectRef = supabaseProjectRef(c.env);
+  const migrationCount = BUNDLED_SUPABASE_MIGRATIONS.length;
+  if (!projectRef) {
+    return c.json({ ok: false, migration_count: migrationCount }, 503);
+  }
+
+  // 仅在首次初始化（尚未创建管理员）时回显项目标识；
+  // 部署完成后不再向未认证请求暴露 project_ref，避免免费指纹。
+  let setupPending = false;
+  try {
+    setupPending = (await adminAccountStatus(getDatabase(c.env))) === 'absent';
+  } catch {
+    setupPending = false;
+  }
+
   return c.json({
-    ok: Boolean(projectRef),
-    project_ref: projectRef,
-    migration_count: BUNDLED_SUPABASE_MIGRATIONS.length,
-  }, projectRef ? 200 : 503);
+    ok: true,
+    ...(setupPending ? { project_ref: projectRef } : {}),
+    migration_count: migrationCount,
+  }, 200);
 });
 
 setupRoutes.post('/database/init', async (c) => {
