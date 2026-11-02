@@ -816,34 +816,6 @@ export default function Instance() {
     } as PublicMonitorRecord)
     : latestHistory;
 
-  const aggregatedProcesses = useMemo(() => {
-    // 权限门禁：仅管理员登录可见活跃进程，未登录外部访客完全绝缘，防止资产刺探
-    if (!isAuthenticated || !latest?.top_processes || latest.top_processes.length === 0) return [];
-    const map = new Map<string, { pid: number; name: string; cpu: number; ram: number; count: number }>();
-    for (const proc of latest.top_processes) {
-      // 路径脱敏：彻底剔除父路径（如 /usr/bin/python3 归一为 python3），避免泄露系统绝对目录结构
-      const rawName = String(proc.name || '').trim();
-      const sanitizedName = rawName.replace(/^.*[\\/]/, '') || rawName || 'unknown';
-      const existing = map.get(sanitizedName);
-      if (!existing) {
-        map.set(sanitizedName, {
-          pid: proc.pid,
-          name: sanitizedName,
-          cpu: proc.cpu,
-          ram: proc.ram,
-          count: 1,
-        });
-      } else {
-        existing.cpu = Math.round((existing.cpu + proc.cpu) * 10) / 10;
-        existing.ram = Math.round((existing.ram + proc.ram) * 10) / 10;
-        existing.count += 1;
-      }
-    }
-    return Array.from(map.values())
-      .sort((a, b) => (b.cpu === a.cpu ? b.ram - a.ram : b.cpu - a.cpu))
-      .slice(0, 5);
-  }, [isAuthenticated, latest?.top_processes]);
-
   const chartTimeFormatter = (value: unknown) => {
     const dateInput = typeof value === 'string' || typeof value === 'number' || value instanceof Date ? value : '';
     const date = new Date(dateInput);
@@ -1013,10 +985,7 @@ export default function Instance() {
   const todayTraffic = dailyTraffic[dailyTraffic.length - 1];
   const showMetrics = activeViewTab === 'all' || activeViewTab === 'metrics';
   const showNetwork = activeViewTab === 'all' || activeViewTab === 'network';
-  const hasOpsData = Boolean(
-    (isAuthenticated && latest?.top_processes && latest.top_processes.length > 0) ||
-    (latest?.unlock_items && latest.unlock_items.length > 0)
-  );
+  const hasOpsData = Boolean(latest?.unlock_items && latest.unlock_items.length > 0);
   const showOps = activeViewTab === 'ops' || (activeViewTab === 'all' && hasOpsData);
 
   if (!client && clientLoading) return <Loading />;
@@ -1147,7 +1116,7 @@ export default function Instance() {
                 className="instance-anchor-btn"
                 onClick={() => document.getElementById('sec-ops')?.scrollIntoView({ behavior: 'smooth' })}
               >
-                🚀 负载与解锁
+                ✨ 原生解锁矩阵
               </button>
             )}
           </Flex>
@@ -1745,121 +1714,20 @@ export default function Instance() {
       </div>
       )}
 
-      {/* 模块 D：容器运行与运维态势 */}
+      {/* 模块 D：网络解锁与原生接入态势 */}
       {showOps && (
         <div id="sec-ops">
-          {/* Top 5 进程 与 AI/流媒体原生解锁矩阵 双列 Bento Box 并排 */}
-          {((latest?.top_processes && latest.top_processes.length > 0) ||
-            (latest?.unlock_items && latest.unlock_items.length > 0)) && (
-            <div className="instance-ops-bento-grid">
-              {aggregatedProcesses.length > 0 && (
-                <Card className="instance-top-processes-card">
-                  <Flex justify="between" align="center" mb="3" wrap="wrap" gap="2" style={{ minWidth: 0, width: '100%' }}>
-                    <Flex align="center" gap="2" wrap="wrap" style={{ minWidth: 0, flex: '1 1 auto' }}>
-                      <Cpu size={18} color="var(--accent-9)" style={{ flexShrink: 0 }} />
-                      <Heading size="3" weight="bold" style={{ wordBreak: 'break-word' }}>活跃负载进程 (Top 5)</Heading>
-                      <Badge size="1" color="green" variant="soft" style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>仅管理员可见</Badge>
-                    </Flex>
-                    <Text size="1" color="gray" style={{ whiteSpace: 'nowrap' }}>
-                      同名进程智能聚合 · 实时动态采样
-                    </Text>
-                  </Flex>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: 10, minWidth: 0, width: '100%' }}>
-                    {aggregatedProcesses.map((proc) => {
-                      const cpuPercent = Math.min(proc.cpu, 100);
-                      const ramPercent = Math.min(proc.ram, 100);
-                      const cpuColor = proc.cpu > 50 ? 'var(--red-9)' : proc.cpu > 20 ? 'var(--amber-9)' : 'var(--accent-9)';
-                      return (
-                        <div key={proc.pid} className="instance-process-tile">
-                          <Flex justify="between" align="center" mb="2" gap="2" style={{ minWidth: 0 }}>
-                            <Flex align="center" gap="1" style={{ flex: 1, minWidth: 0 }}>
-                              <Text
-                                size="2"
-                                weight="bold"
-                                style={{
-                                  minWidth: 0,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                                }}
-                                title={proc.name}
-                              >
-                                {proc.name}
-                              </Text>
-                              {proc.count > 1 && (
-                                <span
-                                  style={{
-                                    flexShrink: 0,
-                                    fontSize: 10,
-                                    padding: '0 4px',
-                                    borderRadius: 4,
-                                    background: 'var(--accent-a3)',
-                                    color: 'var(--accent-11)',
-                                    fontWeight: 600,
-                                  }}
-                                  title={`包含 ${proc.count} 个聚合进程实例`}
-                                >
-                                  ×{proc.count}
-                                </span>
-                              )}
-                            </Flex>
-                          </Flex>
-
-                          {/* CPU Metric & Micro Bar */}
-                          <div style={{ marginBottom: 6 }}>
-                            <Flex justify="between" align="center" style={{ fontSize: 11 }}>
-                              <Text size="1" color="gray">CPU 占用</Text>
-                              <span style={{ fontWeight: 600, color: cpuColor, fontFamily: 'monospace' }}>
-                                {proc.cpu.toFixed(1)}%
-                              </span>
-                            </Flex>
-                            <div className="instance-metric-track">
-                              <div
-                                className="instance-metric-fill"
-                                style={{ width: `${Math.max(cpuPercent, 2)}%`, background: cpuColor }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* RAM Metric & Micro Bar */}
-                          <div>
-                            <Flex justify="between" align="center" style={{ fontSize: 11 }}>
-                              <Text size="1" color="gray">内存占比</Text>
-                              <span style={{ fontWeight: 600, color: 'var(--blue-9)', fontFamily: 'monospace' }}>
-                                {proc.ram.toFixed(1)}%
-                              </span>
-                            </Flex>
-                            <div className="instance-metric-track">
-                              <div
-                                className="instance-metric-fill"
-                                style={{ width: `${Math.max(ramPercent, 2)}%`, background: 'var(--blue-9)' }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Card>
-              )}
-
-              {latest?.unlock_items && latest.unlock_items.length > 0 && (
-                <UnlockMatrix items={latest.unlock_items} />
-              )}
-            </div>
-          )}
-
-          {!hasOpsData && (
+          {latest?.unlock_items && latest.unlock_items.length > 0 ? (
+            <UnlockMatrix items={latest.unlock_items} />
+          ) : (
             <Card mb="4" className="instance-ops-empty-card" style={{ textAlign: 'center', padding: '48px 20px', borderRadius: 16 }}>
               <Flex direction="column" align="center" gap="2">
                 <Boxes size={32} color="var(--gray-8)" style={{ opacity: 0.6 }} />
                 <Text size="2" weight="bold" color="gray">
-                  {isAuthenticated ? '该节点暂未上报活跃负载进程或流媒体解锁数据' : '该节点暂未上报流媒体解锁数据'}
+                  该节点暂未上报流媒体与 AI 解锁数据
                 </Text>
                 <Text size="1" color="gray" style={{ opacity: 0.8, maxWidth: 460 }}>
-                  {isAuthenticated ? '系统每 15 秒动态采样 Top 5 负载进程（仅管理端呈现），每 30 分钟刷新一次流媒体与 AI 原生解锁矩阵。' : '系统每 30 分钟自动刷新一次该节点的流媒体与 AI 原生网络解锁矩阵。'}
+                  系统每 30 分钟自动轮询一次该节点的流媒体与前沿 AI 原生网络连通性。
                 </Text>
               </Flex>
             </Card>

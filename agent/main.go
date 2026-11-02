@@ -135,13 +135,6 @@ type BasicInfo struct {
 	Uptime         int64  `json:"uptime"`
 }
 
-type ProcessInfo struct {
-	PID  int32   `json:"pid"`
-	Name string  `json:"name"`
-	CPU  float64 `json:"cpu"`
-	RAM  float32 `json:"ram"`
-}
-
 type DockerContainerInfo struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
@@ -187,7 +180,6 @@ type Report struct {
 	BasicInfo           *BasicInfo           `json:"basic_info,omitempty"`
 	PingResults         []PingResult         `json:"ping_results,omitempty"`
 	WebsiteProbeResults []WebsiteProbeResult `json:"website_probe_results,omitempty"`
-	TopProcesses        []ProcessInfo        `json:"top_processes,omitempty"`
 	DockerContainers    []DockerContainerInfo `json:"docker_containers,omitempty"`
 	UnlockItems         []UnlockItem         `json:"unlock_items,omitempty"`
 
@@ -464,7 +456,6 @@ func main() {
 	logFilter("network include", nicInclude)
 	logFilter("network exclude", nicExclude)
 
-	go refreshTopProcesses()
 	go refreshUnlockItems()
 
 	switch reportMode {
@@ -2709,10 +2700,6 @@ func (s *cpuUsageSampler) usage() float64 {
 }
 
 var (
-	topProcessesCache   []ProcessInfo
-	topProcessesMu      sync.RWMutex
-	topProcessesLastRun time.Time
-	topProcessesRunning bool
 
 	dockerContainersCache   []DockerContainerInfo
 	dockerContainersMu      sync.RWMutex
@@ -2724,107 +2711,6 @@ var (
 	unlockItemsLastRun time.Time
 	unlockItemsRunning bool
 )
-
-func getCachedTopProcesses() []ProcessInfo {
-	topProcessesMu.RLock()
-	if time.Since(topProcessesLastRun) < 15*time.Second && len(topProcessesCache) > 0 {
-		res := make([]ProcessInfo, len(topProcessesCache))
-		copy(res, topProcessesCache)
-		topProcessesMu.RUnlock()
-		return res
-	}
-	topProcessesMu.RUnlock()
-
-	go refreshTopProcesses()
-
-	topProcessesMu.RLock()
-	defer topProcessesMu.RUnlock()
-	res := make([]ProcessInfo, len(topProcessesCache))
-	copy(res, topProcessesCache)
-	return res
-}
-
-func refreshTopProcesses() {
-	topProcessesMu.Lock()
-	if topProcessesRunning || (time.Since(topProcessesLastRun) < 15*time.Second && len(topProcessesCache) > 0) {
-		topProcessesMu.Unlock()
-		return
-	}
-	topProcessesRunning = true
-	topProcessesLastRun = time.Now()
-	topProcessesMu.Unlock()
-
-	defer func() {
-		topProcessesMu.Lock()
-		topProcessesRunning = false
-		topProcessesMu.Unlock()
-	}()
-
-	procs, err := process.Processes()
-	if err != nil {
-		return
-	}
-
-	type procItem struct {
-		pid  int32
-		name string
-		cpu  float64
-		ram  float32
-	}
-
-	var list []procItem
-	for _, p := range procs {
-		c, err := p.CPUPercent()
-		if err != nil {
-			c = 0
-		}
-		m, _ := p.MemoryPercent()
-		name, _ := p.Name()
-		if name == "" {
-			continue
-		}
-		// 安全脱敏：去除可执行文件路径前缀（如 /usr/bin/python3 归一为 python3），防止暴露系统内部绝对路径
-		name = filepath.Base(strings.TrimSpace(name))
-		if name == "" || name == "." || name == "/" {
-			continue
-		}
-		if len(name) > 64 {
-			name = name[:64]
-		}
-		list = append(list, procItem{
-			pid:  p.Pid,
-			name: name,
-			cpu:  math.Round(c*10) / 10,
-			ram:  float32(math.Round(float64(m)*10) / 10),
-		})
-	}
-
-	sort.Slice(list, func(i, j int) bool {
-		if list[i].cpu == list[j].cpu {
-			return list[i].ram > list[j].ram
-		}
-		return list[i].cpu > list[j].cpu
-	})
-
-	limit := 10
-	if len(list) < limit {
-		limit = len(list)
-	}
-
-	result := make([]ProcessInfo, 0, limit)
-	for i := 0; i < limit; i++ {
-		result = append(result, ProcessInfo{
-			PID:  list[i].pid,
-			Name: list[i].name,
-			CPU:  list[i].cpu,
-			RAM:  list[i].ram,
-		})
-	}
-
-	topProcessesMu.Lock()
-	topProcessesCache = result
-	topProcessesMu.Unlock()
-}
 
 func getCachedDockerContainers() []DockerContainerInfo {
 	return nil
@@ -3022,7 +2908,6 @@ func collectReportWithInterval(intervalSec int) Report {
 	}
 	gpuDetailsMu.Unlock()
 
-	r.TopProcesses = getCachedTopProcesses()
 	r.DockerContainers = getCachedDockerContainers()
 	r.UnlockItems = getCachedUnlockItems()
 

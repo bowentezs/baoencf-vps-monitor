@@ -5399,6 +5399,60 @@ html[data-theme-appearance='dark'] .instance-back-pill:hover {
 }
 
 /* 🍎 详情页运维 Bento Box 双列并排与紧凑布局 */
+
+/* 🍎 解锁矩阵双翼 Bento 网格与微晶子舱 */
+.instance-unlock-wings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 16px;
+  align-items: stretch;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 860px) {
+  .instance-unlock-wings-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.instance-unlock-pod {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--gray-a2);
+  border: 1px solid var(--gray-a4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  min-width: 0;
+  box-sizing: border-box;
+  transition: all 0.25s ease;
+}
+
+.instance-unlock-pod-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.layout.has-custom-bg .instance-unlock-pod {
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+}
+
+html[data-theme-appearance='dark'] .layout.has-custom-bg .instance-unlock-pod {
+  background: rgba(18, 18, 24, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .instance-ops-bento-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));

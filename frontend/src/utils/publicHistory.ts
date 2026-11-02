@@ -1,4 +1,4 @@
-import type { ProcessInfo, DockerContainerInfo, UnlockItem } from '../contexts/LiveDataContext';
+import type { DockerContainerInfo, UnlockItem } from '../contexts/LiveDataContext';
 
 export interface PublicMonitorRecord {
   time: string;
@@ -19,7 +19,6 @@ export interface PublicMonitorRecord {
   connections: number;
   connections_udp: number;
   uptime: number;
-  top_processes?: ProcessInfo[];
   docker_containers?: DockerContainerInfo[];
   unlock_items?: UnlockItem[];
 }
