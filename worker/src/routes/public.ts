@@ -116,6 +116,8 @@ async function timed<T>(metrics: TimingMetric[], name: string, fn: () => Promise
 
 function setServerTiming(c: PublicContext, metrics: TimingMetric[]): void {
   if (metrics.length === 0) return;
+  const isDebug = c.env.DEBUG_SERVER_TIMING === 'true' || c.env.DEBUG_SERVER_TIMING === '1';
+  if (!isDebug) return;
   c.header('Server-Timing', metrics.map(metric => `${metric.name};dur=${metric.dur.toFixed(1)}`).join(', '));
 }
 
