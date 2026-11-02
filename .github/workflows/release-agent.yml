@@ -76,6 +76,37 @@ jobs:
           cp install-windows.ps1 dist/install-windows.ps1
           (cd dist && sha256sum * > SHA256SUMS)
 
+      - name: Sync self-hosted agent binaries and checksums
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          cp agent/dist/cf-vps-monitor-agent-linux-amd64 frontend/public/download/cf-vps-monitor-agent-linux-amd64
+          cp agent/dist/cf-vps-monitor-agent-linux-arm64 frontend/public/download/cf-vps-monitor-agent-linux-arm64
+          cp agent/dist/cf-vps-monitor-agent-linux-amd64 frontend/public/download/agent-linux-amd64
+          cp agent/dist/cf-vps-monitor-agent-linux-arm64 frontend/public/download/agent-linux-arm64
+          node scripts/sync-agent-sums.mjs
+          if git diff --quiet -- frontend/public/download worker/src/generated/agent-shasums.ts; then
+            echo "Self-hosted agent binaries already current."
+            exit 0
+          fi
+          git add frontend/public/download worker/src/generated/agent-shasums.ts
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "chore(agent): sync self-hosted binaries for ${AGENT_VERSION_TAG:-${AGENT_VERSION}} [skip ci]"
+          git push origin HEAD:main
+
+      - name: Verify self-hosted checksums
+        if: github.event_name == 'push'
+        continue-on-error: true
+        shell: bash
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          node scripts/sync-agent-sums.mjs --check \
+            || echo "::warning::self-hosted agent binaries are stale; run the release workflow manually to sync them"
+
       - name: Generate artifact provenance
         continue-on-error: true
         uses: actions/attest-build-provenance@v3

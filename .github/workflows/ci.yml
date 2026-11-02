@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -22,6 +25,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - name: Verify agent checksum manifest
+        run: node scripts/sync-agent-sums.mjs --check
 
       - name: Setup Go
         uses: actions/setup-go@v6
