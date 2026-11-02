@@ -167,10 +167,10 @@ export default function UnlockMatrix({ items, compact = false }: UnlockMatrixPro
     );
   }
 
-  // 完整渲染大卡片
+  // 完整渲染大卡片（升级为 Bento 双翼对称微晶玻璃仪表板）
   return (
     <Card className="instance-unlock-card" mb="4">
-      {/* 标题栏与综合评级胶囊 */}
+      {/* 头部标题栏与综合评级胶囊 */}
       <Flex justify="between" align="center" mb="3" wrap="wrap" gap="2" style={{ minWidth: 0, width: '100%' }}>
         <Flex align="center" gap="2" wrap="wrap" style={{ minWidth: 0, flex: '1 1 auto' }}>
           <div
@@ -178,18 +178,18 @@ export default function UnlockMatrix({ items, compact = false }: UnlockMatrixPro
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 26,
-              height: 26,
+              width: 28,
+              height: 28,
               borderRadius: 8,
-              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%)',
-              border: '1px solid rgba(168, 85, 247, 0.35)',
-              boxShadow: '0 0 10px rgba(168, 85, 247, 0.25)',
+              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(59, 130, 246, 0.25) 100%)',
+              border: '1px solid rgba(168, 85, 247, 0.4)',
+              boxShadow: '0 0 12px rgba(168, 85, 247, 0.3)',
               flexShrink: 0,
             }}
           >
             <Sparkles size={16} color="var(--purple-9)" />
           </div>
-          <Heading size="3" weight="bold" style={{ wordBreak: 'break-word' }}>
+          <Heading size="3" weight="bold" style={{ wordBreak: 'break-word', letterSpacing: -0.2 }}>
             AI 与全球流媒体原生解锁矩阵
           </Heading>
           <Badge
@@ -219,55 +219,102 @@ export default function UnlockMatrix({ items, compact = false }: UnlockMatrixPro
         </Flex>
 
         <Flex align="center" gap="2" style={{ flexShrink: 0 }}>
-          <Badge size="1" color="gray" variant="soft" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+          <Badge size="1" color="gray" variant="soft" style={{ fontSize: 11, whiteSpace: 'nowrap', borderRadius: 8 }}>
             出口网络纯净度检测 · 每 30 分钟轮询
           </Badge>
         </Flex>
       </Flex>
 
-      {/* 专区分类排列 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0, width: '100%' }}>
-        {/* 1. 前沿大模型生态专区 */}
+      {/* 动态液态高光解锁进度光条 */}
+      <div
+        style={{
+          width: '100%',
+          height: 4,
+          borderRadius: 999,
+          background: 'var(--gray-a3)',
+          overflow: 'hidden',
+          marginBottom: 16,
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            width: `${Math.max(unlockRate, 4)}%`,
+            borderRadius: 999,
+            background: isAllUnlocked
+              ? 'linear-gradient(90deg, #10B981 0%, #34D399 100%)'
+              : unlockRate >= 60
+                ? 'linear-gradient(90deg, #10B981 0%, #38BDF8 50%, #A855F7 100%)'
+                : 'linear-gradient(90deg, #F59E0B 0%, #EF4444 100%)',
+            boxShadow: isAllUnlocked
+              ? '0 0 10px rgba(16, 185, 129, 0.6)'
+              : '0 0 10px rgba(56, 189, 248, 0.5)',
+            transition: 'width 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        />
+      </div>
+
+      {/* 双翼对称 Bento 舱体布局（大屏左右并排，小屏自适应堆叠） */}
+      <div className="instance-unlock-wings-grid">
+        {/* 左翼：前沿 AI 大模型原生接入 */}
         {aiItems.length > 0 && (
-          <div style={{ minWidth: 0, width: '100%' }}>
-            <Flex align="center" gap="2" mb="2" wrap="wrap">
-              <Bot size={14} color="var(--purple-9)" />
-              <Text size="1" weight="bold" color="gray" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                前沿 AI 大模型原生接入
-              </Text>
+          <div className="instance-unlock-pod">
+            <Flex justify="between" align="center" mb="3">
+              <Flex align="center" gap="2">
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 22,
+                    height: 22,
+                    borderRadius: 6,
+                    background: 'rgba(168, 85, 247, 0.15)',
+                  }}
+                >
+                  <Bot size={13} color="var(--purple-9)" />
+                </div>
+                <Text size="2" weight="bold" style={{ letterSpacing: -0.2 }}>
+                  前沿 AI 大模型原生接入
+                </Text>
+              </Flex>
+              <Badge size="1" color="purple" variant="soft" style={{ borderRadius: 6, fontSize: 10 }}>
+                {aiItems.filter((i) => i.status === 'yes' || i.status === 'full').length} / {aiItems.length} 可用
+              </Badge>
             </Flex>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
-                gap: 10,
-                minWidth: 0,
-                width: '100%',
-              }}
-            >
+            <div className="instance-unlock-pod-tiles">
               {aiItems.map((item) => renderUnlockTile(item))}
             </div>
           </div>
         )}
 
-        {/* 2. 全球顶级流媒体影音专区 */}
+        {/* 右翼：全球影音流媒体矩阵 */}
         {mediaItems.length > 0 && (
-          <div style={{ minWidth: 0, width: '100%' }}>
-            <Flex align="center" gap="2" mb="2" wrap="wrap">
-              <Film size={14} color="var(--red-9)" />
-              <Text size="1" weight="bold" color="gray" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                全球影音流媒体矩阵
-              </Text>
+          <div className="instance-unlock-pod">
+            <Flex justify="between" align="center" mb="3">
+              <Flex align="center" gap="2">
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 22,
+                    height: 22,
+                    borderRadius: 6,
+                    background: 'rgba(239, 68, 68, 0.15)',
+                  }}
+                >
+                  <Film size={13} color="var(--red-9)" />
+                </div>
+                <Text size="2" weight="bold" style={{ letterSpacing: -0.2 }}>
+                  全球影音流媒体矩阵
+                </Text>
+              </Flex>
+              <Badge size="1" color="red" variant="soft" style={{ borderRadius: 6, fontSize: 10 }}>
+                {mediaItems.filter((i) => i.status === 'yes' || i.status === 'full').length} / {mediaItems.length} 可用
+              </Badge>
             </Flex>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
-                gap: 10,
-                minWidth: 0,
-                width: '100%',
-              }}
-            >
+            <div className="instance-unlock-pod-tiles">
               {mediaItems.map((item) => renderUnlockTile(item))}
             </div>
           </div>
@@ -277,7 +324,7 @@ export default function UnlockMatrix({ items, compact = false }: UnlockMatrixPro
   );
 }
 
-// 渲染单个微晶毛玻璃卡片
+// 渲染单个微晶毛玻璃磁贴卡片
 function renderUnlockTile(item: UnlockItem) {
   const isYes = item.status === 'yes' || item.status === 'full';
   const isOrig = item.status === 'original_only';
@@ -299,43 +346,42 @@ function renderUnlockTile(item: UnlockItem) {
   // 状态发光点样式
   const dotColor = isYes ? '#10B981' : isOrig ? '#F59E0B' : '#EF4444';
   const dotGlow = isYes
-    ? '0 0 8px rgba(16, 185, 129, 0.7)'
+    ? '0 0 8px rgba(16, 185, 129, 0.8)'
     : isOrig
-      ? '0 0 8px rgba(245, 158, 11, 0.7)'
-      : 'none';
+      ? '0 0 8px rgba(245, 158, 11, 0.8)'
+      : '0 0 6px rgba(239, 68, 68, 0.8)';
 
   return (
     <div
       key={item.platform}
       className="instance-unlock-tile"
-      style={{
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        minHeight: 82,
-        minWidth: 0,
-        maxWidth: '100%',
-        padding: '12px 14px',
-        borderRadius: 12,
-        boxSizing: 'border-box',
-        overflow: 'hidden',
-        transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-      }}
     >
-      {/* 顶部：品牌 Logo + 平台名 + 状态 Badge */}
-      <Flex justify="between" align="center" mb="2" wrap="wrap" gap="2" style={{ minWidth: 0, width: '100%' }}>
+      {/* 顶部：品牌 Logo 托盘 + 平台名 + 状态 Badge */}
+      <Flex justify="between" align="center" mb="2" gap="2" style={{ minWidth: 0, width: '100%' }}>
         <Flex align="center" gap="2" style={{ minWidth: 0, flex: '1 1 auto' }}>
           {Logo ? (
-            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-              <Logo size={22} />
+            <div
+              style={{
+                flexShrink: 0,
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                background: 'var(--gray-a3)',
+                border: '1px solid var(--gray-a4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+              }}
+            >
+              <Logo size={20} />
             </div>
           ) : (
             <div
               style={{
-                width: 22,
-                height: 22,
-                borderRadius: 6,
+                width: 32,
+                height: 32,
+                borderRadius: 8,
                 background: 'var(--gray-4)',
                 display: 'flex',
                 alignItems: 'center',
@@ -343,11 +389,22 @@ function renderUnlockTile(item: UnlockItem) {
                 flexShrink: 0,
               }}
             >
-              <Sparkles size={14} color="var(--gray-11)" />
+              <Sparkles size={16} color="var(--gray-11)" />
             </div>
           )}
           <div style={{ minWidth: 0 }}>
-            <Text size="2" weight="bold" style={{ letterSpacing: -0.2, lineHeight: 1.2, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <Text
+              size="2"
+              weight="bold"
+              style={{
+                letterSpacing: -0.2,
+                lineHeight: 1.25,
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
               {item.platform}
             </Text>
             {item.platform === 'ChatGPT' && (
@@ -389,6 +446,7 @@ function renderUnlockTile(item: UnlockItem) {
             borderRadius: 8,
             whiteSpace: 'nowrap',
             flexShrink: 0,
+            boxShadow: isYes ? '0 0 8px rgba(16, 185, 129, 0.15)' : undefined,
           }}
         >
           <span
@@ -407,7 +465,7 @@ function renderUnlockTile(item: UnlockItem) {
       </Flex>
 
       {/* 底部：属地国旗与详细说明 */}
-      <Flex justify="between" align="center" pt="1" wrap="wrap" gap="1" style={{ borderTop: '1px solid var(--gray-a3)', minWidth: 0, width: '100%' }}>
+      <Flex justify="between" align="center" pt="2" wrap="wrap" gap="1" style={{ borderTop: '1px solid var(--gray-a3)', minWidth: 0, width: '100%', marginTop: 'auto' }}>
         <Flex align="center" gap="1" style={{ minWidth: 0 }}>
           {item.region ? (
             <>
@@ -436,22 +494,23 @@ function renderUnlockTile(item: UnlockItem) {
         {item.detail ? (
           <Text
             size="1"
-            color="gray"
+            color={isBlocked ? 'red' : 'gray'}
             style={{
               fontSize: 10,
-              maxWidth: 130,
+              maxWidth: 140,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
               fontFamily: 'monospace',
-              opacity: 0.85,
+              fontWeight: isBlocked ? 600 : 400,
+              opacity: 0.9,
             }}
             title={item.detail}
           >
             {item.detail}
           </Text>
         ) : isBlocked ? (
-          <Text size="1" color="red" style={{ fontSize: 10, opacity: 0.85, whiteSpace: 'nowrap' }}>
+          <Text size="1" color="red" style={{ fontSize: 10, opacity: 0.85, whiteSpace: 'nowrap', fontWeight: 600 }}>
             WAF / 地区未开放
           </Text>
         ) : (
