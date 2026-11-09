@@ -11,7 +11,7 @@ import { decryptTotpSecret, encryptTotpSecret, generateRecoveryCodes, hashRecove
 import { generateMfaSetupToken, generateMfaToken, verifyMfaSetupToken } from '../auth/mfa-token';
 import { generateRegistrationOptions, verifyRegistrationResponse } from '@simplewebauthn/server';
 import { isoBase64URL, isoUint8Array } from '@simplewebauthn/server/helpers';
-import { generateWebAuthnChallengeToken, getWebAuthnConfig, verifyWebAuthnChallengeToken } from '../auth/webauthn';
+import { MAX_WEBAUTHN_CREDENTIAL_ID_LENGTH, generateWebAuthnChallengeToken, getWebAuthnConfig, verifyWebAuthnChallengeToken } from '../auth/webauthn';
 import { buildTotpUri, generateTotpSecret, verifyTotpCode } from '../auth/totp';
 import { invalidateAdminSessionCache } from '../auth/admin-session';
 import { hashPassword, validateAdminPasswordStrength, verifyPassword } from '../auth/password';
@@ -2873,7 +2873,7 @@ adminRoutes.post('/account/passkeys', async (c) => {
   if (!parsed.ok) return parsed.response;
 
   const response = parsed.body.response as PasskeyRegistrationResponse | undefined;
-  if (!isJsonObjectBody(response) || typeof response.id !== 'string' || response.id.length > 1024) {
+  if (!isJsonObjectBody(response) || typeof response.id !== 'string' || response.id.length > MAX_WEBAUTHN_CREDENTIAL_ID_LENGTH) {
     return c.json({ error: '通行密钥响应无效' }, 400);
   }
   const name = typeof parsed.body.name === 'string' ? parsed.body.name.trim().slice(0, 64) : '';

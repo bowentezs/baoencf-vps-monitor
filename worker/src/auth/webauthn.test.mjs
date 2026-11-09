@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { generateWebAuthnChallengeToken, getWebAuthnConfig, verifyWebAuthnChallengeToken } from './webauthn.ts';
+import { MAX_WEBAUTHN_CREDENTIAL_ID_LENGTH, generateWebAuthnChallengeToken, getWebAuthnConfig, verifyWebAuthnChallengeToken } from './webauthn.ts';
 
 const env = { JWT_SECRET: '0123456789abcdef0123456789abcdef' };
 const payload = {
@@ -25,6 +25,11 @@ test('challenge token rejects a different secret and expired tokens', async () =
 
   const expired = await generateWebAuthnChallengeToken(payload, env, Date.now() - 10 * 60 * 1000);
   assert.equal(await verifyWebAuthnChallengeToken(expired, 'authentication', env), null);
+});
+
+test('credential ID limit covers the WebAuthn specification maximum', () => {
+  // 1023-byte credential ID becomes at most 1364 base64url characters.
+  assert.ok(MAX_WEBAUTHN_CREDENTIAL_ID_LENGTH >= Math.ceil(1023 * 4 / 3));
 });
 
 test('WebAuthn config uses the request hostname and origin', () => {

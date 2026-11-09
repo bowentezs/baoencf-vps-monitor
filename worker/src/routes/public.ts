@@ -16,7 +16,7 @@ import { verifyTotpCode } from '../auth/totp';
 import { hashPassword, needsPasswordRehash, validateAdminPasswordStrength, verifyPassword } from '../auth/password';
 import { generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
-import { generateWebAuthnChallengeToken, getWebAuthnConfig, verifyWebAuthnChallengeToken } from '../auth/webauthn';
+import { MAX_WEBAUTHN_CREDENTIAL_ID_LENGTH, generateWebAuthnChallengeToken, getWebAuthnConfig, verifyWebAuthnChallengeToken } from '../auth/webauthn';
 import {
   clearAdminSessionCookie,
   clearWebAuthnChallengeCookie,
@@ -65,6 +65,8 @@ const PUBLIC_METADATA_RATE_LIMIT_MAX = 120;
 const PUBLIC_HISTORY_RATE_LIMIT_MAX = 60;
 const PUBLIC_LIVE_RATE_LIMIT_MAX = 180;
 const PUBLIC_ADMIN_RECOVERY_RATE_LIMIT_MAX = 5;
+const PASSKEY_OPTIONS_IP_RATE_LIMIT_MAX = 40;
+const PASSKEY_OPTIONS_USER_RATE_LIMIT_MAX = 12;
 type AuthenticationAllowCredential = NonNullable<Parameters<typeof generateAuthenticationOptions>[0]['allowCredentials']>[number];
 type AuthenticationResponse = Parameters<typeof verifyAuthenticationResponse>[0]['response'];
 type StoredPasskeyCredential = Parameters<typeof verifyAuthenticationResponse>[0]['credential'];
@@ -837,6 +839,13 @@ function guardAdminRecovery(c: PublicContext): Promise<Response | null> {
   return publicApiRateLimit(c, 'admin-recovery', PUBLIC_ADMIN_RECOVERY_RATE_LIMIT_MAX);
 }
 
+async function guardPasskeyOptions(c: PublicContext, username: string): Promise<Response | null> {
+  const ipLimited = await publicApiRateLimit(c, 'passkey-options:ip', PASSKEY_OPTIONS_IP_RATE_LIMIT_MAX);
+  if (ipLimited) return ipLimited;
+  const usernameBucket = `passkey-options:user:${normalizeLoginUsername(username).slice(0, 64)}`;
+  return publicApiRateLimit(c, usernameBucket, PASSKEY_OPTIONS_USER_RATE_LIMIT_MAX);
+}
+
 async function preparePublicHistoryRequest(
   c: PublicContext,
   database: db.QueryDatabase,
@@ -926,6 +935,14 @@ function loginRateLimitBuckets(ip: string, username: string): string[] {
   return [
     `login:ip:${ip}`,
     `login:ip-user:${ip}:${normalizedUsername}`,
+  ];
+}
+
+function passkeyRateLimitBuckets(ip: string, username: string): string[] {
+  const normalizedUsername = normalizeLoginUsername(username);
+  return [
+    `passkey:ip:${ip}`,
+    `passkey:ip-user:${ip}:${normalizedUsername}`,
   ];
 }
 
@@ -1397,16 +1414,10 @@ publicRoutes.post('/login/passkey/options', async (c) => {
     return c.json({ code: 'PASSKEY_INPUT_INVALID', error: '用户名无效' }, 400);
   }
 
-  const clientIp = getClientIp(c);
-  const buckets = loginRateLimitBuckets(clientIp, username);
-  const database = getDatabase(c.env);
-  const states = await loadLoginRateLimitStates(database, buckets);
-  const retryAfter = getLoginRetryAfterSeconds(states, Date.now());
-  if (retryAfter > 0) {
-    c.header('Retry-After', String(retryAfter));
-    return c.json({ code: 'PASSKEY_RATE_LIMITED', error: `尝试过于频繁，请 ${retryAfter} 秒后再试` }, 429);
-  }
+  const limited = await guardPasskeyOptions(c, username);
+  if (limited) return limited;
 
+  const database = getDatabase(c.env);
   const user = await db.getUserByUsername(database, username);
   if (!user) {
     return c.json({ code: 'PASSKEY_UNAVAILABLE', error: '该账号未绑定通行密钥' }, 401);
@@ -1471,7 +1482,7 @@ publicRoutes.post('/login/passkey/verify', async (c) => {
   if ('response' in parsed) return parsed.response;
 
   const response = parsed.body.response as AuthenticationResponse | undefined;
-  if (!isJsonObjectPayload(response) || typeof response.id !== 'string' || response.id.length > 1024) {
+  if (!isJsonObjectPayload(response) || typeof response.id !== 'string' || response.id.length > MAX_WEBAUTHN_CREDENTIAL_ID_LENGTH) {
     return c.json({ code: 'PASSKEY_INPUT_INVALID', error: '通行密钥响应无效' }, 400);
   }
 
@@ -1505,7 +1516,7 @@ publicRoutes.post('/login/passkey/verify', async (c) => {
   }
 
   const clientIp = getClientIp(c);
-  const buckets = loginRateLimitBuckets(clientIp, user.username);
+  const buckets = passkeyRateLimitBuckets(clientIp, user.username);
   const states = await loadLoginRateLimitStates(database, buckets);
   const retryAfter = getLoginRetryAfterSeconds(states, Date.now());
   if (retryAfter > 0) {

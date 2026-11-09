@@ -5,6 +5,10 @@ const WEBAUTHN_CHALLENGE_TTL_SECONDS = 5 * 60;
 const MAX_CHALLENGE_LENGTH = 512;
 const MAX_USERNAME_LENGTH = 128;
 
+// WebAuthn 规范允许 credential ID 最长 1023 字节；base64url 后约 1364 字符。
+// 这里留出余量，避免合法的大凭据 ID 在注册/登录时被误拒。
+export const MAX_WEBAUTHN_CREDENTIAL_ID_LENGTH = 2048;
+
 type WebAuthnEnv = { JWT_SECRET?: string };
 
 export type WebAuthnChallengePurpose = 'registration' | 'authentication';
