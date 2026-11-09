@@ -50,6 +50,7 @@ const MAX_LOGIN_PASSWORD_LENGTH = 4096;
 const MAX_MFA_CHALLENGE_LENGTH = 4096;
 const MAX_MFA_CODE_LENGTH = 128;
 const MAX_PUBLIC_JSON_BYTES = 8 * 1024;
+const MAX_VISIT_BODY_BYTES = 4 * 1024;
 const MAX_PUBLIC_RECORD_RANGE_MS = 3 * 24 * 60 * 60 * 1000;
 const PUBLIC_RECORD_RANGE_SLOP_MS = 60 * 1000;
 const PUBLIC_RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -275,7 +276,7 @@ function publicJsonResponse(c: PublicContext, value: unknown, maxAgeSeconds: num
       'Content-Type': 'application/json; charset=UTF-8',
       'Cache-Control': `public, max-age=${maxAgeSeconds}, s-maxage=${maxAgeSeconds}, stale-while-revalidate=${maxAgeSeconds * 2}`,
       'X-CF-VPS-Monitor-Public-Cache': cacheState,
-      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
     },
   });
 }
@@ -286,7 +287,7 @@ function withPublicCacheHeader(c: PublicContext, response: Response, maxAgeSecon
   const headers = new Headers(response.headers);
   headers.set('Cache-Control', `public, max-age=${maxAgeSeconds}, s-maxage=${maxAgeSeconds}, stale-while-revalidate=${maxAgeSeconds * 2}`);
   headers.set('X-CF-VPS-Monitor-Public-Cache', cacheState);
-  headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -521,7 +522,7 @@ function privateJsonResponse(value: unknown): Response {
     headers: {
       'Content-Type': 'application/json; charset=UTF-8',
       'Cache-Control': 'no-store',
-      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
     },
   });
 }
@@ -1867,12 +1868,13 @@ publicRoutes.get('/live', async (c) => {
 publicRoutes.all('/visit', async (c) => {
   let targetPath = '/';
   if (c.req.method === 'POST') {
-    try {
-      const body = await c.req.json() as { path?: string };
+    const parsed = await readJsonWithLimit(c.req.raw, MAX_VISIT_BODY_BYTES);
+    if (parsed.ok) {
+      const body = parsed.body as { path?: unknown } | null;
       if (body && typeof body.path === 'string') {
         targetPath = body.path.trim();
       }
-    } catch {
+    } else {
       targetPath = c.req.query('path') || '/';
     }
   } else {
