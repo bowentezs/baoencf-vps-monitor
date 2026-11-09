@@ -266,7 +266,7 @@ async function requireMfaStepUp(
   database: db.QueryDatabase,
   payload: AdminJwtPayload,
 ): Promise<Response | null> {
-  const pathname = new URL(c.req.url).pathname;
+  const pathname = c.req.path;
   if (!isMfaStepUpProtectedRequest(c.req.method, pathname)) return null;
 
   const user = await db.getUserByUuid(database, payload.userId);

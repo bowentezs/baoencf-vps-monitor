@@ -24,5 +24,14 @@ const CONFIG_WRITE_PATH = /^\/api\/admin\/(?:settings|ping\/|websites\/|notifica
 
 export function isMfaStepUpProtectedRequest(method: string, pathname: string): boolean {
   if (method.toUpperCase() !== 'POST') return false;
-  return EXACT_PROTECTED_PATHS.has(pathname) || CLIENT_SECRET_PATH.test(pathname) || CONFIG_WRITE_PATH.test(pathname);
+  let normalizedPath = pathname;
+  try {
+    normalizedPath = decodeURI(pathname);
+  } catch {
+    // 保留原始路径；畸形编码交给路由层处理。
+  }
+  if (normalizedPath.length > 1) {
+    normalizedPath = normalizedPath.replace(/\/+$/, '');
+  }
+  return EXACT_PROTECTED_PATHS.has(normalizedPath) || CLIENT_SECRET_PATH.test(normalizedPath) || CONFIG_WRITE_PATH.test(normalizedPath);
 }

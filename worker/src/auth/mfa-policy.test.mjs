@@ -53,3 +53,10 @@ test('does not recursively protect the step-up endpoint or ordinary edits', () =
   assert.equal(isMfaStepUpProtectedRequest('POST', '/api/admin/clients/reorder'), false);
   assert.equal(isMfaStepUpProtectedRequest('GET', '/api/admin/clients/node-1/token'), false);
 });
+
+test('normalizes percent-encoded and trailing-slash protected paths', () => {
+  assert.equal(isMfaStepUpProtectedRequest('POST', '/api/admin/account/%70asskeys/options'), true);
+  assert.equal(isMfaStepUpProtectedRequest('POST', '/api/admin/account/passkeys/%6fptions'), true);
+  assert.equal(isMfaStepUpProtectedRequest('POST', '/api/admin/account/passkeys/delete/'), true);
+  assert.equal(isMfaStepUpProtectedRequest('POST', '/api/admin/settings/'), true);
+});
