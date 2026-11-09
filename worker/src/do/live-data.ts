@@ -20,6 +20,7 @@ import { bestEffortRecordHealthEvent, errorDetail } from '../utils/observability
 import { isPublicIpAddress, normalizeIpSubnetKey } from '../utils/request-ip';
 import { unwrapMonitorReportEnvelope } from '../utils/report-envelope';
 import { checkWebsiteMonitorHttp } from '../utils/website-monitor';
+import { planExpiryAlarm } from './expiry-alarm';
 
 // 客户端状态
 interface ClientState {
@@ -83,6 +84,7 @@ const VIEWER_DEFAULT_TTL_MS = 120 * 1000;
 const VIEWER_MAX_TOTAL_SESSIONS = 128;
 const VIEWER_MAX_SESSIONS_PER_IP = 8;
 const PING_RESULT_STORAGE_PREFIX = 'ping-result:';
+const PING_RESULT_CLIENT_STATE_PREFIX = 'ping-result-client:';
 const PING_VALUE_CHANGE_THRESHOLD_MS = 5;
 const PING_UNCHANGED_HEARTBEAT_MS = 30 * 60_000;
 const GPU_SNAPSHOT_META_PREFIX = 'gpu-snapshot-meta:';
@@ -394,6 +396,7 @@ export class LiveDataDO {
   private healthOkLastWriteAt: Map<string, number> = new Map();
   private recordLastPersistAt: Map<string, number> = new Map();
   private pingResultStateCache: Map<string, PingResultState> = new Map();
+  private pingResultStateClientLoaded = new Set<string>();
   private policySettings: AgentPolicySettings = {
     activeIntervalSec: 3,
     idleIntervalSec: 120,
@@ -413,6 +416,8 @@ export class LiveDataDO {
   private geoRegionCache = new Map<string, { region: string; expiresAt: number }>();
   private clientLastReportTimes = new Map<string, number>();
   private expiredViewersNotified = new Set<string>();
+  // 已排程到期闹钟的本地缓存；undefined 表示未知，需要向 DO 存储读取一次。
+  private alarmScheduledAt: number | null | undefined = undefined;
 
   constructor(state: DurableObjectState, env: LiveDataEnv) {
     this.state = state;
@@ -1065,31 +1070,50 @@ export class LiveDataDO {
     }
   }
 
+  /**
+   * 到期闹钟去抖。
+   *
+   * 每条 WebSocket 上报都会调用本方法，而 DO 的 setAlarm()/deleteAlarm() 在
+   * SQLite 计费里各算 1 行写入。旧实现无条件重写闹钟，观看者活跃时 9 台节点
+   * 每秒约产生 1.8 行写入，几小时就能耗尽免费版 100,000 行/天配额，导致所有
+   * 历史入库失败。现在只在「没有闹钟」或「需要更早触发」时才写存储；已有更早
+   * 的闹钟触发后会在 alarm() 中重新计算下一次到期时间。
+   */
   private async scheduleExpiryAlarm(now: number) {
     try {
-      const expiries: number[] = [];
-      for (const client of this.clients.values()) {
-        const expiresAt = client.expiresAt;
-        if (typeof expiresAt === 'number' && Number.isFinite(expiresAt) && expiresAt > now) {
-          expiries.push(expiresAt);
-        }
+      if (this.alarmScheduledAt === undefined) {
+        this.alarmScheduledAt = await this.state.storage.getAlarm();
       }
-      for (const expiresAt of this.viewerExpiresAt.values()) {
-        if (Number.isFinite(expiresAt) && expiresAt > now) {
-          expiries.push(expiresAt);
-        }
-      }
-      const nextExpiry = expiries.sort((a, b) => a - b)[0];
 
-      if (nextExpiry === undefined) {
+      const plan = planExpiryAlarm(this.alarmScheduledAt, this.nextExpiryAt(now), now);
+      if (plan.action === 'delete') {
         await this.state.storage.deleteAlarm();
-        return;
+        this.alarmScheduledAt = null;
+      } else if (plan.action === 'set') {
+        await this.state.storage.setAlarm(plan.at);
+        this.alarmScheduledAt = plan.at;
       }
-
-      await this.state.storage.setAlarm(Math.max(nextExpiry, now + 1000));
     } catch {
       // Alarm scheduling is best effort; snapshots still filter expired HTTP clients.
+      // 写失败（例如配额耗尽）时清空缓存，下次上报重新读取真实闹钟状态。
+      this.alarmScheduledAt = undefined;
     }
+  }
+
+  private nextExpiryAt(now: number): number | undefined {
+    let nextExpiry: number | undefined;
+    for (const client of this.clients.values()) {
+      const expiresAt = client.expiresAt;
+      if (typeof expiresAt === 'number' && Number.isFinite(expiresAt) && expiresAt > now) {
+        nextExpiry = nextExpiry === undefined ? expiresAt : Math.min(nextExpiry, expiresAt);
+      }
+    }
+    for (const expiresAt of this.viewerExpiresAt.values()) {
+      if (Number.isFinite(expiresAt) && expiresAt > now) {
+        nextExpiry = nextExpiry === undefined ? expiresAt : Math.min(nextExpiry, expiresAt);
+      }
+    }
+    return nextExpiry;
   }
 
   private broadcastToViewers(message: JsonObject, audience: 'all' | 'public' | 'admin' = 'all') {
@@ -1997,6 +2021,8 @@ export class LiveDataDO {
 
   async alarm(): Promise<void> {
     const now = Date.now();
+    // 闹钟已触发并从 DO 存储中消费；清空缓存，让 finally 按最新到期时间重新排程。
+    this.alarmScheduledAt = null;
     try {
       this.removeExpiredClients(now);
       this.removeExpiredViewers(now);
@@ -2310,6 +2336,10 @@ export class LiveDataDO {
     return `${PING_RESULT_STORAGE_PREFIX}${clientId}:${taskId}`;
   }
 
+  private pingResultStateClientKey(clientId: string): string {
+    return `${PING_RESULT_CLIENT_STATE_PREFIX}${clientId}`;
+  }
+
   private normalizePingResultState(raw: unknown): PingResultState {
     if (typeof raw === 'number' && Number.isFinite(raw)) {
       return { lastAcceptedMs: raw };
@@ -2329,18 +2359,46 @@ export class LiveDataDO {
     return state;
   }
 
-  private async readPingResultState(key: string): Promise<PingResultState> {
+  private async loadPingResultStateClient(clientId: string): Promise<void> {
+    if (this.pingResultStateClientLoaded.has(clientId)) return;
+
+    const raw = await this.state.storage.get<Record<string, unknown>>(this.pingResultStateClientKey(clientId));
+    if (raw && typeof raw === 'object') {
+      for (const [taskId, state] of Object.entries(raw)) {
+        this.pingResultStateCache.set(
+          this.pingResultStateKey(clientId, Number(taskId)),
+          this.normalizePingResultState(state),
+        );
+      }
+    }
+    this.pingResultStateClientLoaded.add(clientId);
+  }
+
+  private async readPingResultState(clientId: string, taskId: number): Promise<PingResultState> {
+    const key = this.pingResultStateKey(clientId, taskId);
     const cached = this.pingResultStateCache.get(key);
     if (cached) return cached;
 
-    const state = this.normalizePingResultState(await this.state.storage.get(key));
-    this.pingResultStateCache.set(key, state);
-    return state;
+    await this.loadPingResultStateClient(clientId);
+    return this.pingResultStateCache.get(key) || this.normalizePingResultState(undefined);
   }
 
-  private async writePingResultState(key: string, state: PingResultState): Promise<void> {
-    this.pingResultStateCache.set(key, state);
-    await this.state.storage.put(key, state);
+  /**
+   * 把单个客户端的全部 Ping 去重状态合并为一行写入。
+   *
+   * 旧实现每个 task 一行、且限频状态与已持久化状态各写一次；9 个任务 × 9 台节点
+   * 在 60 秒探测间隔下每天会产生十万级 DO 行写入。合并后每个客户端每批只写 1 行。
+   */
+  private async persistPingResultState(clientId: string): Promise<void> {
+    await this.loadPingResultStateClient(clientId);
+
+    const prefix = `${PING_RESULT_STORAGE_PREFIX}${clientId}:`;
+    const entries: Record<string, PingResultState> = {};
+    for (const [key, state] of this.pingResultStateCache) {
+      if (!key.startsWith(prefix)) continue;
+      entries[key.slice(prefix.length)] = state;
+    }
+    await this.state.storage.put(this.pingResultStateClientKey(clientId), entries);
   }
 
   private shouldPersistPingResult(result: PingPersistenceResult, state: PingResultState, nowMs: number): boolean {
@@ -2359,16 +2417,19 @@ export class LiveDataDO {
   }
 
   private async markPingResultsPersisted(clientId: string, results: PingPersistenceResult[], nowMs: number): Promise<void> {
+    if (results.length === 0) return;
+
     for (const result of results) {
       const key = this.pingResultStateKey(clientId, result.taskId);
       const previous = this.pingResultStateCache.get(key) || { lastAcceptedMs: nowMs };
-      await this.writePingResultState(key, {
+      this.pingResultStateCache.set(key, {
         ...previous,
         lastAcceptedMs: previous.lastAcceptedMs || nowMs,
         value: result.value,
         persistedAt: nowMs,
       });
     }
+    await this.persistPingResultState(clientId);
   }
 
   private async persistReport(clientId: string, report: JsonObject, nowMs: number, force = false): Promise<boolean> {
@@ -2575,12 +2636,13 @@ export class LiveDataDO {
     for (const result of results) {
       const minIntervalMs = this.pingResultIntervalMs(result.intervalSec);
       const key = this.pingResultStateKey(clientId, result.taskId);
-      const state = await this.readPingResultState(key);
+      const state = await this.readPingResultState(clientId, result.taskId);
       if (state.lastAcceptedMs && nowMs - state.lastAcceptedMs < minIntervalMs) {
         continue;
       }
       const shouldPersist = this.shouldPersistPingResult(result, state, nowMs);
-      await this.writePingResultState(key, {
+      // 仅推进内存中的限频时间；未真正入库的结果不再各自写一行 DO 存储。
+      this.pingResultStateCache.set(key, {
         ...state,
         lastAcceptedMs: nowMs,
       });
