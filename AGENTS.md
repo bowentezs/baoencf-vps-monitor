@@ -15,3 +15,16 @@
 3. 交付前真机/无头挂载验证：
    - 前端代码修改后，严禁仅凭 `tsc` 或打包绿灯就草率交付（TypeScript 编译器默认不校验 Hook 执行时序）。
    - 涉及核心页面和复杂状态改动，必须通过无头浏览器挂载或自动化测试，实机核验控制台 0 项异常、0 项报错，且绝不命中 `ErrorBoundary` 后方可宣布交付。
+
+## 敏感数据、凭据与 Git 提交门禁（强制执行）
+
+1. **零环境变量文件提交**：
+   - `.env*`、`.dev.vars*`（非 `.example` 模板）绝对禁止提交入库；修改配置模板时仅允许使用 `replace-with-...` 等显式占位符。
+
+2. **零真实公钥与凭据数据入库**：
+   - 数据库迁移（`supabase/migrations/*.sql`）只允许包含 DDL 与存储过程，严禁包含任何真实用户 Passkey 公钥（`public_key`）、`credential_id`、密码 Hash 或会话数据。
+   - 单元测试与 Mock 数据中一律使用规范前缀（如 `TEST_`、`mock_`），严禁使用与生产环境不可区分的真实格式凭据。
+
+3. **提交前必须进行确定性反查**：
+   - 任何改动提交前，必须运行 `git diff --cached` 确保未包含任何真实 Cloudflare Account ID、Supabase 私有实例地址、私钥或 Telegram Token。
+   - 必须确保本地 `.git/hooks/pre-commit` 处于激活状态，严禁使用 `--no-verify` 绕过安全提交检查。
