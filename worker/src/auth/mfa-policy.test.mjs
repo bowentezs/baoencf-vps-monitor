@@ -18,6 +18,9 @@ const protectedRequests = [
   ['POST', '/api/admin/account/mfa/enable'],
   ['POST', '/api/admin/account/mfa/recovery-codes'],
   ['POST', '/api/admin/account/mfa/disable'],
+  ['POST', '/api/admin/account/passkeys/options'],
+  ['POST', '/api/admin/account/passkeys'],
+  ['POST', '/api/admin/account/passkeys/delete'],
   ['POST', '/api/admin/cron/run'],
 ];
 
