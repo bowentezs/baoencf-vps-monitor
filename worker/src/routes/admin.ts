@@ -9,10 +9,13 @@ import * as db from '../db/queries';
 import { AuthConfigurationError, generateToken } from '../auth/jwt';
 import { decryptTotpSecret, encryptTotpSecret, generateRecoveryCodes, hashRecoveryCode } from '../auth/mfa';
 import { generateMfaSetupToken, generateMfaToken, verifyMfaSetupToken } from '../auth/mfa-token';
+import { generateRegistrationOptions, verifyRegistrationResponse } from '@simplewebauthn/server';
+import { isoBase64URL, isoUint8Array } from '@simplewebauthn/server/helpers';
+import { generateWebAuthnChallengeToken, getWebAuthnConfig, verifyWebAuthnChallengeToken } from '../auth/webauthn';
 import { buildTotpUri, generateTotpSecret, verifyTotpCode } from '../auth/totp';
 import { invalidateAdminSessionCache } from '../auth/admin-session';
 import { hashPassword, validateAdminPasswordStrength, verifyPassword } from '../auth/password';
-import { clearMfaStepUpCookie, setAdminSessionCookie, setMfaStepUpCookie } from '../auth/session';
+import { clearMfaStepUpCookie, setAdminSessionCookie, setMfaStepUpCookie, clearWebAuthnChallengeCookie, getWebAuthnChallengeToken, setWebAuthnChallengeCookie } from '../auth/session';
 import { SETTING_SCHEMA, SENSITIVE_SETTING_KEYS, buildAdminSettings, sanitizeSettingsForStorage } from '../settings/schema';
 import {
   BACKUP_ENCRYPTION_ALGORITHM,
@@ -80,6 +83,8 @@ import {
 const adminRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 type AdminContext = Context<{ Bindings: Bindings; Variables: Variables }>;
 const MAX_ADMIN_USERNAME_BYTES = 64;
+type PasskeyRegistrationResponse = Parameters<typeof verifyRegistrationResponse>[0]['response'];
+type PasskeyExcludeCredential = NonNullable<Parameters<typeof generateRegistrationOptions>[0]['excludeCredentials']>[number];
 const MIN_JWT_SECRET_BYTES = 32;
 const CAPACITY_ESTIMATE_CACHE_MS = 30_000;
 const CAPACITY_ROW_COUNT_CACHE_MS = 60_000;
@@ -2785,6 +2790,209 @@ adminRoutes.post('/account/mfa/step-up', async (c) => {
   await db.insertAuditLog(database, user.username, 'mfa_step_up', '完成敏感操作二次确认');
   return c.json({ success: true, expires_in: 1800 });
 });
+// 通行密钥（Passkey）管理
+adminRoutes.get('/account/passkeys', async (c) => {
+  const database = getDatabase(c.env);
+  const user = await db.getUserByUuid(database, c.get('userId')!);
+  if (!user) return c.json({ error: '用户不存在' }, 404);
+  try {
+    const passkeys = await db.listUserPasskeys(database, user.uuid);
+    return c.json({ passkeys });
+  } catch (error) {
+    console.error('[auth] failed to list passkeys:', sanitizeSetupDiagnosticDetail(error));
+    return c.json({ error: '无法读取通行密钥' }, 500);
+  }
+});
+
+adminRoutes.post('/account/passkeys/options', async (c) => {
+  const database = getDatabase(c.env);
+  const user = await db.getUserByUuid(database, c.get('userId')!);
+  if (!user) return c.json({ error: '用户不存在' }, 404);
+
+  let config;
+  try {
+    config = getWebAuthnConfig(c.req.url);
+  } catch {
+    return c.json({ error: '通行密钥需要通过 HTTPS 访问' }, 400);
+  }
+
+  let passkeys;
+  try {
+    passkeys = await db.getUserPasskeys(database, user.uuid);
+  } catch (error) {
+    console.error('[auth] failed to load passkeys:', sanitizeSetupDiagnosticDetail(error));
+    return c.json({ error: '无法读取通行密钥' }, 500);
+  }
+
+  let options;
+  try {
+    options = await generateRegistrationOptions({
+      rpName: config.rpName,
+      rpID: config.rpID,
+      userName: user.username,
+      userDisplayName: user.username,
+      userID: isoUint8Array.fromUTF8String(user.uuid),
+      attestationType: 'none',
+      excludeCredentials: passkeys.map(passkey => ({
+        id: passkey.credential_id,
+        transports: passkey.transports as PasskeyExcludeCredential['transports'],
+      })),
+      authenticatorSelection: {
+        residentKey: 'preferred',
+        userVerification: 'required',
+      },
+    });
+  } catch (error) {
+    console.error('[auth] failed to generate passkey registration options:', sanitizeSetupDiagnosticDetail(error));
+    return c.json({ error: '无法生成通行密钥注册参数' }, 500);
+  }
+
+  try {
+    const challenge = await generateWebAuthnChallengeToken({
+      purpose: 'registration',
+      challenge: options.challenge,
+      userId: user.uuid,
+      username: user.username,
+      sessionVersion: user.session_version,
+    }, c.env);
+    setWebAuthnChallengeCookie(c, challenge);
+  } catch (error) {
+    if (error instanceof AuthConfigurationError) {
+      console.error('[auth] JWT_SECRET is missing or shorter than 32 bytes');
+      return c.json({ error: '服务端 JWT_SECRET 未正确配置' }, 500);
+    }
+    throw error;
+  }
+
+  c.header('Cache-Control', 'no-store');
+  return c.json({ options });
+});
+
+adminRoutes.post('/account/passkeys', async (c) => {
+  const parsed = await readAdminJsonObject(c);
+  if (!parsed.ok) return parsed.response;
+
+  const response = parsed.body.response as PasskeyRegistrationResponse | undefined;
+  if (!isJsonObjectBody(response) || typeof response.id !== 'string' || response.id.length > 1024) {
+    return c.json({ error: '通行密钥响应无效' }, 400);
+  }
+  const name = typeof parsed.body.name === 'string' ? parsed.body.name.trim().slice(0, 64) : '';
+
+  const database = getDatabase(c.env);
+  const user = await db.getUserByUuid(database, c.get('userId')!);
+  if (!user) return c.json({ error: '用户不存在' }, 404);
+
+  const challengeToken = getWebAuthnChallengeToken(c);
+  if (!challengeToken) return c.json({ error: '绑定验证已失效，请重新开始' }, 401);
+
+  let payload;
+  try {
+    payload = await verifyWebAuthnChallengeToken(challengeToken, 'registration', c.env);
+  } catch (error) {
+    if (error instanceof AuthConfigurationError) {
+      console.error('[auth] JWT_SECRET is missing or shorter than 32 bytes');
+      return c.json({ error: '服务端 JWT_SECRET 未正确配置' }, 500);
+    }
+    throw error;
+  }
+  if (
+    !payload ||
+    payload.userId !== user.uuid ||
+    payload.username !== user.username ||
+    payload.sessionVersion !== user.session_version
+  ) {
+    return c.json({ error: '绑定验证已失效，请重新开始' }, 401);
+  }
+
+  let config;
+  try {
+    config = getWebAuthnConfig(c.req.url);
+  } catch {
+    return c.json({ error: '通行密钥需要通过 HTTPS 访问' }, 400);
+  }
+
+  let verification;
+  try {
+    verification = await verifyRegistrationResponse({
+      response: response as PasskeyRegistrationResponse,
+      expectedChallenge: payload.challenge,
+      expectedOrigin: config.origin,
+      expectedRPID: config.rpID,
+      requireUserVerification: true,
+    });
+  } catch (error) {
+    console.error('[auth] passkey registration verification failed:', sanitizeSetupDiagnosticDetail(error));
+    return c.json({ error: '通行密钥注册验证失败' }, 400);
+  }
+  if (!verification.verified) {
+    return c.json({ error: '通行密钥注册验证失败' }, 400);
+  }
+
+  const credential = verification.registrationInfo.credential;
+  let created;
+  try {
+    created = await db.createUserPasskey(database, {
+      userUuid: user.uuid,
+      credentialId: credential.id,
+      publicKey: isoBase64URL.fromBuffer(credential.publicKey),
+      counter: credential.counter,
+      transports: credential.transports ?? [],
+      name: name || '通行密钥',
+      aaguid: verification.registrationInfo.aaguid || '',
+    });
+  } catch (error) {
+    console.error('[auth] failed to save passkey:', sanitizeSetupDiagnosticDetail(error));
+    return c.json({ error: '保存通行密钥失败' }, 500);
+  }
+  if (!created) {
+    return c.json({ error: '该通行密钥已绑定' }, 409);
+  }
+
+  clearWebAuthnChallengeCookie(c);
+  await db.insertAuditLog(database, user.username, 'passkey_added', `添加通行密钥: ${created.name}`, 'warning');
+  const passkeys = await db.listUserPasskeys(database, user.uuid);
+  return c.json({
+    success: true,
+    passkey: {
+      id: created.id,
+      name: created.name,
+      created_at: created.created_at,
+      last_used_at: created.last_used_at,
+      transports: created.transports,
+    },
+    passkeys,
+  });
+});
+
+adminRoutes.post('/account/passkeys/delete', async (c) => {
+  const parsed = await readAdminJsonObject(c);
+  if (!parsed.ok) return parsed.response;
+
+  const id = typeof parsed.body.id === 'string' ? parsed.body.id.trim() : '';
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: '通行密钥 ID 无效' }, 400);
+  }
+
+  const database = getDatabase(c.env);
+  const user = await db.getUserByUuid(database, c.get('userId')!);
+  if (!user) return c.json({ error: '用户不存在' }, 404);
+
+  let deleted = false;
+  try {
+    deleted = await db.deleteUserPasskey(database, user.uuid, id);
+  } catch (error) {
+    console.error('[auth] failed to delete passkey:', sanitizeSetupDiagnosticDetail(error));
+    return c.json({ error: '删除通行密钥失败' }, 500);
+  }
+  if (!deleted) {
+    return c.json({ error: '通行密钥不存在' }, 404);
+  }
+
+  await db.insertAuditLog(database, user.username, 'passkey_deleted', '删除通行密钥', 'warning');
+  const passkeys = await db.listUserPasskeys(database, user.uuid);
+  return c.json({ success: true, passkeys });
+});
+
 // 修改用户名
 adminRoutes.post('/account/username', async (c) => {
   try {

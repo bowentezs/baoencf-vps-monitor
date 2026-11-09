@@ -1,5 +1,6 @@
 import type { AuditLogsPage, BoundedTableRowCounts, ClearAllRecordsResult, Client, ClientCapacityCounts, ClientIdentity, ClientReferenceCleanupResult, ClientTokenMeta, ClientVisibility, DailyTrafficSnapshot, DeleteClientsResult, DeleteOldRowsOptions, ExpiryNotification, ExpiryNotificationUpdate, GPUHistoryRecord, GPUInfo, HistoryTableRowCounts, LoadMetricWindowStats, LoadNotification, LoadNotificationInput, LoadNotificationMetric, LoginRateLimit, MonitorRecord, OfflineNotification, OfflineNotificationUpdate, OrphanClientDataCleanupResult, PingHistoryRecord, PingSnapshotInput, PingTask, PingTaskEstimateRow, PingTaskHistoryRequest, PublicClientRow, PublicWebsiteMonitor, ScheduledClientRow, TableRowCounts, Theme, ThemeAsset, ThemeAssetUpsertInput, ThemeUpsertInput, User, WebsiteCheck, WebsiteCheckInput, WebsiteMonitor, WebsiteMonitorInput, VisitorLogsPagedResult } from '../types.ts';
 import type { BackupData } from '../../utils/backup.ts';
+import type { AdminPasskey, AdminPasskeyInput, AdminPasskeySummary } from '../types.ts';
 import { redactDatabaseSecrets } from '../../utils/setup-diagnostics.ts';
 import { generateAgentToken, hashAgentToken } from '../../utils/client.ts';
 
@@ -965,6 +966,64 @@ export function consumeSupabaseRecoveryCode(env: SupabaseApiEnv, uuid: string, c
     input_code_hash: codeHash,
   });
 }
+
+export function listSupabaseUserPasskeys(
+  env: SupabaseApiEnv,
+  userUuid: string,
+): Promise<AdminPasskeySummary[]> {
+  return callSupabaseRpc<AdminPasskeySummary[]>(env, 'cfm_passkey_list', {
+    input_user_uuid: userUuid,
+  });
+}
+
+export function getSupabaseUserPasskeys(
+  env: SupabaseApiEnv,
+  userUuid: string,
+): Promise<AdminPasskey[]> {
+  return callSupabaseRpc<AdminPasskey[]>(env, 'cfm_passkeys_by_user', {
+    input_user_uuid: userUuid,
+  });
+}
+
+export function createSupabaseUserPasskey(
+  env: SupabaseApiEnv,
+  input: AdminPasskeyInput,
+): Promise<AdminPasskey | null> {
+  return callSupabaseRpc<AdminPasskey | null>(env, 'cfm_passkey_create', {
+    input_user_uuid: input.userUuid,
+    input_credential_id: input.credentialId,
+    input_public_key: input.publicKey,
+    input_counter: input.counter,
+    input_transports: input.transports,
+    input_name: input.name,
+    input_aaguid: input.aaguid,
+  });
+}
+
+export function deleteSupabaseUserPasskey(
+  env: SupabaseApiEnv,
+  userUuid: string,
+  id: string,
+): Promise<boolean> {
+  return callSupabaseRpc<boolean>(env, 'cfm_passkey_delete', {
+    input_user_uuid: userUuid,
+    input_id: id,
+  });
+}
+
+export function updateSupabaseUserPasskeyCounter(
+  env: SupabaseApiEnv,
+  userUuid: string,
+  credentialId: string,
+  counter: number,
+): Promise<boolean> {
+  return callSupabaseRpc<boolean>(env, 'cfm_passkey_update_counter', {
+    input_user_uuid: userUuid,
+    input_credential_id: credentialId,
+    input_counter: counter,
+  });
+}
+
 export function updateSupabaseUserUsername(env: SupabaseApiEnv, uuid: string, username: string): Promise<void> {
   return callSupabaseRpc<void>(env, 'cfm_update_user_username', {
     input_uuid: uuid,

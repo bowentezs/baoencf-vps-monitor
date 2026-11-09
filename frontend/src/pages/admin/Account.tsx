@@ -15,18 +15,21 @@ import {
 import {
   Copy,
   Download,
+  Fingerprint,
   KeyRound,
   QrCode,
   RefreshCw,
   Save,
   ShieldCheck,
   ShieldOff,
+  Trash2,
   User,
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { toast } from 'sonner';
 import { useApi, useAuth } from '../../contexts/AuthContext';
 import { downloadRecoveryCodes, formatRecoveryCodesText, normalizeMfaCode, requestMfaStepUp } from '../../utils/mfa';
+import { passkeyErrorMessage, passkeySupported, startRegistration } from '../../utils/passkeys';
 
 type AccountTab = 'username' | 'password' | 'security';
 
@@ -40,6 +43,14 @@ type MfaSetup = {
   setup_token: string;
   secret: string;
   uri: string;
+};
+
+type PasskeySummary = {
+  id: string;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
+  transports?: string[];
 };
 
 export default function AdminAccount() {
@@ -61,6 +72,11 @@ export default function AdminAccount() {
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [showRebind, setShowRebind] = useState(false);
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
+  const [passkeys, setPasskeys] = useState<PasskeySummary[]>([]);
+  const [passkeysLoading, setPasskeysLoading] = useState(false);
+  const [passkeyName, setPasskeyName] = useState('');
+  const [addingPasskey, setAddingPasskey] = useState(false);
+  const [pendingPasskeyDelete, setPendingPasskeyDelete] = useState<PasskeySummary | null>(null);
 
   useEffect(() => {
     setUsername(user?.username || '');
@@ -74,9 +90,22 @@ export default function AdminAccount() {
     }
   }, [apiFetch]);
 
+  const loadPasskeys = useCallback(async () => {
+    try {
+      const data = await apiFetch('/admin/account/passkeys');
+      setPasskeys(Array.isArray(data.passkeys) ? data.passkeys : []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '无法读取通行密钥');
+    }
+  }, [apiFetch]);
+
   useEffect(() => {
     if (activeTab === 'security' && !mfaStatus) void loadMfaStatus();
   }, [activeTab, loadMfaStatus, mfaStatus]);
+
+  useEffect(() => {
+    if (activeTab === 'security') void loadPasskeys();
+  }, [activeTab, loadPasskeys]);
 
   useEffect(() => {
     let cancelled = false;
@@ -216,6 +245,57 @@ export default function AdminAccount() {
   const copyRecoveryCodes = async () => {
     await navigator.clipboard.writeText(formatRecoveryCodesText(recoveryCodes, user?.username || 'admin'));
     toast.success('恢复码已复制');
+  };
+
+  const addPasskey = async () => {
+    if (!passkeySupported()) {
+      toast.error('当前浏览器不支持通行密钥');
+      return;
+    }
+    setAddingPasskey(true);
+    try {
+      const optionsResult = await apiFetch('/admin/account/passkeys/options', { method: 'POST' });
+      let credential;
+      try {
+        credential = await startRegistration({ optionsJSON: optionsResult.options });
+      } catch (error) {
+        toast.error(passkeyErrorMessage(error));
+        return;
+      }
+      const result = await apiFetch('/admin/account/passkeys', {
+        method: 'POST',
+        body: JSON.stringify({
+          response: credential,
+          name: passkeyName.trim() || '通行密钥',
+        }),
+      });
+      setPasskeys(Array.isArray(result.passkeys) ? result.passkeys : []);
+      setPasskeyName('');
+      toast.success('通行密钥已添加');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '添加通行密钥失败');
+    } finally {
+      setAddingPasskey(false);
+    }
+  };
+
+  const deletePasskey = async () => {
+    const target = pendingPasskeyDelete;
+    if (!target) return;
+    setPendingPasskeyDelete(null);
+    setPasskeysLoading(true);
+    try {
+      const result = await apiFetch('/admin/account/passkeys/delete', {
+        method: 'POST',
+        body: JSON.stringify({ id: target.id }),
+      });
+      setPasskeys(Array.isArray(result.passkeys) ? result.passkeys : []);
+      toast.success('通行密钥已删除');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '删除通行密钥失败');
+    } finally {
+      setPasskeysLoading(false);
+    }
   };
 
   return (
@@ -381,6 +461,84 @@ export default function AdminAccount() {
           )}
         </Card>
       )}
+
+      {activeTab === 'security' && (
+        <Card className="admin-account-card" style={{ marginTop: 16 }}>
+          <Flex justify="between" align="center" gap="3" mb="4" wrap="wrap">
+            <Box>
+              <Heading size="3">通行密钥（Passkey）</Heading>
+              <Text size="2" color="gray">使用 Windows Hello、Touch ID 或 1Password 直接登录；通行密钥登录会跳过 TOTP。</Text>
+            </Box>
+            <Badge color={passkeys.length > 0 ? 'green' : 'gray'} size="2">{passkeys.length} 个</Badge>
+          </Flex>
+
+          {!passkeySupported() ? (
+            <Callout.Root color="amber">
+              <Callout.Icon><Fingerprint size={18} /></Callout.Icon>
+              <Callout.Text>当前浏览器不支持通行密钥。请使用 Chrome、Edge、Safari 或 Firefox 的最新版本。</Callout.Text>
+            </Callout.Root>
+          ) : (
+            <Flex direction="column" gap="4">
+              {passkeys.length === 0 ? (
+                <Text size="2" color="gray">尚未绑定通行密钥。绑定后可以不用密码直接登录。</Text>
+              ) : (
+                <Flex direction="column" gap="2">
+                  {passkeys.map((passkey) => (
+                    <Flex key={passkey.id} justify="between" align="center" gap="3" style={{ padding: '8px 0', borderBottom: '1px solid var(--gray-a4)' }}>
+                      <Box>
+                        <Text size="2" weight="bold">{passkey.name}</Text>
+                        <Text size="1" color="gray" style={{ display: 'block' }}>
+                          创建：{new Date(passkey.created_at).toLocaleString()}
+                          {passkey.last_used_at ? ` · 最近使用：${new Date(passkey.last_used_at).toLocaleString()}` : ''}
+                        </Text>
+                      </Box>
+                      <Button color="red" variant="soft" size="1" onClick={() => setPendingPasskeyDelete(passkey)} disabled={passkeysLoading}>
+                        <Trash2 size={14} />删除
+                      </Button>
+                    </Flex>
+                  ))}
+                </Flex>
+              )}
+
+              <Flex gap="2" wrap="wrap" align="end">
+                <label style={{ flex: '1 1 240px' }}>
+                  <Text size="2" weight="bold" style={{ display: 'block', marginBottom: 6 }}>通行密钥名称</Text>
+                  <TextField.Root
+                    className="admin-account-input"
+                    value={passkeyName}
+                    placeholder="例如：Windows Hello / MacBook Touch ID"
+                    onChange={(event) => setPasskeyName(event.target.value)}
+                  />
+                </label>
+                <Button onClick={() => void addPasskey()} disabled={addingPasskey}>
+                  <Fingerprint size={16} />{addingPasskey ? '添加中...' : '添加通行密钥'}
+                </Button>
+              </Flex>
+
+              <Text size="1" color="gray">
+                添加时需要通过一次 TOTP 确认（如果已启用）。通行密钥只保存在你的设备或密码管理器中，服务器只保存公钥。
+              </Text>
+            </Flex>
+          )}
+        </Card>
+      )}
+
+      <Dialog.Root open={Boolean(pendingPasskeyDelete)} onOpenChange={(open) => { if (!open && !passkeysLoading) setPendingPasskeyDelete(null); }}>
+        <Dialog.Content style={{ maxWidth: 440 }}>
+          <Dialog.Title>
+            <Flex align="center" gap="2"><Trash2 size={20} />确认删除通行密钥</Flex>
+          </Dialog.Title>
+          <Dialog.Description size="2" color="gray">
+            删除后这个通行密钥将无法再用于登录。如果已启用 TOTP，仍可使用密码 + 动态验证码登录。
+          </Dialog.Description>
+          <Flex justify="end" gap="2" mt="4">
+            <Button variant="soft" color="gray" disabled={passkeysLoading} onClick={() => setPendingPasskeyDelete(null)}>取消</Button>
+            <Button color="red" disabled={passkeysLoading} onClick={() => void deletePasskey()}>
+              <Trash2 size={16} />{passkeysLoading ? '删除中...' : '确认删除'}
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
 
       <Dialog.Root open={disableDialogOpen} onOpenChange={(open) => { if (!mfaLoading) setDisableDialogOpen(open); }}>
         <Dialog.Content style={{ maxWidth: 440 }}>

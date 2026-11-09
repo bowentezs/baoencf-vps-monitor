@@ -12,6 +12,7 @@ assert.deepEqual(migrationFiles, [
   '5_runtime_defaults.sql',
   '6_daily_traffic.sql',
   '7_visitor_logs.sql',
+  '8_admin_passkeys.sql',
 ]);
 assert.deepEqual(BUNDLED_SUPABASE_MIGRATIONS.map(({ version }) => version), [
   '1_core_schema',
@@ -21,12 +22,14 @@ assert.deepEqual(BUNDLED_SUPABASE_MIGRATIONS.map(({ version }) => version), [
   '5_runtime_defaults',
   '6_daily_traffic',
   '7_visitor_logs',
+  '8_admin_passkeys',
 ]);
 
 const featureSchemaSql = await readFile(new URL('3_feature_schema.sql', migrationsUrl), 'utf8');
 const migrationSql = await readFile(new URL('../../../../supabase/migrations/4_rpc_api.sql', import.meta.url), 'utf8');
 const runtimeDefaultsSql = await readFile(new URL('5_runtime_defaults.sql', migrationsUrl), 'utf8');
 const dailyTrafficSql = await readFile(new URL('6_daily_traffic.sql', migrationsUrl), 'utf8');
+const adminPasskeysSql = await readFile(new URL('8_admin_passkeys.sql', migrationsUrl), 'utf8');
 const generatedSql = await readFile(new URL('../../generated/supabase-migrations.ts', import.meta.url), 'utf8');
 const agentRoutesSql = await readFile(new URL('../../routes/client.ts', import.meta.url), 'utf8');
 const allMigrationSql = await Promise.all(migrationFiles.map((name) => readFile(new URL(name, migrationsUrl), 'utf8'))).then((sources) => sources.join('\n'));
@@ -90,3 +93,17 @@ assert.match(runtimeDefaultsSql, /\('webhook_url', ''\)/i);
 assert.match(dailyTrafficSql, /create or replace function public\.cfm_daily_traffic\(input_days integer default 7\)/i);
 assert.match(dailyTrafficSql, /timezone\('Asia\/Shanghai', time\)/i);
 assert.match(dailyTrafficSql, /grant execute on function public\.cfm_daily_traffic\(integer\) to service_role/i);
+
+assert.match(adminPasskeysSql, /create table if not exists public\.admin_passkeys/i);
+assert.match(adminPasskeysSql, /alter table public\.admin_passkeys enable row level security/i);
+assert.match(adminPasskeysSql, /alter table public\.admin_passkeys force row level security/i);
+for (const functionName of [
+  'cfm_passkey_list',
+  'cfm_passkeys_by_user',
+  'cfm_passkey_create',
+  'cfm_passkey_delete',
+  'cfm_passkey_update_counter',
+]) {
+  assert.match(adminPasskeysSql, new RegExp(`create or replace function public\\.${functionName}\\(`, 'i'));
+  assert.match(adminPasskeysSql, new RegExp(`grant execute on function public\\.${functionName}\\([^;]+\\) to service_role;`, 'i'));
+}

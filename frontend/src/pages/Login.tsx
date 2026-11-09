@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Flex, Card, Text, TextField, Button, Heading, Box, Separator, SegmentedControl } from '@radix-ui/themes';
-import { ArrowLeft, LogIn, Eye, EyeOff, KeyRound, ShieldCheck, UserPlus } from 'lucide-react';
+import { ArrowLeft, LogIn, Eye, EyeOff, KeyRound, ShieldCheck, UserPlus, Fingerprint } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { passkeySupported } from '../utils/passkeys';
 import { hasLocalDisplayThemePreference, useDisplayTheme } from '../contexts/DisplayThemeContext';
 import { toast } from 'sonner';
 import Loading from '../components/Loading';
@@ -31,7 +32,7 @@ function safeLogoUrl(value: unknown) {
 }
 
 export default function Login() {
-  const { login, completeMfaLogin, isAuthenticated, authLoading } = useAuth();
+  const { login, loginWithPasskey, completeMfaLogin, isAuthenticated, authLoading } = useAuth();
   const { setDisplayThemeFromSettings } = useDisplayTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -103,6 +104,29 @@ export default function Login() {
     const result = await login(username, password);
     setLoading(false);
 
+    if (result.kind === 'error') {
+      toast.error(result.error);
+      return;
+    }
+    if (result.kind === 'mfa_required') {
+      setMfaChallenge(result.challenge);
+      setMfaMethod(result.methods.includes('totp') ? 'totp' : result.methods[0] || 'totp');
+      setMfaCode('');
+      setPassword('');
+      return;
+    }
+    toast.success('登录成功');
+    navigate(redirectTo, { replace: true });
+  };
+
+  const handlePasskeyLogin = async () => {
+    if (!username.trim()) {
+      toast.error('请先输入用户名');
+      return;
+    }
+    setLoading(true);
+    const result = await loginWithPasskey(username.trim());
+    setLoading(false);
     if (result.kind === 'error') {
       toast.error(result.error);
       return;
@@ -270,6 +294,20 @@ export default function Login() {
               <LogIn size={18} />
               {loading ? '登录中...' : '登录'}
             </Button>
+
+            {passkeySupported() && (
+              <Button
+                type="button"
+                variant="soft"
+                size="3"
+                disabled={loading}
+                onClick={() => void handlePasskeyLogin()}
+                style={{ height: 44, fontSize: '15px' }}
+              >
+                <Fingerprint size={18} />
+                使用通行密钥登录
+              </Button>
+            )}
           </Flex>
         </form>
         )}

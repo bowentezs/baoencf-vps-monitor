@@ -170,6 +170,44 @@ export async function consumeTotpStep(database: QueryDatabase, uuid: string, ste
 export async function consumeRecoveryCode(database: QueryDatabase, uuid: string, codeHash: string): Promise<boolean> {
   return sba.consumeSupabaseRecoveryCode(database.env, uuid, codeHash);
 }
+
+export async function listUserPasskeys(
+  database: QueryDatabase,
+  userUuid: string,
+): Promise<t.AdminPasskeySummary[]> {
+  return sba.listSupabaseUserPasskeys(database.env, userUuid);
+}
+
+export async function getUserPasskeys(
+  database: QueryDatabase,
+  userUuid: string,
+): Promise<t.AdminPasskey[]> {
+  return sba.getSupabaseUserPasskeys(database.env, userUuid);
+}
+
+export async function createUserPasskey(
+  database: QueryDatabase,
+  input: t.AdminPasskeyInput,
+): Promise<t.AdminPasskey | null> {
+  return sba.createSupabaseUserPasskey(database.env, input);
+}
+
+export async function deleteUserPasskey(
+  database: QueryDatabase,
+  userUuid: string,
+  id: string,
+): Promise<boolean> {
+  return sba.deleteSupabaseUserPasskey(database.env, userUuid, id);
+}
+
+export async function updateUserPasskeyCounter(
+  database: QueryDatabase,
+  userUuid: string,
+  credentialId: string,
+  counter: number,
+): Promise<boolean> {
+  return sba.updateSupabaseUserPasskeyCounter(database.env, userUuid, credentialId, counter);
+}
 export async function updateUserUsername(database: QueryDatabase, uuid: string, username: string): Promise<void> {
   return sba.updateSupabaseUserUsername(database.env, uuid, username);
 }

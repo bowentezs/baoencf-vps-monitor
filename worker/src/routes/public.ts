@@ -14,11 +14,17 @@ import { decryptTotpSecret, hashRecoveryCode } from '../auth/mfa';
 import { generateMfaToken, verifyMfaToken } from '../auth/mfa-token';
 import { verifyTotpCode } from '../auth/totp';
 import { hashPassword, needsPasswordRehash, validateAdminPasswordStrength, verifyPassword } from '../auth/password';
+import { generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
+import { generateWebAuthnChallengeToken, getWebAuthnConfig, verifyWebAuthnChallengeToken } from '../auth/webauthn';
 import {
   clearAdminSessionCookie,
+  clearWebAuthnChallengeCookie,
   ensureAdminCsrfCookie,
   getAdminSessionToken,
+  getWebAuthnChallengeToken,
   setAdminSessionCookie,
+  setWebAuthnChallengeCookie,
   verifyAdminCsrfToken,
 } from '../auth/session';
 import { PUBLIC_SETTING_KEYS, buildPublicSettings } from '../settings/schema';
@@ -50,6 +56,7 @@ const MAX_LOGIN_PASSWORD_LENGTH = 4096;
 const MAX_MFA_CHALLENGE_LENGTH = 4096;
 const MAX_MFA_CODE_LENGTH = 128;
 const MAX_PUBLIC_JSON_BYTES = 8 * 1024;
+const MAX_PASSKEY_RESPONSE_BYTES = 64 * 1024;
 const MAX_VISIT_BODY_BYTES = 4 * 1024;
 const MAX_PUBLIC_RECORD_RANGE_MS = 3 * 24 * 60 * 60 * 1000;
 const PUBLIC_RECORD_RANGE_SLOP_MS = 60 * 1000;
@@ -58,6 +65,9 @@ const PUBLIC_METADATA_RATE_LIMIT_MAX = 120;
 const PUBLIC_HISTORY_RATE_LIMIT_MAX = 60;
 const PUBLIC_LIVE_RATE_LIMIT_MAX = 180;
 const PUBLIC_ADMIN_RECOVERY_RATE_LIMIT_MAX = 5;
+type AuthenticationAllowCredential = NonNullable<Parameters<typeof generateAuthenticationOptions>[0]['allowCredentials']>[number];
+type AuthenticationResponse = Parameters<typeof verifyAuthenticationResponse>[0]['response'];
+type StoredPasskeyCredential = Parameters<typeof verifyAuthenticationResponse>[0]['credential'];
 const PUBLIC_METADATA_CACHE_SECONDS = 30;
 const PUBLIC_HISTORY_CACHE_SECONDS = 10;
 const PUBLIC_LIVE_CACHE_SECONDS = 2;
@@ -182,6 +192,20 @@ async function readPublicJsonObject(c: PublicContext): Promise<{ body: Record<st
   return isJsonObjectPayload(body)
     ? { body }
     : { response: c.json({ error: '请求内容必须是 JSON 对象' }, 400) };
+}
+
+async function readPasskeyJsonObject(c: PublicContext): Promise<{ body: Record<string, unknown> } | { response: Response }> {
+  const parsed = await readJsonWithLimit(c.req.raw, MAX_PASSKEY_RESPONSE_BYTES);
+  if (!parsed.ok && parsed.reason === 'too_large') {
+    return { response: c.json({ code: 'PASSKEY_INPUT_INVALID', error: `请求内容不能超过 ${MAX_PASSKEY_RESPONSE_BYTES} 字节` }, 413) };
+  }
+  if (!parsed.ok) {
+    return { response: c.json({ code: 'PASSKEY_INPUT_INVALID', error: '请求格式错误' }, 400) };
+  }
+  const body = parsed.body;
+  return isJsonObjectPayload(body)
+    ? { body }
+    : { response: c.json({ code: 'PASSKEY_INPUT_INVALID', error: '请求内容必须是 JSON 对象' }, 400) };
 }
 
 function cacheIsFresh(entry: { expiresAt: number } | null | undefined, now = Date.now()): boolean {
@@ -1363,6 +1387,207 @@ publicRoutes.post('/login/mfa', async (c) => {
   const loginBuckets = loginRateLimitBuckets(clientIp, user.username);
   return completeAdminLogin(c, database, user, [...loginBuckets, ...mfaBuckets], metrics);
 });
+// 通行密钥（Passkey）登录
+publicRoutes.post('/login/passkey/options', async (c) => {
+  const parsed = await readPasskeyJsonObject(c);
+  if ('response' in parsed) return parsed.response;
+
+  const username = typeof parsed.body.username === 'string' ? parsed.body.username.trim() : '';
+  if (!username || username.length > MAX_LOGIN_USERNAME_LENGTH) {
+    return c.json({ code: 'PASSKEY_INPUT_INVALID', error: '用户名无效' }, 400);
+  }
+
+  const clientIp = getClientIp(c);
+  const buckets = loginRateLimitBuckets(clientIp, username);
+  const database = getDatabase(c.env);
+  const states = await loadLoginRateLimitStates(database, buckets);
+  const retryAfter = getLoginRetryAfterSeconds(states, Date.now());
+  if (retryAfter > 0) {
+    c.header('Retry-After', String(retryAfter));
+    return c.json({ code: 'PASSKEY_RATE_LIMITED', error: `尝试过于频繁，请 ${retryAfter} 秒后再试` }, 429);
+  }
+
+  const user = await db.getUserByUsername(database, username);
+  if (!user) {
+    return c.json({ code: 'PASSKEY_UNAVAILABLE', error: '该账号未绑定通行密钥' }, 401);
+  }
+
+  let passkeys;
+  try {
+    passkeys = await db.getUserPasskeys(database, user.uuid);
+  } catch (error) {
+    console.error('[auth] failed to load passkeys:', sanitizeSetupDiagnosticDetail(error));
+    return c.json({ code: 'PASSKEY_UNAVAILABLE', error: '通行密钥服务暂时不可用' }, 500);
+  }
+  if (passkeys.length === 0) {
+    return c.json({ code: 'PASSKEY_UNAVAILABLE', error: '该账号未绑定通行密钥' }, 401);
+  }
+
+  let config;
+  try {
+    config = getWebAuthnConfig(c.req.url);
+  } catch {
+    return c.json({ code: 'PASSKEY_UNAVAILABLE', error: '通行密钥需要通过 HTTPS 访问' }, 400);
+  }
+
+  let options;
+  try {
+    options = await generateAuthenticationOptions({
+      rpID: config.rpID,
+      allowCredentials: passkeys.map(passkey => ({
+        id: passkey.credential_id,
+        transports: passkey.transports as AuthenticationAllowCredential['transports'],
+      })),
+      userVerification: 'required',
+    });
+  } catch (error) {
+    console.error('[auth] failed to generate passkey options:', sanitizeSetupDiagnosticDetail(error));
+    return c.json({ code: 'PASSKEY_UNAVAILABLE', error: '通行密钥服务暂时不可用' }, 500);
+  }
+
+  try {
+    const challenge = await generateWebAuthnChallengeToken({
+      purpose: 'authentication',
+      challenge: options.challenge,
+      userId: user.uuid,
+      username: user.username,
+      sessionVersion: user.session_version,
+    }, c.env);
+    setWebAuthnChallengeCookie(c, challenge);
+  } catch (error) {
+    if (error instanceof AuthConfigurationError) {
+      console.error('[auth] JWT_SECRET is missing or shorter than 32 bytes');
+      return c.json({ error: '服务端 JWT_SECRET 未正确配置' }, 500);
+    }
+    throw error;
+  }
+
+  c.header('Cache-Control', 'no-store');
+  return c.json({ options });
+});
+
+publicRoutes.post('/login/passkey/verify', async (c) => {
+  const parsed = await readPasskeyJsonObject(c);
+  if ('response' in parsed) return parsed.response;
+
+  const response = parsed.body.response as AuthenticationResponse | undefined;
+  if (!isJsonObjectPayload(response) || typeof response.id !== 'string' || response.id.length > 1024) {
+    return c.json({ code: 'PASSKEY_INPUT_INVALID', error: '通行密钥响应无效' }, 400);
+  }
+
+  const challengeToken = getWebAuthnChallengeToken(c);
+  if (!challengeToken) {
+    return c.json({ code: 'PASSKEY_CHALLENGE_INVALID', error: '登录验证已失效，请重新尝试' }, 401);
+  }
+
+  let payload;
+  try {
+    payload = await verifyWebAuthnChallengeToken(challengeToken, 'authentication', c.env);
+  } catch (error) {
+    if (error instanceof AuthConfigurationError) {
+      console.error('[auth] JWT_SECRET is missing or shorter than 32 bytes');
+      return c.json({ error: '服务端 JWT_SECRET 未正确配置' }, 500);
+    }
+    throw error;
+  }
+  if (!payload) {
+    return c.json({ code: 'PASSKEY_CHALLENGE_INVALID', error: '登录验证已失效，请重新尝试' }, 401);
+  }
+
+  const database = getDatabase(c.env);
+  const user = await db.getUserByUuid(database, payload.userId);
+  if (
+    !user ||
+    user.username !== payload.username ||
+    user.session_version !== payload.sessionVersion
+  ) {
+    return c.json({ code: 'PASSKEY_CHALLENGE_INVALID', error: '登录验证已失效，请重新尝试' }, 401);
+  }
+
+  const clientIp = getClientIp(c);
+  const buckets = loginRateLimitBuckets(clientIp, user.username);
+  const states = await loadLoginRateLimitStates(database, buckets);
+  const retryAfter = getLoginRetryAfterSeconds(states, Date.now());
+  if (retryAfter > 0) {
+    c.header('Retry-After', String(retryAfter));
+    return c.json({ code: 'PASSKEY_RATE_LIMITED', error: `尝试过于频繁，请 ${retryAfter} 秒后再试` }, 429);
+  }
+
+  const recordFailure = async (reason: string) => {
+    const failedAt = Date.now();
+    await recordLoginFailure(database, buckets, failedAt, states);
+    await auditLoginFailure(database, user.username, clientIp, reason, failedAt);
+  };
+
+  let passkeys;
+  try {
+    passkeys = await db.getUserPasskeys(database, user.uuid);
+  } catch (error) {
+    console.error('[auth] failed to load passkeys:', sanitizeSetupDiagnosticDetail(error));
+    return c.json({ code: 'PASSKEY_UNAVAILABLE', error: '通行密钥服务暂时不可用' }, 500);
+  }
+  const passkey = passkeys.find(item => item.credential_id === response.id);
+  if (!passkey) {
+    await recordFailure('unknown_passkey');
+    return c.json({ code: 'PASSKEY_INVALID', error: '通行密钥验证失败' }, 401);
+  }
+
+  let config;
+  try {
+    config = getWebAuthnConfig(c.req.url);
+  } catch {
+    return c.json({ code: 'PASSKEY_UNAVAILABLE', error: '通行密钥需要通过 HTTPS 访问' }, 400);
+  }
+
+  let verification;
+  try {
+    verification = await verifyAuthenticationResponse({
+      response: response as AuthenticationResponse,
+      expectedChallenge: payload.challenge,
+      expectedOrigin: config.origin,
+      expectedRPID: config.rpID,
+      credential: {
+        id: passkey.credential_id,
+        publicKey: isoBase64URL.toBuffer(passkey.public_key),
+        counter: Number(passkey.counter),
+        transports: passkey.transports as StoredPasskeyCredential['transports'],
+      },
+      requireUserVerification: true,
+    });
+  } catch {
+    await recordFailure('invalid_passkey');
+    return c.json({ code: 'PASSKEY_INVALID', error: '通行密钥验证失败' }, 401);
+  }
+
+  if (!verification.verified) {
+    await recordFailure('invalid_passkey');
+    return c.json({ code: 'PASSKEY_INVALID', error: '通行密钥验证失败' }, 401);
+  }
+
+  const storedCounter = Number(passkey.counter);
+  const newCounter = verification.authenticationInfo.newCounter;
+  if (storedCounter > 0 && newCounter <= storedCounter) {
+    await recordFailure('passkey_counter_replay');
+    return c.json({ code: 'PASSKEY_INVALID', error: '通行密钥验证失败' }, 401);
+  }
+
+  const updated = await db.updateUserPasskeyCounter(database, user.uuid, passkey.credential_id, newCounter);
+  if (!updated) {
+    return c.json({ code: 'PASSKEY_STATE_ERROR', error: '通行密钥状态更新失败，请重试' }, 500);
+  }
+
+  clearWebAuthnChallengeCookie(c);
+  const hadFailure = [...states.values()].some(Boolean);
+  runLoginBackground(c, db.insertAuditLog(database, user.username, 'passkey_login', '使用通行密钥登录'));
+  return completeAdminLogin(
+    c,
+    database,
+    user,
+    hadFailure ? buckets : [],
+    [],
+  );
+});
+
 // 退出登录
 publicRoutes.post('/logout', async (c) => {
   const token = getAdminSessionToken(c);

@@ -4,9 +4,11 @@ import type { Context } from 'hono';
 const ADMIN_SESSION_COOKIE = 'cf_monitor_session';
 const ADMIN_CSRF_COOKIE = 'cf_monitor_csrf';
 const MFA_STEP_UP_COOKIE = 'cf_monitor_mfa_stepup';
+const WEBAUTHN_CHALLENGE_COOKIE = 'cf_monitor_webauthn';
 const ADMIN_SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 const ADMIN_CSRF_MAX_AGE_SECONDS = ADMIN_SESSION_MAX_AGE_SECONDS;
 const MFA_STEP_UP_MAX_AGE_SECONDS = 30 * 60;
+const WEBAUTHN_CHALLENGE_MAX_AGE_SECONDS = 5 * 60;
 
 function isHttpsRequest(c: Context): boolean {
   return new URL(c.req.url).protocol === 'https:';
@@ -91,8 +93,30 @@ export function clearMfaStepUpCookie(c: Context): void {
     path: '/api/admin',
   });
 }
+
+export function getWebAuthnChallengeToken(c: Context): string | null {
+  return getCookie(c, WEBAUTHN_CHALLENGE_COOKIE) ?? null;
+}
+
+export function setWebAuthnChallengeCookie(c: Context, token: string): void {
+  setCookie(c, WEBAUTHN_CHALLENGE_COOKIE, token, {
+    path: '/api',
+    httpOnly: true,
+    secure: isHttpsRequest(c),
+    sameSite: 'Lax',
+    maxAge: WEBAUTHN_CHALLENGE_MAX_AGE_SECONDS,
+  });
+}
+
+export function clearWebAuthnChallengeCookie(c: Context): void {
+  deleteCookie(c, WEBAUTHN_CHALLENGE_COOKIE, {
+    path: '/api',
+  });
+}
+
 export function clearAdminSessionCookie(c: Context): void {
   clearMfaStepUpCookie(c);
+  clearWebAuthnChallengeCookie(c);
   deleteCookie(c, ADMIN_SESSION_COOKIE, {
     path: '/',
   });

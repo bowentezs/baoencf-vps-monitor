@@ -8,11 +8,13 @@ import {
   type LoginResult,
   type MfaMethod,
 } from '../utils/mfa';
+import { passkeyErrorMessage, startAuthentication } from '../utils/passkeys';
 import { normalizeAuthUser, shouldCheckAdminSessionOnLoad, shouldClearAuthForStatus, type User } from './auth-state';
 
 interface AuthContextType {
   user: User | null;
   login: (username: string, password: string) => Promise<LoginResult>;
+  loginWithPasskey: (username: string) => Promise<LoginResult>;
   completeMfaLogin: (challenge: string, method: MfaMethod, code: string) => Promise<LoginResult>;
   logout: () => void;
   updateUser: (nextUser: Partial<User>) => void;
@@ -23,6 +25,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   login: async () => ({ kind: 'error', error: '登录不可用' }),
+  loginWithPasskey: async () => ({ kind: 'error', error: '登录不可用' }),
   completeMfaLogin: async () => ({ kind: 'error', error: '登录不可用' }),
   logout: () => {},
   updateUser: () => {},
@@ -129,6 +132,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [finishLogin]);
 
+  const loginWithPasskey = useCallback(async (username: string): Promise<LoginResult> => {
+    try {
+      const optionsRes = await fetch(`${API_BASE}/login/passkey/options`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ username }),
+      });
+      const optionsData = await readJson(optionsRes);
+      if (!optionsRes.ok) {
+        return { kind: 'error', error: optionsData.error || '该账号未绑定通行密钥' };
+      }
+      if (!optionsData.options) {
+        return { kind: 'error', error: '通行密钥参数无效' };
+      }
+
+      let credential;
+      try {
+        credential = await startAuthentication({ optionsJSON: optionsData.options });
+      } catch (error) {
+        return { kind: 'error', error: passkeyErrorMessage(error) };
+      }
+
+      const verifyRes = await fetch(`${API_BASE}/login/passkey/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ response: credential }),
+      });
+      return finishLogin(parseLoginResponse(verifyRes.status, await readJson(verifyRes)));
+    } catch {
+      return { kind: 'error', error: '网络错误' };
+    }
+  }, [finishLogin]);
+
   const completeMfaLogin = useCallback(async (
     challenge: string,
     method: MfaMethod,
@@ -174,6 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       user,
       login,
+      loginWithPasskey,
       completeMfaLogin,
       logout,
       updateUser,

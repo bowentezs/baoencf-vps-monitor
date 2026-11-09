@@ -168,6 +168,34 @@ export interface User {
   updated_at: string;
 }
 
+export interface AdminPasskey {
+  id: string;
+  user_uuid: string;
+  credential_id: string;
+  public_key: string;
+  counter: number;
+  transports: string[];
+  name: string;
+  aaguid: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export type AdminPasskeySummary = Pick<
+  AdminPasskey,
+  'id' | 'name' | 'transports' | 'created_at' | 'last_used_at'
+>;
+
+export interface AdminPasskeyInput {
+  userUuid: string;
+  credentialId: string;
+  publicKey: string;
+  counter: number;
+  transports: string[];
+  name: string;
+  aaguid: string;
+}
+
 export interface LoginRateLimit {
   bucket: string;
   failures: number;
