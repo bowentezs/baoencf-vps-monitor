@@ -1,7 +1,11 @@
 *.sh text eol=lf
 *.sql text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
 wrangler.toml text eol=lf
 worker/wrangler.toml text eol=lf
 worker/worker-configuration.d.ts text eol=lf
 frontend/public/download/SHA256SUMS text eol=lf
 worker/src/generated/agent-shasums.ts text eol=lf
+worker/src/generated/supabase-migrations.ts text eol=lf
