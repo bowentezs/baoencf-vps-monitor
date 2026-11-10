@@ -363,7 +363,7 @@ export default function NodeTable({ nodes, liveData, dailyTraffic = {}, includeH
                     <Link
                       to={`/instance/${node.uuid}`}
                       style={{ textDecoration: 'none', color: 'inherit' }}
-                      onClick={(event) => event.stopPropagation()}
+                      onClick={(event: React.MouseEvent<HTMLAnchorElement>) => event.stopPropagation()}
                     >
                       <Flex className="node-table-name-cell" align="center" gap="2">
                         <Flag region={node.region} size={16} />
