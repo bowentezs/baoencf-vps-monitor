@@ -3,7 +3,7 @@ import test from 'node:test';
 import { sanitizeCustomCss, buildThemeCss } from './theme-package.ts';
 
 test('sanitizeCustomCss removes @import statements', () => {
-  const css = '@import url("https://evil.com/style.css"); body { color: red; }';
+  const css = '@import url("https://evil.com/style.css"); @import"https://evil.com/no-space.css"; @im/**/port url("https://evil.com/comment.css"); body { color: red; }';
   assert.equal(sanitizeCustomCss(css).trim(), 'body { color: red; }');
 });
 

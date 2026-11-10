@@ -450,6 +450,11 @@ if [[ -z "$SERVICE_NAME" ]]; then
   exit 1
 fi
 
+if ! [[ "$SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+$ ]]; then
+  echo "--service-name may only contain A-Z, a-z, 0-9, dot, underscore, dash, or @." >&2
+  exit 1
+fi
+
 if [[ -z "$INSTALL_DIR" || "$INSTALL_DIR" == "/" ]]; then
   echo "--install-dir cannot be empty or /." >&2
   exit 1
@@ -490,6 +495,16 @@ fi
 
 if [[ "$MODE" != "websocket" && "$MODE" != "http" ]]; then
   echo "--mode must be websocket or http." >&2
+  exit 1
+fi
+
+if ! [[ "$INTERVAL" =~ ^[1-9][0-9]*$ ]]; then
+  echo "--interval must be a positive integer." >&2
+  exit 1
+fi
+
+if ! [[ "$PING_INTERVAL" =~ ^[1-9][0-9]*$ ]]; then
+  echo "--ping-interval must be a positive integer." >&2
   exit 1
 fi
 
@@ -685,16 +700,16 @@ EOF
 fi
 
 ENV_CONTENT=$(cat <<EOF
-CF_MONITOR_SERVER=${SERVER}
-CF_MONITOR_TOKEN=${TOKEN}
-CF_MONITOR_NAME=${NODE_NAME}
-CF_MONITOR_MODE=${MODE}
-CF_MONITOR_MOUNT_INCLUDE=${MOUNT_INCLUDE}
-CF_MONITOR_MOUNT_EXCLUDE=${MOUNT_EXCLUDE}
-CF_MONITOR_NIC_INCLUDE=${NIC_INCLUDE}
-CF_MONITOR_NIC_EXCLUDE=${NIC_EXCLUDE}
-CF_MONITOR_TRAFFIC_RESET_DAY=${TRAFFIC_RESET_DAY}
-CF_MONITOR_TRAFFIC_STATE_FILE=${STATE_DIR}/traffic-state.json
+CF_MONITOR_SERVER=$(shell_quote "$SERVER")
+CF_MONITOR_TOKEN=$(shell_quote "$TOKEN")
+CF_MONITOR_NAME=$(shell_quote "$NODE_NAME")
+CF_MONITOR_MODE=$(shell_quote "$MODE")
+CF_MONITOR_MOUNT_INCLUDE=$(shell_quote "$MOUNT_INCLUDE")
+CF_MONITOR_MOUNT_EXCLUDE=$(shell_quote "$MOUNT_EXCLUDE")
+CF_MONITOR_NIC_INCLUDE=$(shell_quote "$NIC_INCLUDE")
+CF_MONITOR_NIC_EXCLUDE=$(shell_quote "$NIC_EXCLUDE")
+CF_MONITOR_TRAFFIC_RESET_DAY=$(shell_quote "$TRAFFIC_RESET_DAY")
+CF_MONITOR_TRAFFIC_STATE_FILE=$(shell_quote "${STATE_DIR}/traffic-state.json")
 EOF
 )
 write_file "$ENV_FILE" "600" "$ENV_CONTENT"

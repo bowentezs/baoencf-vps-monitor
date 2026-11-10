@@ -106,7 +106,14 @@ export function normalizeMonitorReport(input: unknown): MonitorReportPayload {
   const gpus = normalizeGpuList(gpuData, report.gpus);
 
   return {
-    ...report,
+    ...Object.fromEntries(
+      Object.entries(report).filter(([key]) => [
+        'name', 'report_interval', 'timestamp', 'ipv4', 'ipv6', 'region',
+        'basic_info', 'ping_results', 'website_probe_results', 'docker_containers',
+        'unlock_items', 'top_processes', 'has_ipv4', 'has_ipv6', 'cpu_name',
+        'virtualization', 'arch', 'cpu_cores', 'os', 'kernel_version', 'gpu_name', 'mem_total',
+      ].includes(key))
+    ),
     cpu: boundedNumber(0, MAX_PERCENT, report.cpu, cpu.usage),
     gpu: boundedNumber(0, MAX_PERCENT, report.gpu, gpuData.average_usage),
     ram: boundedNumber(0, MAX_COUNTER_VALUE, report.ram, ram.used),

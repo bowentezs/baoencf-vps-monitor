@@ -94,14 +94,27 @@ function isBlockedIpv4(host: string): boolean {
 
 function isBlockedIpv6(host: string): boolean {
   const normalized = host.toLowerCase().replace(/^\[|\]$/g, '');
+  let canonical = normalized;
+  if (normalized.includes(':')) {
+    try {
+      canonical = new URL(`http://[${normalized}]`).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    } catch {
+      return true;
+    }
+  }
   return (
-    normalized === '::' ||
-    normalized === '::1' ||
-    normalized.startsWith('::ffff:') ||
+    canonical === '::' ||
+    canonical === '::1' ||
+    canonical.startsWith('::ffff:') ||
+    /^::[0-9a-f]{1,4}:[0-9a-f]{1,4}$/.test(canonical) ||
     normalized.startsWith('0:0:0:0:0:ffff:') ||
-    normalized.startsWith('fc') ||
-    normalized.startsWith('fd') ||
-    normalized.startsWith('fe80:')
+    canonical.startsWith('fc') ||
+    canonical.startsWith('fd') ||
+    canonical.startsWith('fe8') ||
+    canonical.startsWith('fe9') ||
+    canonical.startsWith('fea') ||
+    canonical.startsWith('feb') ||
+    canonical.startsWith('ff')
   );
 }
 

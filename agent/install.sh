@@ -450,6 +450,12 @@ EOF
 validate_common() {
   [ -n "$SERVICE_NAME" ] || die "--service-name cannot be empty."
   [ "$MODE" = "websocket" ] || [ "$MODE" = "http" ] || die "--mode must be websocket or http."
+  if ! printf '%s' "$INTERVAL" | grep -Eq '^[1-9][0-9]*$'; then
+    die "--interval must be a positive integer."
+  fi
+  if ! printf '%s' "$PING_INTERVAL" | grep -Eq '^[1-9][0-9]*$'; then
+    die "--ping-interval must be a positive integer."
+  fi
   if ! printf '%s' "$TRAFFIC_RESET_DAY" | grep -Eq '^[0-9]+$' || [ "$TRAFFIC_RESET_DAY" -lt 1 ] || [ "$TRAFFIC_RESET_DAY" -gt 31 ]; then
     die "--traffic-reset-day must be a number from 1 to 31."
   fi
@@ -676,7 +682,7 @@ install_user_autostart() {
     return 0
   fi
   tmp="$(mktemp "${TMPDIR:-/tmp}/cf-vps-monitor-cron.XXXXXX")"
-  (crontab -l 2>/dev/null | grep -v "$marker" || true; printf '@reboot %s # %s\n' "$INSTALL_DIR/start.sh" "$marker") > "$tmp"
+  (crontab -l 2>/dev/null | grep -v "$marker" || true; printf '@reboot %s # %s\n' "$(shell_quote "$INSTALL_DIR/start.sh")" "$marker") > "$tmp"
   crontab "$tmp"
   rm -f "$tmp"
   echo "Autostart: crontab @reboot configured."

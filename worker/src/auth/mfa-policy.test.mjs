@@ -22,6 +22,12 @@ const protectedRequests = [
   ['POST', '/api/admin/account/passkeys'],
   ['POST', '/api/admin/account/passkeys/delete'],
   ['POST', '/api/admin/cron/run'],
+  ['POST', '/api/admin/maintenance/cleanup'],
+  ['POST', '/api/admin/themes/upload'],
+  ['POST', '/api/admin/themes/set'],
+  ['POST', '/api/admin/themes/settings'],
+  ['POST', '/api/admin/themes/delete'],
+  ['DELETE', '/api/admin/notification/load/1'],
 ];
 
 const configWriteRequests = [

@@ -9,6 +9,7 @@ import type {
 } from '../db/queries.ts';
 import { sanitizeSettingsForStorage } from '../settings/schema.ts';
 import { validatePingTaskInput } from './ping-task.ts';
+import { validateWebsiteMonitorInput } from './website-monitor.ts';
 
 export const BACKUP_SCHEMA_ID = 'cf-monitor.backup';
 export const ENCRYPTED_BACKUP_SCHEMA_ID = 'cf-monitor.encrypted-backup';
@@ -36,12 +37,14 @@ export const MAX_BACKUP_BYTES = 5 * 1024 * 1024;
 
 const MAX_CLIENTS = 1000;
 const MAX_PING_TASKS = 1000;
+const MAX_WEBSITE_MONITORS = 1000;
 const MAX_NOTIFICATIONS = 5000;
 
 type BackupModuleKey =
   | 'settings'
   | 'clients'
   | 'ping_tasks'
+  | 'website_monitors'
   | 'offline_notifications'
   | 'expiry_notifications'
   | 'load_notifications';
@@ -455,6 +458,44 @@ function validateLoadNotifications(items: unknown[], errors: string[]): LoadNoti
   });
 }
 
+function validateWebsiteMonitors(items: unknown[], errors: string[]): WebsiteMonitor[] {
+  return items.flatMap((item, index) => {
+    if (!isPlainObject(item)) {
+      errors.push(`website_monitors[${index}] 必须是对象`);
+      return [];
+    }
+    const id = item.id === undefined
+      ? undefined
+      : integerField(item.id, `website_monitors[${index}].id`, errors, 0, 1, Number.MAX_SAFE_INTEGER);
+    const sortOrder = integerField(item.sort_order, `website_monitors[${index}].sort_order`, errors, index + 1, 1, Number.MAX_SAFE_INTEGER);
+    const validated = validateWebsiteMonitorInput(item);
+    if (!validated.ok) {
+      errors.push(`website_monitors[${index}]: ${validated.error}`);
+      return [];
+    }
+    return [{
+      ...(id !== undefined ? { id } : {}),
+      ...validated.value,
+      sort_order: sortOrder,
+      status: textField(item.status, `website_monitors[${index}].status`, errors, { maxLength: 32 }) || 'unknown',
+      last_checked_at: optionalTimeField(item.last_checked_at, `website_monitors[${index}].last_checked_at`, errors),
+      last_status_code: item.last_status_code === undefined || item.last_status_code === null
+        ? null
+        : integerField(item.last_status_code, `website_monitors[${index}].last_status_code`, errors, 0, 0, 999),
+      last_raw_status_code: item.last_raw_status_code === undefined || item.last_raw_status_code === null
+        ? null
+        : integerField(item.last_raw_status_code, `website_monitors[${index}].last_raw_status_code`, errors, 0, 0, 999),
+      last_latency_ms: item.last_latency_ms === undefined || item.last_latency_ms === null
+        ? null
+        : integerField(item.last_latency_ms, `website_monitors[${index}].last_latency_ms`, errors, 0, 0, 300000),
+      last_error: textField(item.last_error, `website_monitors[${index}].last_error`, errors, { maxLength: 1024 }) ?? null,
+      last_effective_reason: textField(item.last_effective_reason, `website_monitors[${index}].last_effective_reason`, errors, { maxLength: 128 }) ?? null,
+      down_since: optionalTimeField(item.down_since, `website_monitors[${index}].down_since`, errors),
+      last_notified_at: optionalTimeField(item.last_notified_at, `website_monitors[${index}].last_notified_at`, errors),
+    } as WebsiteMonitor];
+  });
+}
+
 export function validateBackup(input: unknown): BackupValidationResult {
   if (!isPlainObject(input)) {
     return { ok: false, errors: ['备份内容必须是对象'] };
@@ -515,6 +556,12 @@ export function validateBackup(input: unknown): BackupValidationResult {
   const pingTasks = requireArray(input, 'ping_tasks', MAX_PING_TASKS, errors);
   if (pingTasks) {
     backup.ping_tasks = validatePingTasks(pingTasks, errors);
+    hasModule = true;
+  }
+
+  const websiteMonitors = requireArray(input, 'website_monitors', MAX_WEBSITE_MONITORS, errors);
+  if (websiteMonitors) {
+    backup.website_monitors = validateWebsiteMonitors(websiteMonitors, errors);
     hasModule = true;
   }
 

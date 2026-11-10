@@ -483,12 +483,17 @@ function normalizeUpdateRepositoryUrl(value: unknown): string | null {
 function normalizeSmtpHost(value: unknown): string | null {
   if (value === '' || value === null || value === undefined) return '';
   if (typeof value !== 'string') return null;
-  const host = value.trim().toLowerCase();
-  if (!host || host === 'localhost') return null;
+  const host = value.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (!host || host === 'localhost' || host.endsWith('.localhost')) return null;
+  if (host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.home.arpa')) return null;
   if (/[\s/@:]/.test(host)) return null;
-  if (/^(127\.|10\.|192\.168\.|169\.254\.)/.test(host)) return null;
+  if (/^(0\.|127\.|10\.|192\.168\.|169\.254\.)/.test(host)) return null;
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host)) return null;
   if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return null;
-  if (host === '::1' || host.startsWith('fc') || host.startsWith('fd')) return null;
+  if (/^198\.1[89]\./.test(host)) return null;
+  if (/^(22[4-9]|23\d|2[45]\d)\./.test(host)) return null;
+  if (host === '::' || host === '::1' || host.startsWith('::ffff:') || host.startsWith('0:0:0:0:0:ffff:')) return null;
+  if (host.startsWith('fc') || host.startsWith('fd') || /^fe[89ab]/.test(host) || host.startsWith('ff')) return null;
   return host;
 }
 

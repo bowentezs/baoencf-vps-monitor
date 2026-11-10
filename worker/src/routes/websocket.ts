@@ -356,6 +356,8 @@ wsRoutes.get('/ws/live-token', async (c) => {
 
 wsRoutes.get('/ws/live', async (c) => {
   if (!isWebSocketUpgrade(c)) {
+    const limited = await enforceLiveClientsRateLimit(c, requestIp(c));
+    if (limited) return limited;
     const doId = c.env.LIVE_DATA.idFromName('global');
     const stub = c.env.LIVE_DATA.get(doId);
     const url = new URL(c.req.url);

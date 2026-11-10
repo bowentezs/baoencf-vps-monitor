@@ -342,7 +342,10 @@ function cssVarValue(value: unknown): string {
 export function sanitizeCustomCss(css: string): string {
   if (!css) return '';
   return css
-    .replace(/@import\s+[^;]+;?/gi, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\\[0-9a-fA-F]{1,6}\s?/g, '')
+    .replace(/<\/?style[^>]*>/gi, '')
+    .replace(/@import\b[^;{}]*(?:;|$)/gi, '')
     .replace(/url\s*\(\s*(['"]?)\s*(?:javascript|vbscript|data\s*:\s*text\/html):.*?\1\s*\)/gi, '')
     .replace(/expression\s*\([^)]*\)/gi, '')
     .replace(/behavior\s*:[^;]+;?/gi, '');
@@ -362,7 +365,7 @@ export function buildThemeCss({
     .map(([key, value]) => `  --cf-theme-${key}: ${cssVarValue(value)};`);
   return [
     variables.length > 0 ? `:root {\n${variables.join('\n')}\n}` : '',
-    styleCss,
+    sanitizeCustomCss(styleCss),
     sanitizeCustomCss(customCss.slice(0, MAX_CUSTOM_CSS_BYTES)),
   ].filter(Boolean).join('\n\n');
 }

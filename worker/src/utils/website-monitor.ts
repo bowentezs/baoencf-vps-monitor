@@ -136,7 +136,18 @@ function isBlockedIPv4(parts: number[]): boolean {
 }
 
 function isIPv4MappedIPv6(host: string): boolean {
-  return /^(::ffff:|0:0:0:0:0:ffff:)/.test(host);
+  if (/^(::ffff:|0:0:0:0:0:ffff:)/.test(host)) return true;
+  if (host.includes(':')) {
+    try {
+      const canonical = new URL(`http://[${host}]`).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+      if (canonical === '::' || canonical === '::1') return true;
+      if (/^::ffff:/.test(canonical)) return true;
+      if (/^::[0-9a-f]{1,4}:[0-9a-f]{1,4}$/.test(canonical)) return true;
+    } catch {
+      return true;
+    }
+  }
+  return false;
 }
 
 function isUnsafeHostname(hostname: string): boolean {

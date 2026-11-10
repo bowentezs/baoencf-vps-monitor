@@ -3595,6 +3595,7 @@ declare
   item jsonb;
   client_ids text[];
   task_ids bigint[];
+  monitor_ids bigint[];
 begin
   if input_backup is null or jsonb_typeof(input_backup) <> 'object' then
     raise exception 'backup must be a JSON object';
@@ -3766,6 +3767,95 @@ begin
     end loop;
 
     perform setval(pg_get_serial_sequence('ping_tasks', 'id'), coalesce((select max(id) from ping_tasks), 0) + 1, false);
+  end if;
+
+  if input_backup ? 'website_monitors' and jsonb_typeof(input_backup->'website_monitors') = 'array' then
+    select coalesce(array_agg(id), array[]::bigint[]) into monitor_ids
+    from (
+      select (value->>'id')::bigint as id
+      from jsonb_array_elements(input_backup->'website_monitors')
+      where coalesce(value->>'id', '') ~ '^[0-9]+$'
+        and (value->>'id')::bigint > 0
+    ) rows;
+
+    if coalesce(array_length(monitor_ids, 1), 0) > 0 then
+      delete from website_monitors where not (id = any(monitor_ids));
+    else
+      delete from website_monitors where true;
+    end if;
+
+    for item in select value from jsonb_array_elements(input_backup->'website_monitors')
+    loop
+      if coalesce(item->>'id', '') ~ '^[0-9]+$' and (item->>'id')::bigint > 0 then
+        insert into website_monitors (
+          id, name, url, method, expected_status_min, expected_status_max,
+          interval_sec, timeout_sec, grace_period_sec, enabled, hidden,
+          agent_probe_mode, agent_probe_clients, agent_probe_limit, agent_probe_status_enabled,
+          sort_order
+        )
+        values (
+          (item->>'id')::bigint,
+          coalesce(item->>'name', ''),
+          coalesce(item->>'url', ''),
+          coalesce(item->>'method', 'GET'),
+          coalesce((item->>'expected_status_min')::integer, 200),
+          coalesce((item->>'expected_status_max')::integer, 399),
+          coalesce((item->>'interval_sec')::integer, 120),
+          coalesce((item->>'timeout_sec')::integer, 10),
+          coalesce((item->>'grace_period_sec')::integer, 180),
+          coalesce((item->>'enabled')::boolean, true),
+          coalesce((item->>'hidden')::boolean, false),
+          case when item->>'agent_probe_mode' in ('off', 'selected', 'country_auto') then item->>'agent_probe_mode' else 'country_auto' end,
+          case when jsonb_typeof(item->'agent_probe_clients') = 'array' then item->'agent_probe_clients' else '[]'::jsonb end,
+          least(greatest(coalesce((item->>'agent_probe_limit')::integer, 3), 1), 10),
+          coalesce((item->>'agent_probe_status_enabled')::boolean, true),
+          coalesce((item->>'sort_order')::integer, (item->>'id')::integer)
+        )
+        on conflict (id) do update set
+          name = excluded.name,
+          url = excluded.url,
+          method = excluded.method,
+          expected_status_min = excluded.expected_status_min,
+          expected_status_max = excluded.expected_status_max,
+          interval_sec = excluded.interval_sec,
+          timeout_sec = excluded.timeout_sec,
+          grace_period_sec = excluded.grace_period_sec,
+          enabled = excluded.enabled,
+          hidden = excluded.hidden,
+          agent_probe_mode = excluded.agent_probe_mode,
+          agent_probe_clients = excluded.agent_probe_clients,
+          agent_probe_limit = excluded.agent_probe_limit,
+          agent_probe_status_enabled = excluded.agent_probe_status_enabled,
+          sort_order = excluded.sort_order,
+          updated_at = now();
+      else
+        insert into website_monitors (
+          name, url, method, expected_status_min, expected_status_max,
+          interval_sec, timeout_sec, grace_period_sec, enabled, hidden,
+          agent_probe_mode, agent_probe_clients, agent_probe_limit, agent_probe_status_enabled,
+          sort_order
+        )
+        values (
+          coalesce(item->>'name', ''),
+          coalesce(item->>'url', ''),
+          coalesce(item->>'method', 'GET'),
+          coalesce((item->>'expected_status_min')::integer, 200),
+          coalesce((item->>'expected_status_max')::integer, 399),
+          coalesce((item->>'interval_sec')::integer, 120),
+          coalesce((item->>'timeout_sec')::integer, 10),
+          coalesce((item->>'grace_period_sec')::integer, 180),
+          coalesce((item->>'enabled')::boolean, true),
+          coalesce((item->>'hidden')::boolean, false),
+          case when item->>'agent_probe_mode' in ('off', 'selected', 'country_auto') then item->>'agent_probe_mode' else 'country_auto' end,
+          case when jsonb_typeof(item->'agent_probe_clients') = 'array' then item->'agent_probe_clients' else '[]'::jsonb end,
+          least(greatest(coalesce((item->>'agent_probe_limit')::integer, 3), 1), 10),
+          coalesce((item->>'agent_probe_status_enabled')::boolean, true),
+          coalesce((item->>'sort_order')::integer, 0)
+        );
+      end if;
+    end loop;
+
+    perform setval(pg_get_serial_sequence('website_monitors', 'id'), coalesce((select max(id) from website_monitors), 0) + 1, false);
   end if;
 
   if input_backup ? 'offline_notifications' and jsonb_typeof(input_backup->'offline_notifications') = 'array' then

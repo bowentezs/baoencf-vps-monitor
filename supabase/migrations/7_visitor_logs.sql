@@ -17,8 +17,15 @@ create index if not exists idx_visitor_logs_time on visitor_logs(time desc);
 create index if not exists idx_visitor_logs_ip on visitor_logs(ip);
 
 alter table visitor_logs enable row level security;
+alter table visitor_logs force row level security;
 revoke all on visitor_logs from public, anon, authenticated;
 grant all on visitor_logs to service_role;
+grant select, insert, update, delete on table public.visitor_logs to cf_monitor_app;
+drop policy if exists cf_monitor_internal_visitor_logs on public.visitor_logs;
+create policy cf_monitor_internal_visitor_logs on public.visitor_logs
+  for all to cf_monitor_app
+  using (true)
+  with check (true);
 
 -- 插入访客记录
 create or replace function public.cfm_insert_visitor_log(
@@ -64,7 +71,7 @@ as $$
 declare
   page_limit integer := least(greatest(coalesce(input_limit, 50), 1), 100);
   page_offset integer := greatest(coalesce(input_page, 1) - 1, 0) * page_limit;
-  clean_search text := trim(coalesce(input_search, ''));
+  clean_search text := regexp_replace(trim(coalesce(input_search, '')), '([%_\\])', '\\\1', 'g');
   total_count integer;
   today_count integer;
   items jsonb;

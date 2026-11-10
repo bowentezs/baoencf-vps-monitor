@@ -28,15 +28,30 @@ export type SmtpIo = {
 const EMAIL_PATTERN = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 
 function isUnsafeHost(host: string): boolean {
-  const normalized = host.trim().toLowerCase();
+  const normalized = host.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
   return !normalized ||
     normalized === 'localhost' ||
-    /[\s/@:]/.test(normalized) ||
-    /^(127\.|10\.|192\.168\.|169\.254\.)/.test(normalized) ||
+    normalized.endsWith('.localhost') ||
+    normalized.endsWith('.local') ||
+    normalized.endsWith('.internal') ||
+    normalized.endsWith('.home.arpa') ||
+    /[\s/@]/.test(normalized) ||
+    /^(0\.|127\.|10\.|192\.168\.|169\.254\.)/.test(normalized) ||
+    /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(normalized) ||
     /^172\.(1[6-9]|2\d|3[01])\./.test(normalized) ||
+    /^198\.1[89]\./.test(normalized) ||
+    /^(22[4-9]|23\d|2[45]\d)\./.test(normalized) ||
+    normalized === '::' ||
     normalized === '::1' ||
+    normalized.startsWith('::ffff:') ||
+    normalized.startsWith('0:0:0:0:0:ffff:') ||
     normalized.startsWith('fc') ||
-    normalized.startsWith('fd');
+    normalized.startsWith('fd') ||
+    normalized.startsWith('fe8') ||
+    normalized.startsWith('fe9') ||
+    normalized.startsWith('fea') ||
+    normalized.startsWith('feb') ||
+    normalized.startsWith('ff');
 }
 
 function utf8Base64(value: string): string {
