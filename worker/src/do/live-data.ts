@@ -414,6 +414,7 @@ export class LiveDataDO {
   private networkMetadataSignatures = new Map<string, { signature: string; syncedAt: number }>();
   private basicInfoSignatures = new Map<string, string>();
   private geoRegionCache = new Map<string, { region: string; expiresAt: number }>();
+  private websiteProbeLastPersistAt = new Map<string, number>();
   private clientLastReportTimes = new Map<string, number>();
   private expiredViewersNotified = new Set<string>();
   // 已排程到期闹钟的本地缓存；undefined 表示未知，需要向 DO 存储读取一次。
@@ -585,28 +586,49 @@ export class LiveDataDO {
     return safeReport as MonitorReportPayload;
   }
 
+  private stripPrivateReportFields(report: Record<string, unknown>): Record<string, unknown> {
+    const safeReport = { ...report };
+    const hasIpv4 = typeof safeReport.ipv4 === 'string' && isPublicIpAddress(safeReport.ipv4);
+    const hasIpv6 = typeof safeReport.ipv6 === 'string' && isPublicIpAddress(safeReport.ipv6);
+    delete safeReport.ipv4;
+    delete safeReport.ipv6;
+    delete safeReport.top_processes;
+    if (isObjectPayload(safeReport.basic_info)) {
+      const safeBasic = { ...safeReport.basic_info };
+      delete safeBasic.ipv4;
+      delete safeBasic.ipv6;
+      safeReport.basic_info = safeBasic;
+    }
+    safeReport.has_ipv4 = hasIpv4;
+    safeReport.has_ipv6 = hasIpv6;
+    return safeReport;
+  }
+
   private buildSnapshot(includeHidden = false, includeOffline = false): LiveSnapshot {
     const now = Date.now();
-    const onlineClients = Array.from(this.clients.values())
-      .filter(c => (includeHidden || !c.hidden) && (includeOffline || !c.expiresAt || c.expiresAt > now))
-      .map(c => {
-        const report = { ...(c.lastReport || {}) };
-        if (!includeHidden) {
-          // 公开快照隐藏节点公网 IP 与敏感进程，与元数据接口 toPublicClient 的 has_ipv4/has_ipv6 设计一致。
-          const hasIpv4 = typeof report.ipv4 === 'string' && isPublicIpAddress(report.ipv4);
-          const hasIpv6 = typeof report.ipv6 === 'string' && isPublicIpAddress(report.ipv6);
-          delete report.ipv4;
-          delete report.ipv6;
-          delete report.top_processes;
-          report.has_ipv4 = hasIpv4;
-          report.has_ipv6 = hasIpv6;
-        }
-        return { ...report, uuid: c.uuid, name: c.name, lastReportTime: c.lastReportTime };
-      });
+    const visibleClients = Array.from(this.clients.values())
+      .filter(c => (includeHidden || !c.hidden) && (includeOffline || !c.expiresAt || c.expiresAt > now));
+    const onlineClients = visibleClients.map(c => {
+      const baseReport = { ...(c.lastReport || {}) };
+      const report = includeHidden ? baseReport : this.stripPrivateReportFields(baseReport);
+      return { ...report, uuid: c.uuid, name: c.name, lastReportTime: c.lastReportTime };
+    });
     const liveData = onlineClients.reduce<Record<string, LiveSnapshotClient>>((acc, client) => {
       acc[client.uuid] = client;
       return acc;
     }, {});
+
+    const filteredLastReportTimes: Record<string, number> = {};
+    for (const [uuid, ts] of this.clientLastReportTimes.entries()) {
+      if (includeHidden) {
+        filteredLastReportTimes[uuid] = ts;
+      } else {
+        const state = this.clients.get(uuid);
+        if (state && !state.hidden) {
+          filteredLastReportTimes[uuid] = ts;
+        }
+      }
+    }
 
     const snapshot: LiveSnapshot = {
       online: Array.from(this.clients.values())
@@ -616,7 +638,7 @@ export class LiveDataDO {
       data: liveData,
       count: onlineClients.length,
       timestamp: Date.now(),
-      last_report_times: Object.fromEntries(this.clientLastReportTimes),
+      last_report_times: filteredLastReportTimes,
     };
     if (this.adminClientsUpdatedAt !== null) {
       snapshot.metadata_version = String(this.adminClientsUpdatedAt);
@@ -710,21 +732,25 @@ export class LiveDataDO {
     if (typeof report.ipv4 === 'string' && isPublicIpAddress(report.ipv4)) patch.ipv4 = report.ipv4.trim();
     if (typeof report.ipv6 === 'string' && isPublicIpAddress(report.ipv6)) patch.ipv6 = report.ipv6.trim();
     if (typeof report.region === 'string' && this.isUsefulRegion(report.region)) patch.region = report.region.trim();
-    if (!isDetailedRegion(String(patch.region || ''))) {
-      const inferredRegion = await this.inferRegionFromPublicIp(String(patch.ipv4 || patch.ipv6 || ''));
-      if (inferredRegion && (!patch.region || isDetailedRegion(inferredRegion))) patch.region = inferredRegion;
-    }
-    if (Object.keys(patch).length === 0) return;
 
-    // 数据库已配置的 IP/地区优先，避免 NAT 场景下 agent 探测的出口 IP 覆盖后台配置。
+    // 数据库已配置的 IP/地区优先，先查库再决定是否调用外部 geojs.io，避免失陷 Agent 轮换 IP 触发外部请求放大。
     const database = this.getQueryDatabase();
+    let hasExistingUsefulRegion = false;
     if (database) {
       const existing = await db.getClient(database, clientId);
       if (existing) {
         if (isPublicIpAddress(existing.ipv4)) delete patch.ipv4;
         if (isPublicIpAddress(existing.ipv6)) delete patch.ipv6;
-        if (this.isUsefulRegion(existing.region)) delete patch.region;
+        if (this.isUsefulRegion(existing.region)) {
+          delete patch.region;
+          hasExistingUsefulRegion = true;
+        }
       }
+    }
+    if (!hasExistingUsefulRegion && !isDetailedRegion(String(patch.region || ''))) {
+      const candidateIp = String(patch.ipv4 || patch.ipv6 || report.ipv4 || report.ipv6 || '');
+      const inferredRegion = await this.inferRegionFromPublicIp(candidateIp);
+      if (inferredRegion && (!patch.region || isDetailedRegion(inferredRegion))) patch.region = inferredRegion;
     }
     if (Object.keys(patch).length === 0) return;
 
@@ -737,7 +763,10 @@ export class LiveDataDO {
 
     const client = { uuid: clientId, name: clientName || clientId, hidden, ...patch };
     await this.upsertAdminClientSnapshot(client);
-    this.broadcastMetadataChanged({ clients: { upsert: [this.publicClientMetadata(client)] } });
+    this.broadcastMetadataChanged(
+      { clients: { upsert: [this.publicClientMetadata(client)] } },
+      hidden ? 'admin' : 'all',
+    );
 
     if (!database) return;
     await db.updateClient(database, clientId, patch as Partial<db.Client>);
@@ -797,8 +826,26 @@ export class LiveDataDO {
     const body = await response.json().catch(() => null);
     const region = regionFromGeoJsBody(body);
     if (!this.isUsefulRegion(region)) return '';
+    if (this.geoRegionCache.size >= 1024) {
+      const oldestKey = this.geoRegionCache.keys().next().value;
+      if (oldestKey !== undefined) this.geoRegionCache.delete(oldestKey);
+    }
     this.geoRegionCache.set(publicIp, { region, expiresAt: now + GEO_REGION_CACHE_MS });
     return region;
+  }
+
+  private compactReportForAttachment(report: MonitorReportPayload): MonitorReportPayload {
+    const {
+      basic_info: _basicInfo,
+      docker_containers: _docker,
+      unlock_items: _unlock,
+      top_processes: _top,
+      ping_results: _ping,
+      website_probe_results: _web,
+      gpus: _gpus,
+      ...compact
+    } = report;
+    return { ...compact, gpus: [] } as MonitorReportPayload;
   }
 
   private rememberAgentReportAttachment(
@@ -810,18 +857,22 @@ export class LiveDataDO {
     now: number,
     expiresAt?: number,
   ): void {
-    const previous = this.getSessionAttachment(ws);
-    ws.serializeAttachment({
-      role: 'agent',
-      clientId,
-      clientName,
-      hidden,
-      ...(previous?.sourceIp ? { sourceIp: previous.sourceIp } : {}),
-      ...(previous?.region ? { region: previous.region } : {}),
-      lastReport: report,
-      lastReportTime: now,
-      expiresAt,
-    });
+    try {
+      const previous = this.getSessionAttachment(ws);
+      ws.serializeAttachment({
+        role: 'agent',
+        clientId,
+        clientName,
+        hidden,
+        ...(previous?.sourceIp ? { sourceIp: previous.sourceIp } : {}),
+        ...(previous?.region ? { region: previous.region } : {}),
+        lastReport: this.compactReportForAttachment(report),
+        lastReportTime: now,
+        expiresAt,
+      });
+    } catch {
+      // DO WebSocket attachment 限制 2KB；序列化失败时绝不中断实时上报主流程。
+    }
   }
 
   private boundedHttpTtlMs(value: unknown): number {
@@ -1116,9 +1167,78 @@ export class LiveDataDO {
     return nextExpiry;
   }
 
+  private sanitizePublicMetadataMessage(message: JsonObject): JsonObject | null {
+    const next: JsonObject = { ...message };
+    let hasContent = false;
+
+    if (isObjectPayload(message.clients)) {
+      const clientsPatch: JsonObject = { ...message.clients };
+      if (Array.isArray(clientsPatch.upsert)) {
+        const publicUpsert = clientsPatch.upsert
+          .filter(isObjectPayload)
+          .filter(item => !booleanField(item, 'hidden'))
+          .map(item => this.publicClientMetadata(item));
+        if (publicUpsert.length > 0) {
+          clientsPatch.upsert = publicUpsert;
+          hasContent = true;
+        } else {
+          delete clientsPatch.upsert;
+        }
+      }
+      if (Array.isArray(clientsPatch.remove) && clientsPatch.remove.length > 0) {
+        hasContent = true;
+      }
+      if (Array.isArray(clientsPatch.reorder) && clientsPatch.reorder.length > 0) {
+        hasContent = true;
+      }
+      if (Object.keys(clientsPatch).length > 0) {
+        next.clients = clientsPatch;
+      } else {
+        delete next.clients;
+      }
+    } else if (message.clients === true) {
+      hasContent = true;
+    }
+
+    if (isObjectPayload(message.websites)) {
+      const websitesPatch: JsonObject = { ...message.websites };
+      if (Array.isArray(websitesPatch.upsert)) {
+        const publicWebsites = websitesPatch.upsert
+          .filter(isObjectPayload)
+          .filter(item => !booleanField(item, 'hidden'));
+        if (publicWebsites.length > 0) {
+          websitesPatch.upsert = publicWebsites;
+          hasContent = true;
+        } else {
+          delete websitesPatch.upsert;
+        }
+      }
+      if (Array.isArray(websitesPatch.remove) && websitesPatch.remove.length > 0) {
+        hasContent = true;
+      }
+      if (Array.isArray(websitesPatch.reorder) && websitesPatch.reorder.length > 0) {
+        hasContent = true;
+      }
+      if (Object.keys(websitesPatch).length > 0) {
+        next.websites = websitesPatch;
+      } else {
+        delete next.websites;
+      }
+    } else if (message.websites === true) {
+      hasContent = true;
+    }
+
+    for (const key of Object.keys(next)) {
+      if (key !== 'type' && key !== 'timestamp' && key !== 'clients' && key !== 'websites') {
+        hasContent = true;
+      }
+    }
+    return hasContent ? next : null;
+  }
+
   private broadcastToViewers(message: JsonObject, audience: 'all' | 'public' | 'admin' = 'all') {
     let adminPayload = '';
-    let publicPayload = '';
+    let publicPayload: string | null = null;
     for (const [id, session] of this.sessions) {
       if (this.sessionRoles.get(id) !== 'viewer' || session.readyState !== WebSocket.READY_STATE_OPEN) {
         continue;
@@ -1131,22 +1251,18 @@ export class LiveDataDO {
           adminPayload ||= JSON.stringify(message);
           session.send(adminPayload);
         } else {
-          if (!publicPayload) {
-            let publicMessage = message;
+          if (publicPayload === null) {
+            let publicMessage: JsonObject | null = message;
             if (message.type === 'update' && message.data && typeof message.data === 'object') {
-              const safeData = { ...(message.data as Record<string, unknown>) };
-              const hasIpv4 = typeof safeData.ipv4 === 'string' && isPublicIpAddress(safeData.ipv4);
-              const hasIpv6 = typeof safeData.ipv6 === 'string' && isPublicIpAddress(safeData.ipv6);
-              delete safeData.ipv4;
-              delete safeData.ipv6;
-              delete safeData.top_processes;
-              safeData.has_ipv4 = hasIpv4;
-              safeData.has_ipv6 = hasIpv6;
-              publicMessage = { ...message, data: safeData };
+              publicMessage = { ...message, data: this.stripPrivateReportFields(message.data as Record<string, unknown>) };
+            } else if (message.type === 'metadata_changed') {
+              publicMessage = this.sanitizePublicMetadataMessage(message);
             }
-            publicPayload = JSON.stringify(publicMessage);
+            publicPayload = publicMessage ? JSON.stringify(publicMessage) : '';
           }
-          session.send(publicPayload);
+          if (publicPayload) {
+            session.send(publicPayload);
+          }
         }
       } catch {
         // Close/error handlers clean up broken viewer sockets.
@@ -1154,12 +1270,12 @@ export class LiveDataDO {
     }
   }
 
-  private broadcastMetadataChanged(detail: JsonObject = {}) {
+  private broadcastMetadataChanged(detail: JsonObject = {}, audience: 'all' | 'public' | 'admin' = 'all') {
     this.broadcastToViewers({
       type: 'metadata_changed',
       ...detail,
       timestamp: Date.now(),
-    });
+    }, audience);
   }
 
   private countViewers(viewerIp?: string): { total: number; sameIp: number } {
@@ -1302,6 +1418,51 @@ export class LiveDataDO {
     return Response.json({ success: true });
   }
 
+  private async resetAllRuntimeState(): Promise<Response> {
+    // 备份恢复后彻底清空持久化 Agent 认证快照、管理员节点快照并断开所有活跃 Agent 连接，防止旧 Token 永久有效。
+    for (const [id, session] of this.sessions.entries()) {
+      if (this.sessionRoles.get(id) !== 'agent') continue;
+      if (session.readyState === WebSocket.READY_STATE_OPEN) {
+        try {
+          session.close(1008, 'Backup restored');
+        } catch {
+          // Best effort only.
+        }
+      }
+      this.sessions.delete(id);
+      this.sessionRoles.delete(id);
+    }
+    this.clients.clear();
+    this.clientLastReportTimes.clear();
+    this.expiredViewersNotified.clear();
+    this.networkMetadataSignatures.clear();
+    this.basicInfoSignatures.clear();
+    this.websiteProbeLastPersistAt.clear();
+    this.adminClientsUpdatedAt = null;
+    this.invalidatePingTasksCache();
+    this.invalidateWebsiteProbeTasksCache();
+
+    try {
+      const [authEntries, uuidEntries] = await Promise.all([
+        this.state.storage.list({ prefix: AGENT_AUTH_SNAPSHOT_PREFIX }),
+        this.state.storage.list({ prefix: AGENT_AUTH_UUID_PREFIX }),
+      ]);
+      const keysToDelete = [
+        ADMIN_CLIENTS_SNAPSHOT_KEY,
+        ...Array.from(authEntries.keys()),
+        ...Array.from(uuidEntries.keys()),
+      ];
+      for (let i = 0; i < keysToDelete.length; i += 128) {
+        await this.state.storage.delete(keysToDelete.slice(i, i + 128));
+      }
+    } catch (error) {
+      console.error('[live-data] failed to reset runtime storage:', errorDetail(error));
+    }
+
+    this.broadcastMetadataChanged({ clients: true, websites: true }, 'all');
+    return Response.json({ success: true });
+  }
+
   private async updateClientMeta(request: Request): Promise<Response> {
     const parsed = await parseJsonRequestWithLimit(request, HTTP_CLIENT_META_MAX_BODY_BYTES);
     if ('response' in parsed) return parsed.response;
@@ -1363,11 +1524,12 @@ export class LiveDataDO {
       : { uuid, name: current?.name || uuid, hidden: booleanField(meta, 'hidden') };
     await this.upsertAdminClientSnapshot(client);
     const broadcastClient = this.publicClientMetadata(client);
-    this.broadcastMetadataChanged({
-      clients: booleanField(meta, 'hidden')
-        ? { upsert: [broadcastClient], remove: [uuid] }
-        : { upsert: [broadcastClient] },
-    });
+    if (booleanField(meta, 'hidden')) {
+      this.broadcastMetadataChanged({ clients: { upsert: [broadcastClient] } }, 'admin');
+      this.broadcastMetadataChanged({ clients: { remove: [uuid] } }, 'public');
+    } else {
+      this.broadcastMetadataChanged({ clients: { upsert: [broadcastClient] } }, 'all');
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },
@@ -1447,6 +1609,7 @@ export class LiveDataDO {
     const broadcastClient: JsonObject = safe ? { ...safe } : {};
     delete broadcastClient.ipv4;
     delete broadcastClient.ipv6;
+    delete broadcastClient.remark;
     delete broadcastClient.token_last_used_ip;
     delete broadcastClient.token_last_used_at;
     delete broadcastClient.token_rotated_at;
@@ -1653,9 +1816,11 @@ export class LiveDataDO {
       const clientPatch: JsonObject = { uuid: clientId, name: clientName || clientId, hidden, ...patch };
       await this.upsertAdminClientSnapshot(clientPatch);
       const broadcastPatch = this.publicClientMetadata(clientPatch);
-      this.broadcastMetadataChanged({
-        clients: hidden ? { upsert: [broadcastPatch], remove: [clientId] } : { upsert: [broadcastPatch] },
-      });
+      if (hidden) {
+        this.broadcastMetadataChanged({ clients: { upsert: [broadcastPatch] } }, 'admin');
+      } else {
+        this.broadcastMetadataChanged({ clients: { upsert: [broadcastPatch] } }, 'all');
+      }
     } catch {
       // Basic info is refreshed periodically; keep live reporting independent.
     }
@@ -1684,18 +1849,33 @@ export class LiveDataDO {
 
       const assigned = new Set((await this.getWebsiteProbeTasks(nowMs, clientId)).map(task => task.id));
       if (assigned.size === 0) return;
+      // 按 monitorId 去重仅保留本批次最新一条，并对单 Agent+Monitor 施加密集上报节流，防止 300x256 放大式 DoS
+      const dedupedByMonitor = new Map<number, JsonObject>();
+      for (const item of results) {
+        const monitorId = Number(item.monitor_id);
+        if (Number.isInteger(monitorId) && assigned.has(monitorId)) {
+          dedupedByMonitor.set(monitorId, item);
+        }
+      }
+      if (this.websiteProbeLastPersistAt.size > 4096) {
+        for (const [k, ts] of this.websiteProbeLastPersistAt.entries()) {
+          if (nowMs - ts > 120_000) this.websiteProbeLastPersistAt.delete(k);
+        }
+      }
       const checkedAt = new Date(nowMs).toISOString();
       let changed = false;
       const fallbackChecked = new Set<number>();
-      for (const item of results) {
-        const monitorId = Number(item.monitor_id);
+      for (const [monitorId, item] of dedupedByMonitor.entries()) {
+        const throttleKey = `${clientId}:${monitorId}`;
+        const lastPersist = this.websiteProbeLastPersistAt.get(throttleKey) || 0;
+        if (nowMs - lastPersist < 30_000) {
+          continue;
+        }
         const latencyMs = Math.round(Number(item.latency_ms));
         const statusCode = item.status_code === null || item.status_code === undefined ? null : Number(item.status_code);
         const rawStatusCode = item.raw_status_code === null || item.raw_status_code === undefined ? statusCode : Number(item.raw_status_code);
         const effectiveStatus = item.effective_status === 'up' ? 'up' : item.effective_status === 'down' ? 'down' : null;
         if (
-          !Number.isInteger(monitorId) ||
-          !assigned.has(monitorId) ||
           !Number.isFinite(latencyMs) ||
           latencyMs < 0 ||
           latencyMs > 60_000 ||
@@ -1705,6 +1885,7 @@ export class LiveDataDO {
         ) {
           continue;
         }
+        this.websiteProbeLastPersistAt.set(throttleKey, nowMs);
         const updated = await db.recordWebsiteCheck(database, {
           monitor_id: monitorId,
           checked_at: checkedAt,
@@ -1811,6 +1992,10 @@ export class LiveDataDO {
       this.invalidateWebsiteProbeTasksCache();
       await this.broadcastAgentPolicy(Date.now(), false, true);
       return Response.json({ success: true });
+    }
+
+    if (request.method === 'POST' && url.pathname === '/reset-state') {
+      return this.resetAllRuntimeState();
     }
 
     if (request.method === 'POST' && url.pathname === '/metadata-refresh') {

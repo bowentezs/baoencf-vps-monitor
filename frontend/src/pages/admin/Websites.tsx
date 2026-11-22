@@ -218,9 +218,13 @@ function SortableWebsiteRow({ monitor, selected, dragDisabled, onSelect, onCheck
         </Flex>
       </Table.RowHeaderCell>
       <Table.Cell className="admin-website-url-cell">
-        <a className="admin-website-url" href={monitor.url} target="_blank" rel="noopener noreferrer">
-          {monitor.url}<ExternalLink size={12} aria-hidden="true" />
-        </a>
+        {/^https?:\/\//i.test(monitor.url) ? (
+          <a className="admin-website-url" href={monitor.url} target="_blank" rel="noopener noreferrer">
+            {monitor.url}<ExternalLink size={12} aria-hidden="true" />
+          </a>
+        ) : (
+          <Text size="2" color="gray" className="admin-website-url">{monitor.url}</Text>
+        )}
       </Table.Cell>
       <Table.Cell className="admin-website-status-cell">
         <Badge color={statusColor(monitor.status)} variant="soft">{statusLabel(monitor.status)}</Badge>
@@ -301,9 +305,13 @@ function SortableWebsiteCard({ monitor, selected, dragDisabled, onSelect, onChec
         </div>
 
         <div className="admin-website-card-body">
-          <a className="admin-website-url admin-website-card-url" href={monitor.url} target="_blank" rel="noopener noreferrer">
-            {monitor.url}<ExternalLink size={12} aria-hidden="true" />
-          </a>
+          {/^https?:\/\//i.test(monitor.url) ? (
+            <a className="admin-website-url admin-website-card-url" href={monitor.url} target="_blank" rel="noopener noreferrer">
+              {monitor.url}<ExternalLink size={12} aria-hidden="true" />
+            </a>
+          ) : (
+            <Text size="2" color="gray" className="admin-website-url admin-website-card-url">{monitor.url}</Text>
+          )}
           <div className="admin-website-card-meta-grid">
             <div className="admin-node-card-meta">
               <Text className="admin-node-card-section-label" size="1" weight="bold">原始响应</Text>

@@ -302,7 +302,9 @@ app.use('*', async (c, next) => {
   await next();
   if (c.res.status === 101) return;
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
-    c.header(name, value);
+    if (!c.res.headers.has(name)) {
+      c.header(name, value);
+    }
   }
 });
 

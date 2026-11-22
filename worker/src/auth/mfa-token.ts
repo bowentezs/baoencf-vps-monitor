@@ -2,6 +2,7 @@ import { sign, verify } from 'hono/jwt';
 import { requireJwtSecret } from './jwt.ts';
 
 const MFA_TOKEN_TTL_SECONDS = 30 * 60;
+const MFA_LOGIN_TTL_SECONDS = 5 * 60;
 
 type MfaEnv = { JWT_SECRET?: string };
 export type MfaTokenPurpose = 'mfa-login' | 'mfa-step-up';
@@ -22,12 +23,13 @@ export async function generateMfaToken(
   nowMs = Date.now(),
 ): Promise<string> {
   const now = Math.floor(nowMs / 1000);
+  const ttlSeconds = payload.purpose === 'mfa-login' ? MFA_LOGIN_TTL_SECONDS : MFA_TOKEN_TTL_SECONDS;
   return sign({
     ...payload,
     kind: 'cf-monitor-mfa',
     jti: crypto.randomUUID(),
     iat: now,
-    exp: now + MFA_TOKEN_TTL_SECONDS,
+    exp: now + ttlSeconds,
   }, requireJwtSecret(env), 'HS256');
 }
 

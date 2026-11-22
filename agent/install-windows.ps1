@@ -73,7 +73,7 @@ if (-not $DryRun -and -not (Test-Admin)) {
 function ConvertTo-InstanceId {
   param([string]$Value)
   $candidate = if ([string]::IsNullOrWhiteSpace($Value)) { "default" } else { $Value }
-  $cleaned = ($candidate.ToLowerInvariant() -replace '[^a-z0-9_.-]+', '-') -replace '^-+', '' -replace '-+$', ''
+  $cleaned = ($candidate.ToLowerInvariant() -replace '[^a-z0-9_-]+', '-') -replace '^-+', '' -replace '-+$', ''
   if ([string]::IsNullOrWhiteSpace($cleaned)) {
     $cleaned = "default"
   }
@@ -359,6 +359,9 @@ if ($ServiceName -match '[\\/]') {
 if ([string]::IsNullOrWhiteSpace($InstallDir) -or [System.IO.Path]::GetPathRoot($InstallDir) -eq $InstallDir) {
   throw "-InstallDir cannot be empty or a drive root."
 }
+if ($InstallDir -match '[\r\n\x00"`$&|<>^%]' -or $InstallDir -match '(^|[\\/])\.\.([\\/]|$)') {
+  throw "-InstallDir contains unsafe characters or path traversal segments."
+}
 
 $targetExe = Join-Path $InstallDir "cf-vps-monitor-agent.exe"
 $runnerPath = Join-Path $InstallDir "run-agent.ps1"
@@ -402,6 +405,7 @@ Assert-HttpsUrl -Name "-ChecksumUrl" -Url $ChecksumUrl
 Assert-HttpsUrl -Name "-SourceUrl" -Url $SourceUrl
 $Proxy = Normalize-HttpUrl -Name "-Proxy" -Url $Proxy -AllowPath $false
 $InstallGhproxy = Normalize-HttpUrl -Name "-InstallGhproxy" -Url $InstallGhproxy
+Assert-HttpsUrl -Name "-InstallGhproxy" -Url $InstallGhproxy
 
 if ($BinaryPath -eq "" -and $BinaryUrl -eq "" -and -not $BuildFromSource) {
   $BinaryUrl = Get-DefaultBinaryUrl
@@ -461,6 +465,10 @@ if ($DryRun) {
 
 New-Item -ItemType Directory -Force $InstallDir | Out-Null
 New-Item -ItemType Directory -Force $StateDir | Out-Null
+# Lock ACL before writing run-agent.ps1 containing CF_MONITOR_TOKEN
+takeown.exe /F $InstallDir /R /A /D Y 2>$null | Out-Null
+icacls $InstallDir /inheritance:r /grant:r "*S-1-5-18:F" "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:F" "*S-1-5-32-544:(OI)(CI)F" "*S-1-5-19:RX" "*S-1-5-19:(OI)(CI)RX" /T /C | Out-Null
+icacls $StateDir /inheritance:r /grant:r "*S-1-5-18:F" "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:F" "*S-1-5-32-544:(OI)(CI)F" "*S-1-5-19:M" "*S-1-5-19:(OI)(CI)M" /T /C | Out-Null
 if ((Resolve-Path -LiteralPath $BinaryPath).Path -ne (Resolve-Path -LiteralPath $targetExe -ErrorAction SilentlyContinue).Path) {
   Copy-Item $BinaryPath $targetExe -Force
 }
@@ -483,8 +491,7 @@ Set-Location `$PSScriptRoot
 
 try {
   `$agentPath = Join-Path `$PSScriptRoot "cf-vps-monitor-agent.exe"
-  `$command = '"' + `$agentPath + '" --interval $ReportInterval --ping-interval $PingInterval --traffic-reset-day $TrafficResetDay >> "' + `$logPath + '" 2>&1'
-  & `$env:ComSpec /d /c `$command
+  & `$agentPath --interval $ReportInterval --ping-interval $PingInterval --traffic-reset-day $TrafficResetDay *>> `$logPath
   `$exitCode = `$LASTEXITCODE
 } catch {
   `$exitCode = 1

@@ -23,35 +23,81 @@ export type SmtpIo = {
   readLine: () => Promise<string>;
   writeLine: (line: string) => Promise<void>;
   writeData: (data: string) => Promise<void>;
+  startTls?: () => Promise<void> | void;
 };
 
-const EMAIL_PATTERN = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+const EMAIL_PATTERN = /^[^\s@<>\r\n\x00]+@[^\s@<>\r\n\x00]+\.[^\s@<>\r\n\x00]+$/;
+
+function parseIPv4(host: string): number[] | null {
+  if (!/^(0|[1-9]\d{0,2})(\.(0|[1-9]\d{0,2})){3}$/.test(host)) return null;
+  const parts = host.split('.').map(part => Number(part));
+  return parts.every(part => Number.isInteger(part) && part >= 0 && part <= 255) ? parts : null;
+}
+
+function isAmbiguousNumericHost(host: string): boolean {
+  if (host.includes(':')) return false;
+  const parts = host.split('.');
+  if (parts.length < 1 || parts.length > 4) return false;
+  if (!parts.every(part => /^(0x[0-9a-f]+|\d+)$/i.test(part))) return false;
+  if (parts.length !== 4) return true;
+  return parts.some(part => /^0x/i.test(part) || (part.length > 1 && part.startsWith('0'))) || !parseIPv4(host);
+}
+
+function isBlockedIpv6Literal(host: string): boolean {
+  if (!host.includes(':')) return false;
+  try {
+    const canonical = new URL(`http://[${host}]`).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    return (
+      canonical === '::' ||
+      canonical === '::1' ||
+      canonical.startsWith('::ffff:') ||
+      /^::[0-9a-f]{1,4}:[0-9a-f]{1,4}$/.test(canonical) ||
+      canonical.startsWith('64:ff9b:') ||
+      canonical.startsWith('2002:') ||
+      canonical.startsWith('2001:db8:') ||
+      canonical.startsWith('100:') ||
+      /^(fc|fd|fe8|fe9|fea|feb|ff)/.test(canonical)
+    );
+  } catch {
+    return true;
+  }
+}
 
 function isUnsafeHost(host: string): boolean {
-  const normalized = host.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
-  return !normalized ||
+  const normalized = host.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+  if (
+    !normalized ||
+    /[\r\n\x00\s/@]/.test(normalized) ||
     normalized === 'localhost' ||
     normalized.endsWith('.localhost') ||
     normalized.endsWith('.local') ||
     normalized.endsWith('.internal') ||
     normalized.endsWith('.home.arpa') ||
-    /[\s/@]/.test(normalized) ||
-    /^(0\.|127\.|10\.|192\.168\.|169\.254\.)/.test(normalized) ||
-    /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(normalized) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(normalized) ||
-    /^198\.1[89]\./.test(normalized) ||
-    /^(22[4-9]|23\d|2[45]\d)\./.test(normalized) ||
-    normalized === '::' ||
-    normalized === '::1' ||
-    normalized.startsWith('::ffff:') ||
-    normalized.startsWith('0:0:0:0:0:ffff:') ||
-    normalized.startsWith('fc') ||
-    normalized.startsWith('fd') ||
-    normalized.startsWith('fe8') ||
-    normalized.startsWith('fe9') ||
-    normalized.startsWith('fea') ||
-    normalized.startsWith('feb') ||
-    normalized.startsWith('ff');
+    normalized === 'metadata.google.internal' ||
+    normalized === 'metadata.aws.internal' ||
+    isAmbiguousNumericHost(normalized)
+  ) {
+    return true;
+  }
+  const ipv4 = parseIPv4(normalized);
+  if (ipv4) {
+    const [a, b, c] = ipv4;
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 192 && b === 0 && (c === 0 || c === 2)) ||
+      (a === 198 && (b === 18 || b === 19)) ||
+      (a === 198 && b === 51 && c === 100) ||
+      (a === 203 && b === 0 && c === 113) ||
+      a >= 224
+    );
+  }
+  return isBlockedIpv6Literal(normalized);
 }
 
 function utf8Base64(value: string): string {
@@ -62,7 +108,8 @@ function utf8Base64(value: string): string {
 }
 
 function quoteDisplayName(value: string): string {
-  return `"${value.replace(/["\\]/g, '\\$&')}"`;
+  const safe = value.replace(/[\r\n\x00]+/g, ' ').trim();
+  return `"${safe.replace(/["\\]/g, '\\$&')}"`;
 }
 
 function encodeHeader(value: string): string {
@@ -103,11 +150,19 @@ export function buildEmailMessage(input: {
   body: string;
   host: string;
 }): string {
-  const subject = input.subject.slice(0, EMAIL_SUBJECT_MAX_CHARS);
-  const body = input.body.slice(0, EMAIL_MESSAGE_MAX_CHARS);
+  const safeFromAddress = input.fromAddress.trim();
+  if (!EMAIL_PATTERN.test(safeFromAddress)) {
+    throw new Error('发件人地址无效');
+  }
+  const safeHost = input.host.trim();
+  if (isUnsafeHost(safeHost)) {
+    throw new Error('SMTP Host 无效');
+  }
+  const subject = input.subject.replace(/[\r\n\x00]+/g, ' ').slice(0, EMAIL_SUBJECT_MAX_CHARS);
+  const body = input.body.slice(0, EMAIL_MESSAGE_MAX_CHARS).replace(/\r\n|\r|\n/g, '\r\n');
   const from = input.fromName.trim()
-    ? `${quoteDisplayName(input.fromName.trim())} <${input.fromAddress}>`
-    : input.fromAddress;
+    ? `${quoteDisplayName(input.fromName.trim())} <${safeFromAddress}>`
+    : safeFromAddress;
   const headers = [
     `From: ${from}`,
     `To: ${input.recipients.join(', ')}`,
@@ -116,7 +171,7 @@ export function buildEmailMessage(input: {
     'Content-Type: text/plain; charset=UTF-8',
     'Content-Transfer-Encoding: 8bit',
     `Date: ${new Date().toUTCString()}`,
-    `Message-ID: <${crypto.randomUUID()}@${input.host}>`,
+    `Message-ID: <${crypto.randomUUID()}@${safeHost}>`,
   ];
   return `${headers.join('\r\n')}\r\n\r\n${body}`;
 }
@@ -126,7 +181,7 @@ function smtpSuccess(line: string): boolean {
 }
 
 function dotStuff(data: string): string {
-  return data.replace(/(^|\r\n)\./g, '$1..');
+  return data.replace(/\r\n|\r|\n/g, '\r\n').replace(/(^|\r\n)\./g, '$1..');
 }
 
 export async function sendSmtpCommands(
@@ -135,11 +190,37 @@ export async function sendSmtpCommands(
   subject: string,
   body: string,
 ): Promise<SmtpResult> {
+  if (!EMAIL_PATTERN.test(config.fromAddress.trim())) {
+    return { ok: false, error: '发件人地址无效' };
+  }
+  if (/[\r\n\x00]/.test(config.fromName || '')) {
+    return { ok: false, error: '发件人名称包含无效字符' };
+  }
+  for (const recipient of config.recipients) {
+    if (!EMAIL_PATTERN.test(recipient.trim())) {
+      return { ok: false, error: '收件地址无效' };
+    }
+  }
+
   const greeting = await io.readLine();
   if (!smtpSuccess(greeting)) return { ok: false, error: 'SMTP 服务不可用' };
 
   await io.writeLine(`EHLO ${config.host}`);
   if (!smtpSuccess(await io.readLine())) return { ok: false, error: 'SMTP EHLO 失败' };
+
+  if (config.security === 'starttls') {
+    if (!io.startTls) {
+      return { ok: false, error: 'SMTP STARTTLS 升级不可用' };
+    }
+    await io.writeLine('STARTTLS');
+    const startTlsResp = await io.readLine();
+    if (!/^220\b/.test(startTlsResp)) {
+      return { ok: false, error: 'SMTP STARTTLS 协商失败' };
+    }
+    await io.startTls();
+    await io.writeLine(`EHLO ${config.host}`);
+    if (!smtpSuccess(await io.readLine())) return { ok: false, error: 'SMTP TLS EHLO 失败' };
+  }
 
   if (config.authMethod === 'login') {
     await io.writeLine('AUTH LOGIN');
@@ -153,23 +234,23 @@ export async function sendSmtpCommands(
     if (!smtpSuccess(await io.readLine())) return { ok: false, error: 'SMTP 认证失败' };
   }
 
-  await io.writeLine(`MAIL FROM:<${config.fromAddress}>`);
+  await io.writeLine(`MAIL FROM:<${config.fromAddress.trim()}>`);
   if (!smtpSuccess(await io.readLine())) return { ok: false, error: 'SMTP 发件人被拒绝' };
 
   for (const recipient of config.recipients) {
-    await io.writeLine(`RCPT TO:<${recipient}>`);
+    await io.writeLine(`RCPT TO:<${recipient.trim()}>`);
     if (!smtpSuccess(await io.readLine())) return { ok: false, error: 'SMTP 收件人被拒绝' };
   }
 
   await io.writeLine('DATA');
   if (!smtpSuccess(await io.readLine())) return { ok: false, error: 'SMTP DATA 失败' };
   await io.writeData(`${dotStuff(buildEmailMessage({
-    fromAddress: config.fromAddress,
+    fromAddress: config.fromAddress.trim(),
     fromName: config.fromName,
-    recipients: config.recipients,
+    recipients: config.recipients.map(item => item.trim()),
     subject,
     body,
-    host: config.host,
+    host: config.host.trim(),
   }))}\r\n.`);
   if (!smtpSuccess(await io.readLine())) return { ok: false, error: 'SMTP 邮件内容被拒绝' };
 
@@ -177,39 +258,52 @@ export async function sendSmtpCommands(
   return { ok: true };
 }
 
-async function readSmtpLine(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
+async function readSmtpResponse(
+  getReader: () => ReadableStreamDefaultReader<Uint8Array>,
   decoder: TextDecoder,
 ): Promise<string> {
-  let text = '';
-  while (!text.includes('\n')) {
-    const chunk = await reader.read();
+  let buffer = '';
+  let lastLine = '';
+  while (true) {
+    const nlIndex = buffer.indexOf('\n');
+    if (nlIndex >= 0) {
+      const line = buffer.slice(0, nlIndex).replace(/\r$/, '');
+      buffer = buffer.slice(nlIndex + 1);
+      lastLine = line;
+      // SMTP 多行响应形如 "250-..."，末行形如 "250 ..."
+      if (/^\d{3}(?: |$)/.test(line)) {
+        return line;
+      }
+      continue;
+    }
+    const chunk = await getReader().read();
     if (chunk.done) break;
-    text += decoder.decode(chunk.value, { stream: true });
+    buffer += decoder.decode(chunk.value, { stream: true });
+    if (buffer.length > 16384) break;
   }
-  return text.split(/\r?\n/)[0] || '';
+  return lastLine || buffer.split(/\r?\n/)[0] || '';
 }
 
 export async function sendSmtpEmail(config: SmtpConfig, subject: string, body: string): Promise<SmtpResult> {
   validateSmtpConfig(config);
   if (!config.username || !config.password) return { ok: false, error: 'SMTP 用户名或密码未配置' };
-  if (!config.fromAddress) return { ok: false, error: '发件人未配置' };
+  if (!config.fromAddress || !EMAIL_PATTERN.test(config.fromAddress.trim())) return { ok: false, error: '发件人未配置或格式无效' };
   if (config.recipients.length === 0) return { ok: false, error: '收件地址未配置' };
 
   const { connect } = await import('cloudflare:sockets');
-  const socket = connect(
+  let activeSocket = connect(
     { hostname: config.host, port: config.port },
     { secureTransport: config.security === 'tls' ? 'on' : 'starttls', allowHalfOpen: false },
   );
-  const reader = socket.readable.getReader();
-  const writer = socket.writable.getWriter();
+  let reader = activeSocket.readable.getReader();
+  let writer = activeSocket.writable.getWriter();
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const timeout = new Promise<SmtpResult>((resolve) => {
     timeoutId = setTimeout(() => {
-      try { socket.close(); } catch {}
+      try { activeSocket.close(); } catch {}
       resolve({ ok: false, error: 'SMTP 连接超时' });
     }, SMTP_FETCH_TIMEOUT_MS);
   });
@@ -217,14 +311,21 @@ export async function sendSmtpEmail(config: SmtpConfig, subject: string, body: s
   const send = (async () => {
     try {
       return await sendSmtpCommands({
-        readLine: () => readSmtpLine(reader, decoder),
+        readLine: () => readSmtpResponse(() => reader, decoder),
         writeLine: line => writer.write(encoder.encode(`${line}\r\n`)),
         writeData: data => writer.write(encoder.encode(`${data}\r\n`)),
+        startTls: async () => {
+          reader.releaseLock();
+          writer.releaseLock();
+          activeSocket = activeSocket.startTls();
+          reader = activeSocket.readable.getReader();
+          writer = activeSocket.writable.getWriter();
+        },
       }, config, subject, body);
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
       try { await writer.close(); } catch {}
-      try { socket.close(); } catch {}
+      try { activeSocket.close(); } catch {}
     }
   })();
 

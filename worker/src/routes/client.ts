@@ -14,7 +14,7 @@ import { validatePingResults } from '../utils/ping-result';
 import { buildIpChangeNotification } from '../utils/notification-templates';
 import { bestEffortRecordHealthEvent, errorDetail } from '../utils/observability';
 import { NOTIFICATION_DISPATCH_SETTING_KEYS, dispatchNotification } from '../utils/notification-dispatch';
-import { getCloudflareClientIp, isPublicIpAddress } from '../utils/request-ip';
+import { getCloudflareClientIp, isPublicIpAddress, normalizeIpSubnetKey } from '../utils/request-ip';
 import { hashAgentToken, isAgentTokenShape } from '../utils/client';
 import { readAcceptedCount, readClientReportResult, readRateLimitResult } from '../utils/do-response';
 import { invalidatePublicMetadataCache } from './public';
@@ -891,35 +891,30 @@ async function enforceAgentRateLimit(
   return enforceAgentBucketRateLimit(c, bucket, tokenKey, max);
 }
 
-async function agentPresentedTokenKey(c: ClientContext, token: string): Promise<string> {
-  const ip = requestClientIp(c) || 'unknown';
-  const tokenPart = token
-    ? (isAgentTokenShape(token) ? await agentTokenKey(token) : 'malformed')
-    : 'missing';
-  return `${ip}:${tokenPart}`;
-}
-
-async function enforceAgentAuthAttemptLimit(c: ClientContext, token: string): Promise<Response | null> {
+async function enforceAgentAuthAttemptLimit(c: ClientContext, _token: string): Promise<Response | null> {
+  const ip = normalizeIpSubnetKey(requestClientIp(c) || 'unknown');
   const ipLimited = localAgentRateLimit(
     c,
-    `agent-auth-attempt:${requestClientIp(c) || 'unknown'}`,
+    `agent-auth-attempt:${ip}`,
     AGENT_AUTH_ATTEMPT_RATE_LIMIT_MAX,
     AGENT_RATE_LIMIT_WINDOW_MS,
   );
   if (ipLimited) return ipLimited;
-  return localAgentRateLimit(
+  return enforceAgentBucketRateLimit(
     c,
-    `agent-auth-presented-token:${await agentPresentedTokenKey(c, token)}`,
+    'agent-auth-attempt',
+    ip,
     AGENT_AUTH_ATTEMPT_RATE_LIMIT_MAX,
-    AGENT_RATE_LIMIT_WINDOW_MS,
   );
 }
 
-async function enforceAgentAuthFailureLimit(c: ClientContext, token: string): Promise<Response | null> {
+async function enforceAgentAuthFailureLimit(c: ClientContext, _token: string): Promise<Response | null> {
+  // 按归一化子网 IP 限流失败认证，防止攻击者轮换随机无效 Token 绕过 6 次/分钟阈值
+  const ip = normalizeIpSubnetKey(requestClientIp(c) || 'unknown');
   return enforceAgentBucketRateLimit(
     c,
     'agent-auth-failure',
-    await agentPresentedTokenKey(c, token),
+    ip,
     AGENT_AUTH_FAILURE_RATE_LIMIT_MAX,
   );
 }

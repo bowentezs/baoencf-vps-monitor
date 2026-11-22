@@ -163,9 +163,9 @@ download_file() {
   fi
   if has curl; then
     if [ -n "$PROXY" ]; then
-      curl -fsSL --retry 3 --proxy "$PROXY" -o "$output" "$url"
+      curl -fsSL --proto '=https' --proto-redir '=https' --retry 3 --proxy "$PROXY" -o "$output" "$url"
     else
-      curl -fsSL --retry 3 -o "$output" "$url"
+      curl -fsSL --proto '=https' --proto-redir '=https' --retry 3 -o "$output" "$url"
     fi
   elif has wget; then
     if [ -n "$PROXY" ]; then
@@ -204,7 +204,8 @@ write_file() {
   if [ "$DRY_RUN" = "1" ]; then
     echo "[dry-run] write ${path} (${mode})"
   else
-    printf '%s\n' "$content" > "$path"
+    # 先在 umask 077 下创建文件，消除含 CF_MONITOR_TOKEN 配置的 0644 世界可读 TOCTOU 窗口
+    (umask 077 && printf '%s\n' "$content" > "$path")
     chmod "$mode" "$path"
   fi
 }
@@ -225,7 +226,7 @@ copy_binary_to() {
 
 sanitize_instance_id() {
   raw="${1:-default}"
-  cleaned="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_.-]+/-/g; s/^-+//; s/-+$//')"
+  cleaned="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_-]+/-/g; s/^-+//; s/-+$//')"
   [ -n "$cleaned" ] || cleaned="default"
   printf '%s' "$cleaned" | cut -c 1-48
 }
@@ -429,6 +430,10 @@ apply_defaults() {
       ;;
   esac
   [ -n "$INSTALL_DIR" ] && [ "$INSTALL_DIR" != "/" ] || die "--install-dir cannot be empty or /."
+  reject_newline "install-dir" "$INSTALL_DIR"
+  if ! printf '%s' "$INSTALL_DIR" | grep -Eq '^/[A-Za-z0-9._/@+-]+(/[A-Za-z0-9._/@+-]+)*$' || printf '%s' "$INSTALL_DIR" | grep -Eq '(^|/)\.\.(/|$)'; then
+    die "--install-dir must be a safe absolute path without spaces, quotes, shell metacharacters, or '..'."
+  fi
   RUNNER_FILE="${INSTALL_DIR}/run-agent.sh"
 }
 
@@ -480,6 +485,7 @@ prepare_binary() {
   require_https_url "--binary-base-url" "$BINARY_BASE_URL"
   require_https_url "--checksum-url" "$CHECKSUM_URL"
   require_https_url "--source-url" "$SOURCE_URL"
+  require_https_url "--install-ghproxy" "$INSTALL_GHPROXY"
 
   WORK_BIN=""
   if [ -n "$BINARY" ]; then
@@ -510,15 +516,9 @@ prepare_binary() {
       if download_file "$BINARY_URL" "$WORK_BIN"; then
         verify_binary_checksum "$WORK_BIN" "$(basename "$BINARY_URL")" "$CHECKSUM_URL"
         chmod 0755 "$WORK_BIN"
-      elif [ "$AUTO_BINARY_URL" = "1" ]; then
-        echo "Prebuilt agent binary was not found at ${BINARY_URL}; falling back to source build." >&2
-        rm -f "$WORK_BIN"
-        WORK_BIN=""
-        BINARY_URL=""
-        BUILD_FROM_SOURCE="1"
       else
         rm -f "$WORK_BIN"
-        exit 1
+        die "Failed to download prebuilt agent binary from ${BINARY_URL}. Refusing unverified source fallback; pass --build-from-source explicitly if intended."
       fi
     fi
   fi
@@ -910,6 +910,7 @@ done
 set_release_base
 PROXY="$(normalize_proxy_url "--proxy" "$PROXY")"
 INSTALL_GHPROXY="$(normalize_proxy_url "--install-ghproxy" "$INSTALL_GHPROXY")"
+require_https_url "--install-ghproxy" "$INSTALL_GHPROXY"
 SERVICE_MODE="$(detect_service_mode)"
 apply_defaults
 

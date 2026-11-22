@@ -89,13 +89,17 @@ function normalizeReleaseTag(value?: string | null) {
   return /^v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(raw) ? raw : '';
 }
 
-export function normalizeProxyUrl(value: string, allowPath = true) {
+export function normalizeProxyUrl(value: string, allowPath = true, requireHttps = false) {
   const raw = value.trim();
   if (!raw) return '';
-  const withScheme = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
+  const defaultScheme = requireHttps ? 'https://' : 'http://';
+  const withScheme = /^https?:\/\//i.test(raw) ? raw : `${defaultScheme}${raw}`;
   try {
     const url = new URL(withScheme);
-    if ((url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password && url.hostname && !url.search && !url.hash) {
+    const protocolAllowed = requireHttps
+      ? url.protocol === 'https:'
+      : (url.protocol === 'https:' || url.protocol === 'http:');
+    if (protocolAllowed && !url.username && !url.password && url.hostname && !url.search && !url.hash) {
       const path = allowPath && url.pathname !== '/' ? url.pathname.replace(/\/+$/g, '') : '';
       return `${url.origin}${path}`;
     }
@@ -106,7 +110,7 @@ export function normalizeProxyUrl(value: string, allowPath = true) {
 }
 
 export function proxiedUrl(url: string, ghproxy = '') {
-  const proxy = normalizeProxyUrl(ghproxy);
+  const proxy = normalizeProxyUrl(ghproxy, true, true);
   if (!proxy) return url;
   return `${proxy}/${url}`;
 }
@@ -147,7 +151,22 @@ function shellQuote(value: string) {
 }
 
 function psQuote(value: string) {
-  return "'" + value.replace(/'/g, "''") + "'";
+  const clean = value.replace(/[\r\n\u0000]/g, '');
+  return "'" + clean.replace(/'/g, "''") + "'";
+}
+
+function encodePowerShellCommand(script: string): string {
+  const bytes = new Uint8Array(script.length * 2);
+  for (let i = 0; i < script.length; i += 1) {
+    const code = script.charCodeAt(i);
+    bytes[i * 2] = code & 0xff;
+    bytes[i * 2 + 1] = (code >> 8) & 0xff;
+  }
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 function normalizeTrafficResetDay(value: string) {
@@ -160,7 +179,7 @@ function normalizeInstanceId(value?: string) {
   const cleaned = (value || 'default')
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9_.-]+/g, '-')
+    .replace(/[^a-z0-9_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return (cleaned || 'default').slice(0, 48);
 }
@@ -184,8 +203,8 @@ export function buildAgentInstallCommand({
   instanceId?: string;
   nodeName?: string;
 }) {
-  const ghproxy = normalizeProxyUrl(options.ghproxy);
-  const downloadProxy = normalizeProxyUrl(options.downloadProxy, false);
+  const ghproxy = normalizeProxyUrl(options.ghproxy, true, true);
+  const downloadProxy = normalizeProxyUrl(options.downloadProxy, false, false);
   const { binaryUrl, checksumUrl } = customAgentDownloadUrls(options.binaryUrl, options.checksumUrl);
   const releaseTag = normalizeReleaseTag(options.releaseTag);
   const scriptRef = options.scriptRef?.trim();
@@ -244,8 +263,8 @@ export function buildAgentInstallCommand({
       if (mountExclude) args.push('-MountExclude', mountExclude);
       if (nicInclude) args.push('-NicInclude', nicInclude);
       if (nicExclude) args.push('-NicExclude', nicExclude);
-      return 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ' +
-        `"iwr ${psQuote(cfMonitorAgentScriptUrl('install-windows.ps1', ghproxy, releaseTag, scriptRef))} -UseBasicParsing -OutFile 'install-windows.ps1'; & '.\\install-windows.ps1' ${args.map((arg, index) => index % 2 === 0 ? arg : psQuote(arg)).join(' ')}"`;
+      const psScript = `iwr ${psQuote(cfMonitorAgentScriptUrl('install-windows.ps1', ghproxy, releaseTag, scriptRef))} -UseBasicParsing -OutFile 'install-windows.ps1'; & '.\\install-windows.ps1' ${args.map((arg, index) => index % 2 === 0 ? arg : psQuote(arg)).join(' ')}`;
+      return `powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${encodePowerShellCommand(psScript)}`;
     }
     default:
       return '';
@@ -261,13 +280,14 @@ export function buildAgentUninstallAllCommand({
   ghproxy?: string;
   scriptRef?: string;
 }) {
-  const proxy = normalizeProxyUrl(ghproxy);
+  const proxy = normalizeProxyUrl(ghproxy, true, true);
   const scriptUrl = (file: 'install.sh' | 'install-windows.ps1') =>
     cfMonitorAgentScriptUrl(file, proxy, '', scriptRef);
   switch (platform) {
-    case 'windows':
-      return 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ' +
-        `"iwr ${psQuote(scriptUrl('install-windows.ps1'))} -UseBasicParsing -OutFile 'install-windows.ps1'; & '.\\install-windows.ps1' -UninstallAll -Yes"`;
+    case 'windows': {
+      const psScript = `iwr ${psQuote(scriptUrl('install-windows.ps1'))} -UseBasicParsing -OutFile 'install-windows.ps1'; & '.\\install-windows.ps1' -UninstallAll -Yes`;
+      return `powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${encodePowerShellCommand(psScript)}`;
+    }
     case 'unix':
     default:
       return shPipe(

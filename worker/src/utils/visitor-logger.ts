@@ -1,14 +1,16 @@
 import type { Context } from 'hono';
 import type { Bindings, Variables } from '../index.ts';
-import { getCloudflareClientIp } from './request-ip.ts';
+import { getCloudflareClientIp, normalizeIpSubnetKey } from './request-ip.ts';
 import { getDatabase } from '../db/provider.ts';
 import * as db from '../db/queries.ts';
 
 type AppContext = Context<{ Bindings: Bindings; Variables: Variables }>;
 
 const LOCAL_DEDUPE_WINDOW_MS = 10 * 60 * 1000; // 10 分钟防抖
+const VISITOR_SUBNET_MAX_PER_WINDOW = 10; // 单 IP /64 子网每 10 分钟最多记录 10 条不同路径，防止轮换 path 灌库
 const LOCAL_MAP_MAX_ENTRIES = 2000;
 const localSeenMap = new Map<string, number>();
+const localSubnetCountMap = new Map<string, { count: number; resetAt: number }>();
 
 // 清理本地内存过期的防抖记录，防止 V8 堆内存泄露
 function sweepExpiredLocalBuckets(now: number): void {
@@ -17,17 +19,37 @@ function sweepExpiredLocalBuckets(now: number): void {
       localSeenMap.delete(ip);
     }
   }
+  for (const [subnet, entry] of localSubnetCountMap.entries()) {
+    if (entry.resetAt <= now) {
+      localSubnetCountMap.delete(subnet);
+    }
+  }
 }
 
-// 检查该 IP 与访问路径是否在 10 分钟防抖期内；若不是，则标记并返回 true
-async function checkVisitorAllowed(c: AppContext, dedupeKey: string): Promise<boolean> {
+// 检查该 IP 与访问路径是否在 10 分钟防抖期内；同时按归一化子网限制总写入频次
+async function checkVisitorAllowed(c: AppContext, subnetKey: string, dedupeKey: string): Promise<boolean> {
   const now = Date.now();
 
-  // 1. 若配置了 Durable Objects RATE_LIMIT，使用全局强一致防抖
+  // 1. 若配置了 Durable Objects RATE_LIMIT，使用全局强一致防抖 + 子网总限额
   if (c.env.RATE_LIMIT) {
     try {
       const doId = c.env.RATE_LIMIT.idFromName('visitor-limiter');
       const stub = c.env.RATE_LIMIT.get(doId);
+      const subnetRes = await stub.fetch(new Request('https://do/rate-limit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bucket: 'visitor-subnet-cap',
+          ip: subnetKey,
+          max: VISITOR_SUBNET_MAX_PER_WINDOW,
+          windowMs: LOCAL_DEDUPE_WINDOW_MS,
+        }),
+      }));
+      if (subnetRes.ok) {
+        const subnetData = await subnetRes.json() as { allowed?: boolean };
+        if (!subnetData.allowed) return false;
+      }
+
       const res = await stub.fetch(new Request('https://do/rate-limit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -49,8 +71,13 @@ async function checkVisitorAllowed(c: AppContext, dedupeKey: string): Promise<bo
   }
 
   // 2. 本地内存降级防抖保护
-  if (localSeenMap.size >= LOCAL_MAP_MAX_ENTRIES) {
+  if (localSeenMap.size >= LOCAL_MAP_MAX_ENTRIES || localSubnetCountMap.size >= LOCAL_MAP_MAX_ENTRIES) {
     sweepExpiredLocalBuckets(now);
+  }
+
+  const subnetEntry = localSubnetCountMap.get(subnetKey);
+  if (subnetEntry && subnetEntry.resetAt > now) {
+    if (subnetEntry.count >= VISITOR_SUBNET_MAX_PER_WINDOW) return false;
   }
 
   const lastSeen = localSeenMap.get(dedupeKey);
@@ -59,6 +86,11 @@ async function checkVisitorAllowed(c: AppContext, dedupeKey: string): Promise<bo
   }
 
   localSeenMap.set(dedupeKey, now);
+  if (subnetEntry && subnetEntry.resetAt > now) {
+    subnetEntry.count += 1;
+  } else {
+    localSubnetCountMap.set(subnetKey, { count: 1, resetAt: now + LOCAL_DEDUPE_WINDOW_MS });
+  }
   return true;
 }
 
@@ -117,11 +149,12 @@ export function recordVisitorSafely(c: AppContext, targetPath = '/'): void {
   const city = rawCity.slice(0, 64);
   const userAgent = (c.req.header('user-agent') || '').trim().slice(0, 256);
 
-  const dedupeKey = `${ip}:${path}`.slice(0, 120);
+  const subnetKey = normalizeIpSubnetKey(ip);
+  const dedupeKey = `${subnetKey}:${path}`.slice(0, 120);
 
   const task = (async () => {
     try {
-      const isFirstVisit = await checkVisitorAllowed(c, dedupeKey);
+      const isFirstVisit = await checkVisitorAllowed(c, subnetKey, dedupeKey);
       if (!isFirstVisit) {
         return;
       }

@@ -108,7 +108,6 @@ jobs:
             || echo "::warning::self-hosted agent binaries are stale; run the release workflow manually to sync them"
 
       - name: Generate artifact provenance
-        continue-on-error: true
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: agent/dist/*
@@ -120,7 +119,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git ls-remote --exit-code --tags origin "refs/tags/${AGENT_VERSION_TAG}" >/dev/null 2>&1; then
-            echo "Immutable release tag ${AGENT_VERSION_TAG} already exists."
+            if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+              echo "Refusing to overwrite immutable release tag ${AGENT_VERSION_TAG}." >&2
+              exit 1
+            fi
+            echo "Release tag ${AGENT_VERSION_TAG} triggered this push."
           else
             git tag "$AGENT_VERSION_TAG" "$GITHUB_SHA"
             git push origin "refs/tags/${AGENT_VERSION_TAG}"
@@ -135,21 +138,16 @@ jobs:
           release_notes="Immutable release for ${GITHUB_REPOSITORY}@${GITHUB_SHA}. Artifacts include GitHub artifact attestations."
 
           if gh release view "$AGENT_VERSION_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release edit "$AGENT_VERSION_TAG" \
-              --latest \
-              --title "CF VPS Monitor Agent ${AGENT_VERSION}" \
-              --notes "$release_notes" \
-              --repo "$GITHUB_REPOSITORY"
-          else
-            gh release create "$AGENT_VERSION_TAG" \
-              --latest \
-              --verify-tag \
-              --title "CF VPS Monitor Agent ${AGENT_VERSION}" \
-              --notes "$release_notes" \
-              --repo "$GITHUB_REPOSITORY"
+            echo "Immutable release ${AGENT_VERSION_TAG} already exists; refusing to overwrite." >&2
+            exit 1
           fi
 
-          gh release upload "$AGENT_VERSION_TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+          gh release create "$AGENT_VERSION_TAG" dist/* \
+            --latest \
+            --verify-tag \
+            --title "CF VPS Monitor Agent ${AGENT_VERSION}" \
+            --notes "$release_notes" \
+            --repo "$GITHUB_REPOSITORY"
 
       - name: Verify published releases
         env:

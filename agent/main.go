@@ -817,13 +817,14 @@ func runPingTasks(tasks []PingTask, budget time.Duration) []PingResult {
 		return nil
 	}
 	log.Printf("executing %d ping task(s) (concurrency=%d budget=%s)", len(tasks), maxConcurrentProbes, budget)
-	results := make([]PingResult, len(tasks))
+	var mu sync.Mutex
+	collected := make([]PingResult, 0, len(tasks))
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, maxConcurrentProbes)
 
-	for index, task := range tasks {
+	for _, task := range tasks {
 		wg.Add(1)
-		go func(index int, task PingTask) {
+		go func(task PingTask) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -839,8 +840,12 @@ func runPingTasks(tasks []PingTask, budget time.Duration) []PingResult {
 			default:
 				value = executeTCPPing(task.Target)
 			}
-			results[index] = PingResult{TaskID: task.ID, Value: value}
-		}(index, task)
+			if task.ID > 0 {
+				mu.Lock()
+				collected = append(collected, PingResult{TaskID: task.ID, Value: value})
+				mu.Unlock()
+			}
+		}(task)
 	}
 
 	done := make(chan struct{})
@@ -851,16 +856,13 @@ func runPingTasks(tasks []PingTask, budget time.Duration) []PingResult {
 	select {
 	case <-done:
 	case <-time.After(budget):
-		log.Printf("ping execution exceeded %s budget; discarding unfinished results", budget)
+		log.Printf("ping execution exceeded %s budget; returning completed results", budget)
 	}
 
-	// 丢弃未完成（TaskID<=0）的条目：Worker 端 validatePingResults 会对无效 task_id 整批拒绝。
-	completed := results[:0]
-	for _, result := range results {
-		if result.TaskID > 0 {
-			completed = append(completed, result)
-		}
-	}
+	mu.Lock()
+	completed := make([]PingResult, len(collected))
+	copy(completed, collected)
+	mu.Unlock()
 	return completed
 }
 
@@ -869,23 +871,30 @@ func runWebsiteProbeTasks(tasks []WebsiteProbeTask, budget time.Duration) []Webs
 		return nil
 	}
 	log.Printf("executing %d website probe task(s) (concurrency=%d budget=%s)", len(tasks), maxConcurrentProbes, budget)
-	results := make([]WebsiteProbeResult, len(tasks))
+	var mu sync.Mutex
+	collected := make([]WebsiteProbeResult, 0, len(tasks))
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, maxConcurrentProbes)
 
-	for index, task := range tasks {
+	for _, task := range tasks {
 		wg.Add(1)
-		go func(index int, task WebsiteProbeTask) {
+		go func(task WebsiteProbeTask) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
+			var res WebsiteProbeResult
 			if strings.EqualFold(task.Method, "TCP") {
-				results[index] = executeWebsiteTCPProbe(task)
+				res = executeWebsiteTCPProbe(task)
 			} else {
-				results[index] = executeWebsiteHTTPProbe(task)
+				res = executeWebsiteHTTPProbe(task)
 			}
-		}(index, task)
+			if res.MonitorID > 0 {
+				mu.Lock()
+				collected = append(collected, res)
+				mu.Unlock()
+			}
+		}(task)
 	}
 
 	done := make(chan struct{})
@@ -896,16 +905,13 @@ func runWebsiteProbeTasks(tasks []WebsiteProbeTask, budget time.Duration) []Webs
 	select {
 	case <-done:
 	case <-time.After(budget):
-		log.Printf("website probe execution exceeded %s budget; discarding unfinished results", budget)
+		log.Printf("website probe execution exceeded %s budget; returning completed results", budget)
 	}
 
-	// 丢弃未完成（MonitorID<=0）的条目，避免上报无效 monitor_id。
-	completed := results[:0]
-	for _, result := range results {
-		if result.MonitorID > 0 {
-			completed = append(completed, result)
-		}
-	}
+	mu.Lock()
+	completed := make([]WebsiteProbeResult, len(collected))
+	copy(completed, collected)
+	mu.Unlock()
 	return completed
 }
 
@@ -1200,6 +1206,8 @@ func executeWebsiteHTTPProbe(task WebsiteProbeTask) WebsiteProbeResult {
 	timeout := time.Duration(task.TimeoutSec) * time.Second
 	if timeout <= 0 {
 		timeout = 5 * time.Second
+	} else if timeout > 30*time.Second {
+		timeout = 30 * time.Second
 	}
 	client := &http.Client{Timeout: timeout, Transport: publicHTTPTransport(timeout)}
 	defer client.CloseIdleConnections()

@@ -8,6 +8,7 @@ import type {
   WebsiteMonitor,
 } from '../db/queries.ts';
 import { sanitizeSettingsForStorage } from '../settings/schema.ts';
+import { isAgentTokenShape } from './client.ts';
 import { validatePingTaskInput } from './ping-task.ts';
 import { validateWebsiteMonitorInput } from './website-monitor.ts';
 
@@ -350,10 +351,17 @@ function validateClients(items: unknown[], errors: string[]): Partial<Client>[] 
       uuids.add(uuid);
     }
     if (token) {
+      if (!isAgentTokenShape(token)) {
+        errors.push(`clients[${index}].token 格式无效`);
+      }
       if (tokens.has(token)) errors.push(`clients token 重复: ${token}`);
       tokens.add(token);
-    }
-    if (tokenHash) {
+      // 强制清除潜在与 token 不匹配的旧 token_hash，由恢复阶段按 token 重新计算，杜绝伪造哈希不匹配
+      delete client.token_hash;
+    } else if (tokenHash) {
+      if (!/^[a-f0-9]{64}$/i.test(tokenHash)) {
+        errors.push(`clients[${index}].token_hash 格式无效`);
+      }
       if (tokenHashes.has(tokenHash)) errors.push(`clients token_hash 重复: ${tokenHash}`);
       tokenHashes.add(tokenHash);
     }

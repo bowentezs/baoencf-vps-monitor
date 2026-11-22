@@ -4954,6 +4954,7 @@ begin
         updated_at = now()
     where uuid = target_uuid
     returning * into recovered;
+    delete from admin_passkeys where user_uuid = target_uuid;
   else
     raise exception 'admin recovery supports exactly one admin user';
   end if;

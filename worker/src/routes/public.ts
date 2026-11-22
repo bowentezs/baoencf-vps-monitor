@@ -32,7 +32,7 @@ import type { PublicSettings } from '../settings/schema';
 import { toPublicClient } from '../utils/public-client';
 import type { PublicClient } from '../utils/public-client';
 import { sanitizeSetupDiagnosticDetail } from '../utils/setup-diagnostics';
-import { getCloudflareClientIp } from '../utils/request-ip';
+import { getCloudflareClientIp, normalizeIpSubnetKey } from '../utils/request-ip';
 import { readLiveSnapshot, readRateLimitResult } from '../utils/do-response';
 import { readJsonWithLimit } from '../utils/request-body';
 import { base64ToBytes } from '../utils/theme-package';
@@ -81,7 +81,7 @@ const PUBLIC_HISTORY_CACHE_MAX_ENTRIES = 256;
 const PUBLIC_METADATA_CACHE_MAX_ENTRIES = PUBLIC_HISTORY_CACHE_MAX_ENTRIES;
 const ADMIN_SESSION_EDGE_CACHE_SECONDS = 30;
 const LOGOUT_CLEAR_SITE_DATA_HEADER = '"cache"';
-const DUMMY_ADMIN_PASSWORD_HASH = 'pbkdf2_sha256$10000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+const DUMMY_ADMIN_PASSWORD_HASH = 'pbkdf2_sha256$100000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 const MAX_ADMIN_RECOVERY_KEY_LENGTH = 8192;
 const MAX_ADMIN_RECOVERY_USERNAME_BYTES = 64;
 const SITE_LOGO_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -741,7 +741,7 @@ function toPublicPingTask(task: db.PingTask, publicClientIds: Set<string>): db.P
 }
 
 function getClientIp(c: PublicContext): string {
-  return getCloudflareClientIp(c);
+  return normalizeIpSubnetKey(getCloudflareClientIp(c));
 }
 
 function setPublicCache(c: PublicContext, maxAgeSeconds: number): void {
@@ -931,18 +931,22 @@ function validateRecoveryUsername(username: string): string | null {
 }
 
 function loginRateLimitBuckets(ip: string, username: string): string[] {
+  const normalizedIp = normalizeIpSubnetKey(ip);
   const normalizedUsername = normalizeLoginUsername(username);
   return [
-    `login:ip:${ip}`,
-    `login:ip-user:${ip}:${normalizedUsername}`,
+    `login:ip:${normalizedIp}`,
+    `login:ip-user:${normalizedIp}:${normalizedUsername}`,
+    `login:user:${normalizedUsername}`,
   ];
 }
 
 function passkeyRateLimitBuckets(ip: string, username: string): string[] {
+  const normalizedIp = normalizeIpSubnetKey(ip);
   const normalizedUsername = normalizeLoginUsername(username);
   return [
-    `passkey:ip:${ip}`,
-    `passkey:ip-user:${ip}:${normalizedUsername}`,
+    `passkey:ip:${normalizedIp}`,
+    `passkey:ip-user:${normalizedIp}:${normalizedUsername}`,
+    `passkey:user:${normalizedUsername}`,
   ];
 }
 
@@ -1067,9 +1071,11 @@ async function completeAdminLogin(
 }
 
 export function mfaRateLimitBuckets(ip: string, userId: string): string[] {
+  const normalizedIp = normalizeIpSubnetKey(ip);
   return [
-    `mfa:ip:${ip}`,
-    `mfa:ip-user:${ip}:${userId}`,
+    `mfa:ip:${normalizedIp}`,
+    `mfa:ip-user:${normalizedIp}:${userId}`,
+    `mfa:user:${userId}`,
   ];
 }
 export async function cleanupExpiredLoginRateLimits(database: db.QueryDatabase, nowMs: number): Promise<boolean> {
@@ -1227,6 +1233,9 @@ publicRoutes.post('/login', async (c) => {
   }
 
   const clientIp = getClientIp(c);
+  // 借助 RATE_LIMIT DO 提供跨并发请求的原子突发限流，防止单 IP 并发绕过 DB 读-改-写计数
+  const burstLimited = await publicApiRateLimit(c, 'auth-login-burst', 15);
+  if (burstLimited) return burstLimited;
   const rateLimitBuckets = loginRateLimitBuckets(clientIp, username);
   const nowMs = Date.now();
   const database = getDatabase(c.env);
@@ -1354,6 +1363,9 @@ publicRoutes.post('/login/mfa', async (c) => {
   }
 
   const clientIp = getClientIp(c);
+  // 原子突发限流 + 按账号限流，防止并发竞争突破 5 次 TOTP 失败锁定
+  const mfaBurstLimited = await publicApiRateLimit(c, 'auth-mfa-burst', 10);
+  if (mfaBurstLimited) return mfaBurstLimited;
   const mfaBuckets = mfaRateLimitBuckets(clientIp, user.uuid);
   const nowMs = Date.now();
   const rateLimitStates = await timed(metrics, 'db_rate_limit', () => loadLoginRateLimitStates(database, mfaBuckets));
@@ -1580,6 +1592,34 @@ publicRoutes.post('/login/passkey/verify', async (c) => {
   if (storedCounter > 0 && newCounter <= storedCounter) {
     await recordFailure('passkey_counter_replay');
     return c.json({ code: 'PASSKEY_INVALID', error: '通行密钥验证失败' }, 401);
+  }
+
+  // 通过 RATE_LIMIT DO 原子单次消费 WebAuthn challenge，防止同步型 Passkey (counter=0) 在 5 分钟内重放
+  if (c.env.RATE_LIMIT) {
+    try {
+      const doId = c.env.RATE_LIMIT.idFromName('webauthn-challenge-nonce');
+      const stub = c.env.RATE_LIMIT.get(doId);
+      const consumeRes = await stub.fetch(new Request('https://do/rate-limit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bucket: 'webauthn-challenge',
+          ip: payload.challenge,
+          max: 1,
+          windowMs: 5 * 60 * 1000,
+        }),
+      }));
+      if (consumeRes.ok) {
+        const consumeData = await readRateLimitResult(consumeRes, { limit: 1, remaining: 0, retryAfter: 300 });
+        if (consumeData && !consumeData.allowed) {
+          clearWebAuthnChallengeCookie(c);
+          await recordFailure('passkey_challenge_replay');
+          return c.json({ code: 'PASSKEY_CHALLENGE_EXPIRED', error: '通行密钥验证已失效，请重新验证' }, 401);
+        }
+      }
+    } catch {
+      // DO 临时不可用时回退由数据库 counter 更新保护
+    }
   }
 
   const updated = await db.updateUserPasskeyCounter(database, user.uuid, passkey.credential_id, newCounter);
@@ -2070,8 +2110,12 @@ publicRoutes.get('/live', async (c) => {
   const doId = c.env.LIVE_DATA.idFromName('global');
   const stub = c.env.LIVE_DATA.get(doId);
   const doUrl = new URL(c.req.url);
-  if (includeHidden) doUrl.searchParams.set('include_hidden', '1');
-  else doUrl.searchParams.delete('include_hidden');
+  if (includeHidden) {
+    doUrl.searchParams.set('include_hidden', '1');
+  } else {
+    doUrl.searchParams.delete('include_hidden');
+    doUrl.searchParams.delete('include_offline');
+  }
   // /api/live 是无认证的 HTTP 快照端点：剥离 Upgrade/Connection 头，
   // 防止任意客户端以 role=agent 的 WS 升级请求触达 DO，踢掉真实 agent 连接。
   const forwardHeaders = new Headers(c.req.raw.headers);
@@ -2102,6 +2146,8 @@ publicRoutes.get('/live', async (c) => {
 
 // 前台 SPA 页面路由浏览安全上报端点
 publicRoutes.all('/visit', async (c) => {
+  const limited = await publicApiRateLimit(c, 'public-visit', 30);
+  if (limited) return limited;
   let targetPath = '/';
   if (c.req.method === 'POST') {
     const parsed = await readJsonWithLimit(c.req.raw, MAX_VISIT_BODY_BYTES);

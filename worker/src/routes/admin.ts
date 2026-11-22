@@ -590,6 +590,16 @@ async function refreshLiveAgentPolicy(c: AdminContext): Promise<void> {
   }
 }
 
+async function resetLiveDataState(c: AdminContext): Promise<void> {
+  try {
+    const doId = c.env.LIVE_DATA.idFromName('global');
+    const stub = c.env.LIVE_DATA.get(doId);
+    await stub.fetch(new Request('https://do/reset-state', { method: 'POST' }));
+  } catch {
+    // Best effort reset; caches and DB state remain authoritative.
+  }
+}
+
 async function broadcastLiveMetadataChanged(c: AdminContext, detail: Record<string, unknown>): Promise<void> {
   try {
     const doId = c.env.LIVE_DATA.idFromName('global');
@@ -1689,13 +1699,15 @@ adminRoutes.post('/clients/:uuid/token/rotate', async (c) => {
   invalidateAdminPublicMetadata(c);
   invalidateAgentClientAuthCache(client);
   invalidateAgentClientAuthCache({ uuid, token });
+  // 先删除旧 token 的 DO 认证快照并断开旧连接，再写入新快照，彻底消除并发顺序颠倒导致的残留/误删竞态。
   await Promise.all([
     disconnectLiveClient(c, uuid).catch(() => undefined),
-    // 先删除旧 token 的 DO 认证快照，再写入新快照，避免轮换后旧 token 仍可通过残留快照认证。
     removeAgentAuthSnapshot(c, uuid, client.token_hash).catch(() => undefined),
-    updatedClient ? syncAgentAuthClient(c, updatedClient) : Promise.resolve(),
     purgeAdminClientsEdgeCache(c),
   ]);
+  if (updatedClient) {
+    await syncAgentAuthClient(c, updatedClient);
+  }
   await db.insertAuditLog(database, c.get('username')!, 'client_token_rotate', `重置客户端 Token: ${client.name || uuid}`);
   return c.json({ success: true, token });
 });
@@ -3312,6 +3324,7 @@ adminRoutes.post('/upload/backup', async (c) => {
     await db.restoreBackupData(database, validated.backup);
     const cleanup = await db.cleanupOrphanClientData(database);
     invalidateAdminClientsCache();
+    invalidateAdminSettingsCache();
     invalidateAdminPingTasksCache();
     purgeAdminPingTasksEdgeCache(c);
     void purgeAdminClientsEdgeCache(c);
@@ -3320,6 +3333,7 @@ adminRoutes.post('/upload/backup', async (c) => {
     invalidateAgentPingTaskCache();
     invalidateAllowedClientIdsCache();
     invalidateCapacityEstimateCache();
+    await resetLiveDataState(c);
     await refreshLivePingTasks(c);
 
     await db.insertAuditLog(

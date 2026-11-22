@@ -1,6 +1,8 @@
 const EXACT_PROTECTED_PATHS = new Set([
   '/api/admin/account/username',
   '/api/admin/account/chpasswd',
+  '/api/admin/clients/add',
+  '/api/admin/clients/batch-hide',
   '/api/admin/clients/batch-remove',
   '/api/admin/record/clear',
   '/api/admin/record/clear/all',
@@ -16,14 +18,13 @@ const EXACT_PROTECTED_PATHS = new Set([
   // 手动触发维护任务会立即清理历史记录，同样需要 MFA step-up，防止被劫持会话绕过 record/clear 的保护。
   '/api/admin/cron/run',
   '/api/admin/maintenance/cleanup',
-  '/api/admin/Settings/visitor-logs/clear',
   '/api/admin/visitor-logs/clear',
   '/api/admin/site-logo',
   '/api/admin/site-logo/reset',
   '/api/admin/test/sendMessage',
 ]);
 
-const CLIENT_SECRET_PATH = /^\/api\/admin\/clients\/[^/]+\/(?:remove|token(?:\/install|\/rotate)?)$/;
+const CLIENT_SECRET_PATH = /^\/api\/admin\/clients\/[^/]+\/(?:edit|remove|token(?:\/install|\/rotate)?)$/;
 const THEME_WRITE_PATH = /^\/api\/admin\/themes\/(?:upload|set|settings|delete)$/;
 
 // 配置类写操作（系统设置、监控任务、通知渠道）同样要求 MFA step-up，防止会话被劫持后静默篡改。

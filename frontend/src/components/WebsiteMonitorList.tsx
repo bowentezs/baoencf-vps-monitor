@@ -140,15 +140,21 @@ export default function WebsiteMonitorList({
             <span className={`kuma-monitor-uptime-pill is-${monitor.status}`}>{uptimePercent(periodChecks)}</span>
             <Box className="kuma-monitor-row-main">
               <Flex align="center" gap="2" className="kuma-monitor-url-line">
-                <a
-                  href={monitor.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  {monitor.name}
-                </a>
-                <ExternalLink size={12} aria-hidden="true" />
+                {/^https?:\/\//i.test(monitor.url) ? (
+                  <>
+                    <a
+                      href={monitor.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {monitor.name}
+                    </a>
+                    <ExternalLink size={12} aria-hidden="true" />
+                  </>
+                ) : (
+                  <Text size="2" weight="medium">{monitor.name}</Text>
+                )}
               </Flex>
               <Text size="1" color={monitor.status === 'up' ? 'green' : monitor.status === 'down' ? 'red' : 'gray'}>
                 {statusLine(monitor)}

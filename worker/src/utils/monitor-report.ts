@@ -105,15 +105,32 @@ export function normalizeMonitorReport(input: unknown): MonitorReportPayload {
   const gpuData = asObject(report.gpu);
   const gpus = normalizeGpuList(gpuData, report.gpus);
 
+  const passthrough = Object.fromEntries(
+    Object.entries(report).filter(([key]) => [
+      'name', 'report_interval', 'timestamp', 'ipv4', 'ipv6', 'region',
+      'basic_info', 'ping_results', 'website_probe_results', 'docker_containers',
+      'unlock_items', 'top_processes', 'has_ipv4', 'has_ipv6', 'cpu_name',
+      'virtualization', 'arch', 'cpu_cores', 'os', 'kernel_version', 'gpu_name', 'mem_total',
+    ].includes(key)),
+  );
+  if (Array.isArray(passthrough.docker_containers)) {
+    passthrough.docker_containers = passthrough.docker_containers.slice(0, 64);
+  }
+  if (Array.isArray(passthrough.unlock_items)) {
+    passthrough.unlock_items = passthrough.unlock_items.slice(0, 64);
+  }
+  if (Array.isArray(passthrough.top_processes)) {
+    passthrough.top_processes = passthrough.top_processes.slice(0, 32);
+  }
+  if (Array.isArray(passthrough.ping_results)) {
+    passthrough.ping_results = passthrough.ping_results.slice(0, 256);
+  }
+  if (Array.isArray(passthrough.website_probe_results)) {
+    passthrough.website_probe_results = passthrough.website_probe_results.slice(0, 256);
+  }
+
   return {
-    ...Object.fromEntries(
-      Object.entries(report).filter(([key]) => [
-        'name', 'report_interval', 'timestamp', 'ipv4', 'ipv6', 'region',
-        'basic_info', 'ping_results', 'website_probe_results', 'docker_containers',
-        'unlock_items', 'top_processes', 'has_ipv4', 'has_ipv6', 'cpu_name',
-        'virtualization', 'arch', 'cpu_cores', 'os', 'kernel_version', 'gpu_name', 'mem_total',
-      ].includes(key))
-    ),
+    ...passthrough,
     cpu: boundedNumber(0, MAX_PERCENT, report.cpu, cpu.usage),
     gpu: boundedNumber(0, MAX_PERCENT, report.gpu, gpuData.average_usage),
     ram: boundedNumber(0, MAX_COUNTER_VALUE, report.ram, ram.used),

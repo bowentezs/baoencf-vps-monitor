@@ -161,7 +161,7 @@ download_file() {
   fi
 
   if command -v curl >/dev/null 2>&1; then
-    local curl_args=(-fsSL --retry 3 -o "$output")
+    local curl_args=(-fsSL --proto '=https' --proto-redir '=https' --retry 3 -o "$output")
     if [[ -n "$PROXY" ]]; then
       curl_args+=(--proxy "$PROXY")
     fi
@@ -303,7 +303,7 @@ verify_binary_checksum() {
 sanitize_instance_id() {
   local raw="${1:-}"
   local cleaned
-  cleaned="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_.-]+/-/g; s/^-+//; s/-+$//')"
+  cleaned="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9_-]+/-/g; s/^-+//; s/-+$//')"
   if [[ -z "$cleaned" ]]; then
     cleaned="default"
   fi
@@ -367,7 +367,7 @@ write_file() {
   if [[ "$DRY_RUN" == "1" ]]; then
     echo "[dry-run] write ${path} (${mode})"
   else
-    printf '%s\n' "$content" > "$path"
+    (umask 077 && printf '%s\n' "$content" > "$path")
     chmod "$mode" "$path"
   fi
 }
@@ -459,6 +459,10 @@ if [[ -z "$INSTALL_DIR" || "$INSTALL_DIR" == "/" ]]; then
   echo "--install-dir cannot be empty or /." >&2
   exit 1
 fi
+if [[ "$INSTALL_DIR" == *$'\n'* || "$INSTALL_DIR" == *$'\r'* ]] || ! [[ "$INSTALL_DIR" =~ ^/[A-Za-z0-9._/@+-]+(/[A-Za-z0-9._/@+-]+)*$ ]] || [[ "$INSTALL_DIR" =~ (^|/)\.\.(/|$) ]]; then
+  echo "--install-dir must be a safe absolute path without spaces, quotes, shell metacharacters, or '..'." >&2
+  exit 1
+fi
 
 ENV_FILE="/etc/${SERVICE_NAME}.env"
 UNIT_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
@@ -545,6 +549,7 @@ fi
 
 PROXY="$(normalize_proxy_url "--proxy" "$PROXY")"
 INSTALL_GHPROXY="$(normalize_proxy_url "--install-ghproxy" "$INSTALL_GHPROXY")"
+require_https_url "--install-ghproxy" "$INSTALL_GHPROXY"
 
 if [[ -n "$BINARY" ]]; then
   if [[ ! -f "$BINARY" ]]; then
@@ -581,13 +586,8 @@ if [[ -n "$BINARY_URL" ]]; then
     if download_file "$BINARY_URL" "$WORK_BIN"; then
       verify_binary_checksum "$WORK_BIN" "$(basename "$BINARY_URL")" "$CHECKSUM_URL"
       chmod 0755 "$WORK_BIN"
-    elif [[ "$AUTO_BINARY_URL" == "1" ]]; then
-      echo "Prebuilt agent binary was not found at ${BINARY_URL}; falling back to source build." >&2
-      rm -f "$WORK_BIN"
-      WORK_BIN=""
-      BINARY_URL=""
-      BUILD_FROM_SOURCE="1"
     else
+      echo "Failed to download prebuilt agent binary from ${BINARY_URL}. Refusing unverified source fallback; pass --build-from-source explicitly if intended." >&2
       rm -f "$WORK_BIN"
       exit 1
     fi

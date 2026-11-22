@@ -15,7 +15,7 @@ import { refreshActiveThemeStylesheet } from "../utils/activeThemeStylesheet";
 function safeBackgroundUrl(value: unknown) {
   const raw = typeof value === "string" ? value.trim() : "";
   if (!raw) return "";
-  if (raw.startsWith("/")) return raw;
+  if (raw.startsWith("/") && !raw.startsWith("//")) return raw;
   try {
     const url = new URL(raw, window.location.origin);
     if (url.protocol === "https:") return url.toString();

@@ -56,6 +56,7 @@ export interface ParsedThemePackage {
 }
 
 const MAX_ZIP_BYTES = 2 * 1024 * 1024;
+const MAX_UNZIPPED_TOTAL_BYTES = 4 * 1024 * 1024;
 const MAX_CSS_BYTES = 256 * 1024;
 const MAX_IMAGE_BYTES = 512 * 1024;
 const MAX_ASSETS = 32;
@@ -227,11 +228,38 @@ export function base64ToBytes(base64: string): Uint8Array {
 
 export function parseThemeZip(zipBytes: Uint8Array): ParsedThemePackage {
   if (zipBytes.byteLength > MAX_ZIP_BYTES) throw new Error('theme zip is too large');
-  const files = unzipSync(zipBytes);
+  let fileCount = 0;
+  let totalUnzippedBytes = 0;
+  const files = unzipSync(zipBytes, {
+    filter: (file) => {
+      if (file.name.endsWith('/')) return false;
+      fileCount += 1;
+      if (fileCount > MAX_ASSETS + 1) {
+        throw new Error('theme package has too many files');
+      }
+      const ext = extensionOf(file.name);
+      const maxForEntry = ext === '.css' ? MAX_CSS_BYTES : MAX_IMAGE_BYTES;
+      if (file.originalSize > maxForEntry) {
+        throw new Error(`theme asset is too large: ${file.name}`);
+      }
+      totalUnzippedBytes += file.originalSize;
+      if (totalUnzippedBytes > MAX_UNZIPPED_TOTAL_BYTES) {
+        throw new Error('theme package uncompressed size is too large');
+      }
+      return true;
+    },
+  });
   const entries = Object.entries(files)
     .filter(([path]) => !path.endsWith('/'))
     .map(([rawPath, bytes]) => [normalizeThemePath(rawPath), bytes] as const);
   if (entries.length > MAX_ASSETS + 1) throw new Error('theme package has too many files');
+  let actualTotalBytes = 0;
+  for (const [, bytes] of entries) {
+    actualTotalBytes += bytes.byteLength;
+    if (actualTotalBytes > MAX_UNZIPPED_TOTAL_BYTES) {
+      throw new Error('theme package uncompressed size is too large');
+    }
+  }
   const fileMap = new Map(entries);
 
   const manifestBytes = fileMap.get('cf-monitor-theme.json');
@@ -251,6 +279,7 @@ export function parseThemeZip(zipBytes: Uint8Array): ParsedThemePackage {
   for (const [path, bytes] of entries) {
     if (path === 'cf-monitor-theme.json') continue;
     const ext = extensionOf(path);
+    if (ext === '.css' && bytes.byteLength > MAX_CSS_BYTES) throw new Error(`theme CSS is too large: ${path}`);
     if (ext !== '.css' && bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`theme asset is too large: ${path}`);
     assets.push({
       path,
@@ -344,9 +373,12 @@ export function sanitizeCustomCss(css: string): string {
   return css
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/\\[0-9a-fA-F]{1,6}\s?/g, '')
+    // 移除非十六进制 CSS 反斜杠转义（如 @\import），防止关键字绕过
+    .replace(/\\([^\r\n])/g, '$1')
     .replace(/<\/?style[^>]*>/gi, '')
     .replace(/@import\b[^;{}]*(?:;|$)/gi, '')
-    .replace(/url\s*\(\s*(['"]?)\s*(?:javascript|vbscript|data\s*:\s*text\/html):.*?\1\s*\)/gi, '')
+    // 阻断脚本协议及外部 http(s):// / // URL，防止恶意主题利用 CSS 属性选择器外渗页面数据
+    .replace(/url\s*\(\s*(?:(['"])\s*(?:javascript:|vbscript:|data\s*:\s*text\/html|https?:|\/\/).*?\1|(?:javascript:|vbscript:|data\s*:\s*text\/html|https?:|\/\/)[^)]*)\s*\)/gi, '')
     .replace(/expression\s*\([^)]*\)/gi, '')
     .replace(/behavior\s*:[^;]+;?/gi, '');
 }

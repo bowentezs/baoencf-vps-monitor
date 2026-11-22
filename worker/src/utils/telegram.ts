@@ -19,11 +19,21 @@ export function formatTelegramHtmlText(value: unknown): string {
   return escapeTelegramHtml(String(value ?? '').slice(0, TELEGRAM_MESSAGE_MAX_CHARS));
 }
 
+const TELEGRAM_BOT_TOKEN_PATTERN = /^\d+:[A-Za-z0-9_-]{20,}$/;
+
+export function isValidTelegramBotToken(token: string): boolean {
+  return TELEGRAM_BOT_TOKEN_PATTERN.test(token.trim());
+}
+
 export async function sendTelegramMessage(botToken: string, payload: TelegramSendMessagePayload): Promise<Response> {
+  const normalizedToken = String(botToken || '').trim();
+  if (!isValidTelegramBotToken(normalizedToken)) {
+    throw new Error('Invalid Telegram bot token format');
+  }
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TELEGRAM_FETCH_TIMEOUT_MS);
   try {
-    return await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    return await fetch(`https://api.telegram.org/bot${encodeURIComponent(normalizedToken)}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

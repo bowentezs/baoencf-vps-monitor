@@ -58,7 +58,7 @@ function isAmbiguousNumericHost(host: string): boolean {
 }
 
 function isBlockedIPv4(parts: number[]): boolean {
-  const [a, b] = parts;
+  const [a, b, c] = parts;
   return (
     a === 0 ||
     a === 10 ||
@@ -67,36 +67,43 @@ function isBlockedIPv4(parts: number[]): boolean {
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 168) ||
-    (a === 198 && (b === 18 || b === 19))
+    (a === 192 && b === 0 && (c === 0 || c === 2)) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    (a === 198 && b === 51 && c === 100) ||
+    (a === 203 && b === 0 && c === 113) ||
+    a >= 224
   );
 }
 
-function isIPv4MappedIPv6(host: string): boolean {
-  if (/^(::ffff:|0:0:0:0:0:ffff:)/.test(host)) return true;
-  if (host.includes(':')) {
-    try {
-      const canonical = new URL(`http://[${host}]`).hostname.toLowerCase().replace(/^\[|\]$/g, '');
-      if (canonical === '::' || canonical === '::1') return true;
-      if (/^::ffff:/.test(canonical)) return true;
-      if (/^::[0-9a-f]{1,4}:[0-9a-f]{1,4}$/.test(canonical)) return true;
-    } catch {
-      return true;
-    }
+function isBlockedIPv6Literal(host: string): boolean {
+  if (!host.includes(':')) return false;
+  try {
+    const canonical = new URL(`http://[${host}]`).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    return (
+      canonical === '::' ||
+      canonical === '::1' ||
+      canonical.startsWith('::ffff:') ||
+      /^::[0-9a-f]{1,4}:[0-9a-f]{1,4}$/.test(canonical) ||
+      canonical.startsWith('64:ff9b:') ||
+      canonical.startsWith('2002:') ||
+      canonical.startsWith('2001:db8:') ||
+      canonical.startsWith('100:') ||
+      /^(fc|fd|fe8|fe9|fea|feb|ff)/.test(canonical)
+    );
+  } catch {
+    return true;
   }
-  return false;
 }
 
 function isUnsafeWebhookHostname(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
   if (!host || host === 'localhost' || host.endsWith('.localhost')) return true;
   if (host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.home.arpa')) return true;
   if (host === '169.254.169.254' || host === 'fd00:ec2::254' || host === 'metadata.google.internal' || host === 'metadata.aws.internal') return true;
   if (isAmbiguousNumericHost(host)) return true;
   const ipv4 = parseIPv4(host);
   if (ipv4) return isBlockedIPv4(ipv4);
-  if (isIPv4MappedIPv6(host)) return true;
-  if (host === '::' || host === '::1') return true;
-  if (/^(fc|fd|fe8|fe9|fea|feb)/.test(host)) return true;
+  if (isBlockedIPv6Literal(host)) return true;
   return false;
 }
 

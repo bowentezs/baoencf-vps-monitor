@@ -9,8 +9,8 @@ import * as db from '../db/queries';
 import { getDatabase } from '../db/provider';
 import { createViewerToken, verifyViewerToken } from '../auth/viewer-token';
 import { getAgentClientIdentityByToken } from './client';
-import { hashAgentToken, isAgentTokenShape } from '../utils/client';
-import { getCloudflareClientIp, isPublicIpAddress } from '../utils/request-ip';
+import { isAgentTokenShape } from '../utils/client';
+import { getCloudflareClientIp, isPublicIpAddress, normalizeIpSubnetKey } from '../utils/request-ip';
 import { readLiveSnapshot, readRateLimitResult } from '../utils/do-response';
 import { hasAdminSession, invalidatePublicMetadataCache } from './public';
 import { recordVisitorSafely } from '../utils/visitor-logger';
@@ -242,11 +242,12 @@ function jwtSecret(c: WsContext): string {
 wsRoutes.get('/clients/report', async (c) => {
   const token = bearerToken(c).trim();
   const ip = requestIp(c);
+  const subnetIp = normalizeIpSubnetKey(ip);
   const attemptLimited = await enforceWsRateLimit(
     c,
     'agent-ws-auth-attempt',
     'agent-ws-auth-attempt',
-    ip,
+    subnetIp,
     AGENT_WS_AUTH_ATTEMPT_RATE_LIMIT_MAX,
     VIEWER_TOKEN_RATE_LIMIT_WINDOW_MS,
     'Too many Agent authentication attempts',
@@ -255,12 +256,11 @@ wsRoutes.get('/clients/report', async (c) => {
   if (attemptLimited) return attemptLimited;
 
   if (!isAgentTokenShape(token)) {
-    const tokenKey = token ? await hashAgentToken(token) : 'missing';
     const failureLimited = await enforceWsRateLimit(
       c,
       'agent-ws-auth-failure',
       'agent-ws-auth-failure',
-      `${ip}:${tokenKey}`,
+      subnetIp,
       AGENT_WS_AUTH_FAILURE_RATE_LIMIT_MAX,
       VIEWER_TOKEN_RATE_LIMIT_WINDOW_MS,
       'Too many failed Agent authentication attempts',
@@ -277,7 +277,7 @@ wsRoutes.get('/clients/report', async (c) => {
       c,
       'agent-ws-auth-failure',
       'agent-ws-auth-failure',
-      `${ip}:${await hashAgentToken(token)}`,
+      subnetIp,
       AGENT_WS_AUTH_FAILURE_RATE_LIMIT_MAX,
       VIEWER_TOKEN_RATE_LIMIT_WINDOW_MS,
       'Too many failed Agent authentication attempts',
@@ -362,8 +362,12 @@ wsRoutes.get('/ws/live', async (c) => {
     const stub = c.env.LIVE_DATA.get(doId);
     const url = new URL(c.req.url);
     const includeHidden = url.searchParams.get('include_hidden') === '1' && await hasAdminSession(c);
-    if (includeHidden) url.searchParams.set('include_hidden', '1');
-    else url.searchParams.delete('include_hidden');
+    if (includeHidden) {
+      url.searchParams.set('include_hidden', '1');
+    } else {
+      url.searchParams.delete('include_hidden');
+      url.searchParams.delete('include_offline');
+    }
     return stub.fetch(new Request(url.toString(), { method: 'GET' }));
   }
   if (!requestHasValidOrigin(c)) {

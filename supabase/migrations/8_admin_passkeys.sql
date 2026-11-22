@@ -144,7 +144,7 @@ begin
       last_used_at = now()
   where user_uuid = input_user_uuid
     and credential_id = input_credential_id
-    and counter <= input_counter;
+    and ((counter = 0 and input_counter = 0) or counter < input_counter);
   return found;
 end;
 $$;

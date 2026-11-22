@@ -480,21 +480,44 @@ function normalizeUpdateRepositoryUrl(value: unknown): string | null {
   }
 }
 
+function isAmbiguousNumericSmtpHost(host: string): boolean {
+  if (host.includes(':')) return false;
+  const parts = host.split('.');
+  if (parts.length < 1 || parts.length > 4) return false;
+  if (!parts.every(part => /^(0x[0-9a-f]+|\d+)$/i.test(part))) return false;
+  if (parts.length !== 4) return true;
+  return parts.some(part => /^0x/i.test(part) || (part.length > 1 && part.startsWith('0')));
+}
+
 function normalizeSmtpHost(value: unknown): string | null {
   if (value === '' || value === null || value === undefined) return '';
   if (typeof value !== 'string') return null;
-  const host = value.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  const host = value.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
   if (!host || host === 'localhost' || host.endsWith('.localhost')) return null;
   if (host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.home.arpa')) return null;
-  if (/[\s/@:]/.test(host)) return null;
+  if (/[\r\n\x00\s/@:]/.test(host)) return null;
+  if (isAmbiguousNumericSmtpHost(host)) return null;
   if (/^(0\.|127\.|10\.|192\.168\.|169\.254\.)/.test(host)) return null;
   if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host)) return null;
   if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return null;
   if (/^198\.1[89]\./.test(host)) return null;
   if (/^(22[4-9]|23\d|2[45]\d)\./.test(host)) return null;
-  if (host === '::' || host === '::1' || host.startsWith('::ffff:') || host.startsWith('0:0:0:0:0:ffff:')) return null;
-  if (host.startsWith('fc') || host.startsWith('fd') || /^fe[89ab]/.test(host) || host.startsWith('ff')) return null;
   return host;
+}
+
+function normalizeSmtpFromName(value: unknown): string | null {
+  if (value === '' || value === null || value === undefined) return '';
+  if (typeof value !== 'string') return null;
+  if (/[\r\n\x00]/.test(value)) return null;
+  return value.trim();
+}
+
+function normalizeTelegramBotToken(value: unknown): string | null {
+  if (value === '' || value === null || value === undefined) return '';
+  if (typeof value !== 'string') return null;
+  const token = value.trim();
+  if (!token) return '';
+  return /^\d+:[A-Za-z0-9_-]{20,}$/.test(token) ? token : null;
 }
 
 function normalizeEmailAddress(value: unknown): string | null {
@@ -579,8 +602,10 @@ export function normalizeSettingValue(
       else if (key === 'site_logo_url') normalized = normalizeSiteLogoUrl(value);
       else if (key === 'update_repository_url') normalized = normalizeUpdateRepositoryUrl(value);
       else if (key === 'email_smtp_host') normalized = normalizeSmtpHost(value);
+      else if (key === 'email_smtp_from_name') normalized = normalizeSmtpFromName(value);
       else if (key === 'email_smtp_from_address') normalized = normalizeEmailAddress(value);
       else if (key === 'email_smtp_recipients') normalized = normalizeEmailRecipients(value);
+      else if (key === 'telegram_bot_token') normalized = normalizeTelegramBotToken(value);
       else if (key === 'webhook_url') normalized = normalizeWebhookUrl(value);
       else if (key === 'webhook_content_type') normalized = normalizeWebhookContentType(value);
       else if (key === 'webhook_headers_json') normalized = normalizeWebhookHeadersJson(value);

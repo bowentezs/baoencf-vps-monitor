@@ -32,10 +32,14 @@ export default function WebsiteMonitorDetails({ monitor }: { monitor: WebsiteMon
               {statusLabel(monitor.status)}
             </Badge>
           </Flex>
-          <a className="kuma-monitor-details-url" href={monitor.url} target="_blank" rel="noopener noreferrer">
-            {monitor.url}
-            <ExternalLink size={13} aria-hidden="true" />
-          </a>
+          {/^https?:\/\//i.test(monitor.url) ? (
+            <a className="kuma-monitor-details-url" href={monitor.url} target="_blank" rel="noopener noreferrer">
+              {monitor.url}
+              <ExternalLink size={13} aria-hidden="true" />
+            </a>
+          ) : (
+            <Text size="2" color="gray" className="kuma-monitor-details-url">{monitor.url}</Text>
+          )}
         </Box>
         <Box className="kuma-monitor-latency">
           <Text size="1" color="gray">延迟</Text>

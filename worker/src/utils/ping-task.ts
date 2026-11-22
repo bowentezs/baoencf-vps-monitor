@@ -94,13 +94,12 @@ function isBlockedIpv4(host: string): boolean {
 
 function isBlockedIpv6(host: string): boolean {
   const normalized = host.toLowerCase().replace(/^\[|\]$/g, '');
+  if (!normalized.includes(':')) return false;
   let canonical = normalized;
-  if (normalized.includes(':')) {
-    try {
-      canonical = new URL(`http://[${normalized}]`).hostname.toLowerCase().replace(/^\[|\]$/g, '');
-    } catch {
-      return true;
-    }
+  try {
+    canonical = new URL(`http://[${normalized}]`).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  } catch {
+    return true;
   }
   return (
     canonical === '::' ||
@@ -108,6 +107,10 @@ function isBlockedIpv6(host: string): boolean {
     canonical.startsWith('::ffff:') ||
     /^::[0-9a-f]{1,4}:[0-9a-f]{1,4}$/.test(canonical) ||
     normalized.startsWith('0:0:0:0:0:ffff:') ||
+    canonical.startsWith('64:ff9b:') ||
+    canonical.startsWith('2002:') ||
+    canonical.startsWith('2001:db8:') ||
+    canonical.startsWith('100:') ||
     canonical.startsWith('fc') ||
     canonical.startsWith('fd') ||
     canonical.startsWith('fe8') ||
@@ -119,13 +122,19 @@ function isBlockedIpv6(host: string): boolean {
 }
 
 function validateNetworkBoundary(host: string): string | null {
-  const normalized = host.trim().toLowerCase().replace(/^\[|\]$/g, '');
+  const normalized = host.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
   if (!normalized) return '目标必须包含 host';
   if (normalized === 'localhost' || normalized.endsWith('.localhost')) {
     return 'Ping 目标不能指向 localhost';
   }
-  if (normalized === 'metadata.google.internal') {
-    return 'Ping 目标不能指向云厂商 metadata 地址';
+  if (
+    normalized === 'metadata.google.internal' ||
+    normalized === 'metadata.aws.internal' ||
+    normalized.endsWith('.local') ||
+    normalized.endsWith('.internal') ||
+    normalized.endsWith('.home.arpa')
+  ) {
+    return 'Ping 目标不能指向内网域名或云厂商 metadata 地址';
   }
   if (isAmbiguousNumericHost(normalized)) {
     return 'Ping 目标不能使用内网、环回、链路本地或保留 IP';
