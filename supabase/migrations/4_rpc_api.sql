@@ -5089,7 +5089,7 @@ as $$
         wc.monitor_id, wc.checked_at, wc.ok, wc.effective_status, wc.effective_reason,
         wc.status_code, wc.raw_status_code, wc.latency_ms, wc.source_type,
         case
-          when input_include_hidden or coalesce(cl.hidden, false) = false then wc.source_client
+          when input_include_hidden or coalesce(cl.hidden, 0) = 0 then wc.source_client
           else null
         end as source_client,
         row_number() over (
@@ -5131,12 +5131,11 @@ language plpgsql
 stable
 set search_path = public
 as $$
+declare
+  safe_limit integer := least(greatest(coalesce(input_check_limit, 120), 1), 500);
 begin
   return (
   with
-    args as (
-      select least(greatest(coalesce(input_check_limit, 120), 1), 500) as safe_limit
-    ),
     monitor_row as (
       select
         id, name, url, interval_sec, status, last_checked_at,
@@ -5150,13 +5149,12 @@ begin
       select wc.checked_at, wc.ok, wc.effective_status, wc.effective_reason,
         wc.status_code, wc.raw_status_code, wc.latency_ms, wc.source_type,
         case
-          when input_include_hidden or coalesce(cl.hidden, false) = false then wc.source_client
+          when input_include_hidden or coalesce(cl.hidden, 0) = 0 then wc.source_client
           else null
         end as source_client
       from website_checks wc
       join website_monitors wm on wm.id = wc.monitor_id
       left join clients cl on cl.uuid = wc.source_client
-      cross join args
       where wc.monitor_id = input_id
         and (
           wc.source_type = 'worker'
@@ -5164,7 +5162,7 @@ begin
           or wm.agent_probe_status_enabled = false
         )
       order by wc.checked_at desc, wc.id desc
-      limit args.safe_limit
+      limit safe_limit
     )
   select to_jsonb(m) || jsonb_build_object(
     'checks',
