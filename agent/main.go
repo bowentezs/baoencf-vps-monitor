@@ -1311,6 +1311,7 @@ func runHTTPReporter() {
 	var policyExpiresAt time.Time
 
 	for {
+		cycleStart := time.Now()
 		if time.Now().After(policyExpiresAt) {
 			if newPolicy, err := fetchAgentPolicy(); err == nil {
 				policy = newPolicy
@@ -1365,7 +1366,7 @@ func runHTTPReporter() {
 			pending = nil
 			nextUploadAt = time.Now().Add(currentUploadInterval)
 		}
-		time.Sleep(currentSampleInterval)
+		time.Sleep(nextCycleDelay(cycleStart, currentSampleInterval, time.Now()))
 	}
 }
 
@@ -1442,6 +1443,7 @@ func runWebSocketSession(
 	currentUploadInterval := currentInterval
 	var pending []Report
 
+	initialStart := time.Now()
 	pending = append(pending, prepareReportWithPing(preparer, pingState, currentInterval))
 	if err := sendWebSocketReports(conn, pending); err != nil {
 		log.Printf("WebSocket initial report failed: %v", err)
@@ -1449,9 +1451,10 @@ func runWebSocketSession(
 	}
 	pending = nil
 
-	sampleTimer := time.NewTimer(currentInterval)
+	now := time.Now()
+	sampleTimer := time.NewTimer(nextCycleDelay(initialStart, currentInterval, now))
 	defer sampleTimer.Stop()
-	uploadTimer := time.NewTimer(currentUploadInterval)
+	uploadTimer := time.NewTimer(nextCycleDelay(initialStart, currentUploadInterval, now))
 	defer uploadTimer.Stop()
 	heartbeatTicker := time.NewTicker(heartbeatInterval)
 	defer heartbeatTicker.Stop()
@@ -1459,6 +1462,7 @@ func runWebSocketSession(
 	for {
 		select {
 		case <-sampleTimer.C:
+			cycleStart := time.Now()
 			pending = append(pending, prepareReportWithPing(preparer, pingState, currentInterval))
 			if currentUploadInterval <= currentInterval {
 				if err := sendWebSocketReports(conn, pending); err != nil {
@@ -1466,10 +1470,11 @@ func runWebSocketSession(
 					return err
 				}
 				pending = nil
-				resetTimer(uploadTimer, currentUploadInterval)
+				resetTimer(uploadTimer, nextCycleDelay(cycleStart, currentUploadInterval, time.Now()))
 			}
-			resetTimer(sampleTimer, currentInterval)
+			resetTimer(sampleTimer, nextCycleDelay(cycleStart, currentInterval, time.Now()))
 		case <-uploadTimer.C:
+			cycleStart := time.Now()
 			if len(pending) > 0 {
 				if err := sendWebSocketReports(conn, pending); err != nil {
 					log.Printf("WebSocket report batch failed: %v", err)
@@ -1477,14 +1482,15 @@ func runWebSocketSession(
 				}
 				pending = nil
 			}
-			resetTimer(uploadTimer, currentUploadInterval)
+			resetTimer(uploadTimer, nextCycleDelay(cycleStart, currentUploadInterval, time.Now()))
 		case policy := <-policies:
 			if policy.Type != "policy" {
 				continue
 			}
 			pingState.applyPolicy(policy)
 			nextInterval, nextUploadInterval := policyDurations(policy, currentInterval)
-			if nextInterval != currentInterval || nextUploadInterval != currentUploadInterval {
+			intervalChanged := nextInterval != currentInterval || nextUploadInterval != currentUploadInterval
+			if intervalChanged {
 				currentInterval = nextInterval
 				currentUploadInterval = nextUploadInterval
 				reportInterval = int(currentInterval / time.Second)
@@ -1497,15 +1503,20 @@ func runWebSocketSession(
 				)
 			}
 			if policy.ReportNow {
+				cycleStart := time.Now()
 				pending = append(pending, prepareReportWithPing(preparer, pingState, currentInterval))
 				if err := sendWebSocketReports(conn, pending); err != nil {
 					log.Printf("WebSocket immediate report failed: %v", err)
 					return err
 				}
 				pending = nil
+				now := time.Now()
+				resetTimer(sampleTimer, nextCycleDelay(cycleStart, currentInterval, now))
+				resetTimer(uploadTimer, nextCycleDelay(cycleStart, currentUploadInterval, now))
+			} else if shouldResetPolicyTimers(intervalChanged, false) {
+				resetTimer(sampleTimer, currentInterval)
+				resetTimer(uploadTimer, currentUploadInterval)
 			}
-			resetTimer(sampleTimer, currentInterval)
-			resetTimer(uploadTimer, currentUploadInterval)
 		case <-heartbeatTicker.C:
 			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				log.Printf("WebSocket heartbeat failed: %v", err)
@@ -1539,6 +1550,22 @@ func normalizeReportDuration(interval time.Duration) time.Duration {
 		return minReportInterval
 	}
 	return interval
+}
+
+func nextCycleDelay(cycleStart time.Time, interval time.Duration, now time.Time) time.Duration {
+	normalized := normalizeReportDuration(interval)
+	if cycleStart.IsZero() || now.Before(cycleStart) {
+		return normalized
+	}
+	remaining := normalized - now.Sub(cycleStart)
+	if remaining < minReportInterval {
+		return minReportInterval
+	}
+	return remaining
+}
+
+func shouldResetPolicyTimers(intervalChanged bool, reportNow bool) bool {
+	return intervalChanged || reportNow
 }
 
 func intervalSeconds(interval time.Duration) int {

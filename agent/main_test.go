@@ -1012,6 +1012,91 @@ func TestWebsiteHTTPProbeReportsStatusAndLatency(t *testing.T) {
 	}
 }
 
+func TestNextCycleDelaySubtractsElapsedAndGuardsClockRollback(t *testing.T) {
+	base := time.Date(2026, time.November, 25, 2, 0, 0, 0, time.UTC)
+	if got := nextCycleDelay(base, 120*time.Second, base.Add(57*time.Second)); got != 63*time.Second {
+		t.Fatalf("nextCycleDelay(57s elapsed) = %s, want 63s", got)
+	}
+	if got := nextCycleDelay(base, 5*time.Second, base.Add(8*time.Second)); got != minReportInterval {
+		t.Fatalf("nextCycleDelay(overrun) = %s, want minReportInterval %s", got, minReportInterval)
+	}
+	if got := nextCycleDelay(base, 120*time.Second, base.Add(-10*time.Second)); got != 120*time.Second {
+		t.Fatalf("nextCycleDelay(clock rollback) = %s, want 120s", got)
+	}
+}
+
+func TestShouldResetPolicyTimers(t *testing.T) {
+	if shouldResetPolicyTimers(false, false) {
+		t.Fatal("unchanged policy without report_now must not reset timers")
+	}
+	if !shouldResetPolicyTimers(true, false) {
+		t.Fatal("changed policy interval must reset timers")
+	}
+	if !shouldResetPolicyTimers(false, true) {
+		t.Fatal("report_now policy must reset timers")
+	}
+}
+
+func TestRunWebSocketSessionDoesNotResetTimerOnUnchangedPolicy(t *testing.T) {
+	oldInterval := reportInterval
+	reportInterval = 3
+	defer func() { reportInterval = oldInterval }()
+
+	upgrader := websocket.Upgrader{}
+	reportTimes := make(chan time.Time, 8)
+	doneServer := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer close(doneServer)
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Errorf("upgrade websocket: %v", err)
+			return
+		}
+		defer conn.Close()
+
+		// 1. 读取首包上报
+		var first map[string]any
+		if err := conn.ReadJSON(&first); err != nil {
+			t.Errorf("read initial report: %v", err)
+			return
+		}
+		reportTimes <- time.Now()
+
+		// 2. 在 3s 周期中途（1.2s 与 2.2s）连续发送同间隔 policy（report_now=false），模拟 alarm/viewer 广播。
+		// 若错误重置定时器，第二包会被推迟到 2.2s + 3s = 5.2s 以后。
+		time.Sleep(1200 * time.Millisecond)
+		_ = conn.WriteJSON(serverMessage{Type: "policy", Mode: "active", SampleIntervalSec: 3, ReportIntervalSec: 3, ReportNow: false})
+		time.Sleep(1000 * time.Millisecond)
+		_ = conn.WriteJSON(serverMessage{Type: "policy", Mode: "active", SampleIntervalSec: 3, ReportIntervalSec: 3, ReportNow: false})
+
+		var second map[string]any
+		if err := conn.ReadJSON(&second); err != nil {
+			t.Errorf("read second report: %v", err)
+			return
+		}
+		reportTimes <- time.Now()
+		_ = conn.Close()
+	}))
+	defer server.Close()
+
+	conn, err := connectWebSocket(testWebSocketURL(server.URL), "agent-token")
+	if err != nil {
+		t.Fatalf("connectWebSocket() error = %v", err)
+	}
+	_ = runWebSocketSession(conn, &reportPreparer{}, newPingReportState(), 3*time.Second, 30*time.Second)
+	<-doneServer
+
+	if len(reportTimes) < 2 {
+		t.Fatalf("received %d reports, want 2", len(reportTimes))
+	}
+	t1 := <-reportTimes
+	t2 := <-reportTimes
+	elapsed := t2.Sub(t1)
+	if elapsed > 3800*time.Millisecond {
+		t.Fatalf("second report delayed to %s after unchanged policies, want <= 3.8s", elapsed)
+	}
+}
+
 func TestNormalizeTCPTargetAddress(t *testing.T) {
 	address, host, port, err := normalizeTCPTargetAddress("example.com")
 	if err != nil {

@@ -21,6 +21,10 @@ import { isPublicIpAddress, normalizeIpSubnetKey } from '../utils/request-ip';
 import { unwrapMonitorReportEnvelope } from '../utils/report-envelope';
 import { checkWebsiteMonitorHttp } from '../utils/website-monitor';
 import { planExpiryAlarm } from './expiry-alarm';
+import {
+  agentWsStaleTtlMs,
+  shouldBroadcastPolicyOnViewerChange,
+} from './agent-policy';
 
 // 客户端状态
 interface ClientState {
@@ -67,11 +71,7 @@ const RECORD_PERSISTENCE_SETTING_KEYS = [
 ];
 const HTTP_CLIENT_MIN_TTL_MS = 30_000;
 const HTTP_CLIENT_MAX_TTL_MS = 24 * 60 * 60 * 1000;
-// WebSocket 上报的客户端判死 TTL（毫秒）。
-// 必须大于 agent 空闲上报间隔（live_poll_idle_interval_sec 默认 120s），否则空闲节点会被误判离线；
-// 同时与离线预警宽限期（grace_period 默认 180s）和 HTTP 上报默认 TTL（boundedHttpTtlMs 默认 180s）对齐，
-// 确保「页面判离线」不晚于「离线预警发出」，根治「预警已发但页面仍显示在线」。
-const AGENT_WS_STALE_MS = 180_000;
+// WebSocket 上报的默认最小判死 TTL 为 AGENT_WS_STALE_MS（180s），实际通过 agentWsStaleTtlMs 随 idle 间隔自适应放大。
 const HTTP_CLIENT_REPORT_MAX_BODY_BYTES = 512 * 1024;
 const HTTP_CLIENT_META_MAX_BODY_BYTES = 16 * 1024;
 const HTTP_ADMIN_CLIENTS_SNAPSHOT_MAX_BODY_BYTES = 256 * 1024;
@@ -1347,9 +1347,11 @@ export class LiveDataDO {
     }
   }
 
-  private removeExpiredViewers(now: number): void {
+  private removeExpiredViewers(now: number): boolean {
+    let removed = false;
     for (const [id, expiresAt] of this.viewerExpiresAt) {
       if (expiresAt > now) continue;
+      removed = true;
       const session = this.sessions.get(id);
       if (!session) {
         this.viewerExpiresAt.delete(id);
@@ -1358,17 +1360,18 @@ export class LiveDataDO {
       }
       this.expireViewer(id, session, now);
     }
+    return removed;
   }
 
-  private cleanupSession(ws: WebSocket, attachment: SessionAttachment): void {
-    if (this.sessions.get(attachment.clientId) !== ws) return;
+  private cleanupSession(ws: WebSocket, attachment: SessionAttachment): boolean {
+    if (this.sessions.get(attachment.clientId) !== ws) return false;
 
     const existing = this.clients.get(attachment.clientId);
     this.sessions.delete(attachment.clientId);
     this.sessionRoles.delete(attachment.clientId);
     this.viewerExpiresAt.delete(attachment.clientId);
 
-    if (attachment.role !== 'agent') return;
+    if (attachment.role !== 'agent') return true;
 
     if (existing) {
       existing.expiresAt = Date.now();
@@ -1381,6 +1384,7 @@ export class LiveDataDO {
         }, existing.hidden ? 'admin' : 'all');
       }
     }
+    return true;
   }
 
   private async upsertAgentAuthSnapshot(request: Request): Promise<Response> {
@@ -2136,6 +2140,11 @@ export class LiveDataDO {
     return new Response('Not Found', { status: 404 });
   }
 
+  private agentWsExpiresAt(rawReport: JsonObject, now: number): number {
+    const reportedIntervalSec = Number(rawReport.report_interval ?? rawReport.interval_sec ?? rawReport.interval);
+    return now + agentWsStaleTtlMs(this.policySettings.idleIntervalSec, reportedIntervalSec);
+  }
+
   private async handleMessage(clientId: string, clientName: string, hidden: boolean, data: Record<string, unknown>, ws: WebSocket) {
     const now = Date.now();
     if (data?.type === 'ping_result') {
@@ -2145,13 +2154,17 @@ export class LiveDataDO {
 
     if (data?.type === 'reports' && Array.isArray(data.reports)) {
       const reports = data.reports.slice(0, AGENT_REPORT_MAX_BATCH).filter(isObjectPayload);
+      const lastRawReport = reports[reports.length - 1];
+      const expiresAt = lastRawReport
+        ? this.agentWsExpiresAt(lastRawReport, now)
+        : now + agentWsStaleTtlMs(this.policySettings.idleIntervalSec);
       const reportsToPersist: Array<{ report: JsonObject; reportTime: number }> = [];
       for (let index = 0; index < reports.length; index += 1) {
         const rawReport = reports[index];
         const isLast = index === reports.length - 1;
         const reportTime = isLast ? now : this.reportTimestamp(rawReport, now);
         if (isLast) {
-          const report = this.updateClientReport(clientId, clientName, hidden, rawReport, reportTime, now + AGENT_WS_STALE_MS, ws);
+          const report = this.updateClientReport(clientId, clientName, hidden, rawReport, reportTime, expiresAt, ws);
           reportsToPersist.push({ report, reportTime });
           this.runBackground('ping_persistence', this.persistPingResultsFromReport(clientId, rawReport, reportTime));
           this.runBackground('website_probe_persistence', this.persistWebsiteProbeResultsFromReport(clientId, rawReport, reportTime));
@@ -2180,8 +2193,9 @@ export class LiveDataDO {
     }
 
     const rawReport = unwrapMonitorReportEnvelope(data);
-  const reportTime = now;
-    const report = this.updateClientReport(clientId, clientName, hidden, rawReport, reportTime, now + AGENT_WS_STALE_MS, ws);
+    const expiresAt = this.agentWsExpiresAt(rawReport, now);
+    const reportTime = now;
+    const report = this.updateClientReport(clientId, clientName, hidden, rawReport, reportTime, expiresAt, ws);
     this.runBackground('ping_persistence', this.persistPingResultsFromReport(clientId, rawReport, reportTime));
     this.runBackground('website_probe_persistence', this.persistWebsiteProbeResultsFromReport(clientId, rawReport, reportTime));
     this.runBackground('do_basic_info_sync', this.syncBasicInfoFromReport(clientId, clientName, hidden, rawReport));
@@ -2223,19 +2237,21 @@ export class LiveDataDO {
     }
   }
 
+  private async cleanupDisconnectedSession(ws: WebSocket, now: number): Promise<void> {
+    const attachment = this.getSessionAttachment(ws);
+    if (!attachment) return;
+    const wasViewer = attachment.role === 'viewer';
+    const removedSession = this.cleanupSession(ws, attachment);
+    if (wasViewer && shouldBroadcastPolicyOnViewerChange(removedSession ? 1 : 0, this.activeViewerCount(now))) {
+      await this.broadcastAgentPolicy(now, false);
+    }
+  }
+
   async webSocketClose(ws: WebSocket): Promise<void> {
     // 关闭回调里的未捕获异常会污染对象状态；broadcastAgentPolicy 依赖数据库，
     // 必须整体兜底，绝不让异常抛回运行时。
     try {
-      const attachment = this.getSessionAttachment(ws);
-      if (attachment) {
-        const wasViewer = attachment.role === 'viewer';
-        const activeViewersBefore = this.activeViewerCount(Date.now());
-        this.cleanupSession(ws, attachment);
-        if (wasViewer && activeViewersBefore > 0) {
-          await this.broadcastAgentPolicy(Date.now(), false);
-        }
-      }
+      await this.cleanupDisconnectedSession(ws, Date.now());
     } catch (error) {
       console.error('[live-data] webSocketClose failed:', errorDetail(error));
     }
@@ -2243,15 +2259,7 @@ export class LiveDataDO {
 
   async webSocketError(ws: WebSocket): Promise<void> {
     try {
-      const attachment = this.getSessionAttachment(ws);
-      if (attachment) {
-        const wasViewer = attachment.role === 'viewer';
-        const activeViewersBefore = this.activeViewerCount(Date.now());
-        this.cleanupSession(ws, attachment);
-        if (wasViewer && activeViewersBefore > 0) {
-          await this.broadcastAgentPolicy(Date.now(), false);
-        }
-      }
+      await this.cleanupDisconnectedSession(ws, Date.now());
     } catch (error) {
       console.error('[live-data] webSocketError failed:', errorDetail(error));
     }
@@ -2263,8 +2271,10 @@ export class LiveDataDO {
     this.alarmScheduledAt = null;
     try {
       this.removeExpiredClients(now);
-      this.removeExpiredViewers(now);
-      await this.broadcastAgentPolicy(now, false);
+      const expiredAnyViewer = this.removeExpiredViewers(now);
+      if (shouldBroadcastPolicyOnViewerChange(expiredAnyViewer ? 1 : 0, this.activeViewerCount(now))) {
+        await this.broadcastAgentPolicy(now, false);
+      }
     } catch (error) {
       console.error('[live-data] alarm maintenance failed:', errorDetail(error));
     } finally {
