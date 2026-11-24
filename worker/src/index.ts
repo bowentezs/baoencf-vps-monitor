@@ -94,7 +94,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'same-origin',
   'Permissions-Policy': 'camera=(), geolocation=(), microphone=()',
-  'Content-Security-Policy': "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; form-action 'self'; img-src 'self' data: https:; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self'",
+  'Content-Security-Policy': "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; form-action 'self'; font-src 'self' data:; img-src 'self' data: https:; style-src 'self'; style-src-elem 'self' 'unsafe-inline'; style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self' wss:",
 };
 
 function withSecurityHeaders(headers: HeadersInit = {}): Headers {
@@ -370,20 +370,10 @@ app.use('/api/admin/*', async (c, next): Promise<Response | undefined> => {
   }
 
   const safeMethod = isSafeMethod(c.req.method);
-  if (await getAdminSessionEdgeCache(payload)) {
+  // 仅对只读请求启用单机房 30s 会话缓存；写操作强制直查数据库校验 session_version 与 CSRF，杜绝跨 POP 吊销滞后。
+  if (safeMethod && await getAdminSessionEdgeCache(payload)) {
     c.set('userId', payload.userId);
     c.set('username', payload.username);
-    if (!safeMethod && !verifyAdminCsrfToken(c)) {
-      return c.json({ error: 'CSRF token 无效，请刷新页面后重试' }, 403);
-    }
-    if (!safeMethod) {
-      return withDatabase(c.env, async (database) => {
-        const stepUpResponse = await requireMfaStepUp(c, database, payload);
-        if (stepUpResponse) return stepUpResponse;
-        await next();
-        return undefined;
-      });
-    }
     await next();
     return undefined;
   }

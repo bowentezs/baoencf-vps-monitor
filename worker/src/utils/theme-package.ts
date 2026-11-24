@@ -372,13 +372,18 @@ export function sanitizeCustomCss(css: string): string {
   if (!css) return '';
   return css
     .replace(/\/\*[\s\S]*?\*\//g, '')
+    // 移除 CSS 反斜杠续行（\ + 换行），防止拆分关键字或 URL 协议绕过清洗
+    .replace(/\\\r?\n/g, '')
     .replace(/\\[0-9a-fA-F]{1,6}\s?/g, '')
     // 移除非十六进制 CSS 反斜杠转义（如 @\import），防止关键字绕过
     .replace(/\\([^\r\n])/g, '$1')
     .replace(/<\/?style[^>]*>/gi, '')
     .replace(/@import\b[^;{}]*(?:;|$)/gi, '')
-    // 阻断脚本协议及外部 http(s):// / // URL，防止恶意主题利用 CSS 属性选择器外渗页面数据
-    .replace(/url\s*\(\s*(?:(['"])\s*(?:javascript:|vbscript:|data\s*:\s*text\/html|https?:|\/\/).*?\1|(?:javascript:|vbscript:|data\s*:\s*text\/html|https?:|\/\/)[^)]*)\s*\)/gi, '')
+    // 阻断脚本协议及外部 http(s):// / // URL（含跨行与 image-set），防止恶意主题利用 CSS 属性选择器外渗页面数据
+    .replace(/url\s*\(\s*(?:(['"])\s*(?:javascript:|vbscript:|data\s*:\s*text\/html|https?:|\/\/)[\s\S]*?\1|(?:javascript:|vbscript:|data\s*:\s*text\/html|https?:|\/\/)[^)]*)\s*\)/gi, '')
+    .replace(/(?:-webkit-)?image-set\s*\((?:[^()]|\([^)]*\))*\)/gi, (match) => (
+      /(?:javascript:|vbscript:|data\s*:\s*text\/html|https?:|\/\/)/i.test(match) ? '' : match
+    ))
     .replace(/expression\s*\([^)]*\)/gi, '')
     .replace(/behavior\s*:[^;]+;?/gi, '');
 }

@@ -2045,7 +2045,9 @@ publicRoutes.get('/websites', async (c) => {
   const periodHours = readIntParam(c.req.query('hours'), 24, 72);
   const monitors = await timed(metrics, 'db_list_websites', () => db.listPublicWebsiteMonitors(database, 120, fresh, periodHours, includeHidden));
   const response = includeHidden ? privateJsonResponse(monitors) : setPublicMetadataResponse(c, monitors, !fresh);
-  response.headers.set('Server-Timing', metrics.map(metric => `${metric.name};dur=${metric.dur.toFixed(1)}`).join(', '));
+  if (c.env.DEBUG_SERVER_TIMING === 'true' || c.env.DEBUG_SERVER_TIMING === '1') {
+    response.headers.set('Server-Timing', metrics.map(metric => `${metric.name};dur=${metric.dur.toFixed(1)}`).join(', '));
+  }
   return response;
 });
 

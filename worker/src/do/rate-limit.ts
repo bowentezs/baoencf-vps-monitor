@@ -2,6 +2,7 @@ const RATE_LIMIT_STORAGE_PREFIX = 'rate-limit:';
 const RATE_LIMIT_MAX_BUCKETS = 5000;
 const RATE_LIMIT_CLEANUP_ALARM_MS = 5 * 60 * 1000;
 const RATE_LIMIT_MAX_BODY_BYTES = 2 * 1024;
+const STORAGE_DELETE_BATCH_SIZE = 128;
 
 export class RateLimitDO {
   private state: DurableObjectState;
@@ -17,24 +18,99 @@ export class RateLimitDO {
     if (request.method === 'POST' && url.pathname === '/rate-limit') {
       return this.checkRateLimit(request);
     }
+    if (request.method === 'POST' && url.pathname === '/visitor-check') {
+      return this.checkVisitorLog(request);
+    }
     return Response.json({ error: 'Not Found' }, { status: 404 });
   }
 
-  private async checkRateLimit(request: Request): Promise<Response> {
+  private async readBoundedJson(request: Request): Promise<{ ok: true; body: Record<string, unknown> } | { ok: false; response: Response }> {
     const contentLength = Number(request.headers.get('Content-Length') || '0');
     if (Number.isFinite(contentLength) && contentLength > RATE_LIMIT_MAX_BODY_BYTES) {
-      return Response.json({ error: 'Rate limit payload too large' }, { status: 413 });
+      return { ok: false, response: Response.json({ error: 'Rate limit payload too large' }, { status: 413 }) };
     }
 
-    let body: { bucket?: unknown; ip?: unknown; max?: unknown; windowMs?: unknown } = {};
+    let body: unknown;
     try {
       body = await request.json();
     } catch {
-      return Response.json({ error: 'Invalid rate limit payload' }, { status: 400 });
+      return { ok: false, response: Response.json({ error: 'Invalid rate limit payload' }, { status: 400 }) };
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return { ok: false, response: Response.json({ error: 'Invalid rate limit payload' }, { status: 400 }) };
     }
     if (new TextEncoder().encode(JSON.stringify(body)).byteLength > RATE_LIMIT_MAX_BODY_BYTES) {
-      return Response.json({ error: 'Rate limit payload too large' }, { status: 413 });
+      return { ok: false, response: Response.json({ error: 'Rate limit payload too large' }, { status: 413 }) };
     }
+    return { ok: true, body: body as Record<string, unknown> };
+  }
+
+  private sweepExpiredMemoryBuckets(now: number): void {
+    this.sweepCounter += 1;
+    if (this.sweepCounter % 256 !== 0) return;
+    for (const [k, v] of this.memoryBuckets.entries()) {
+      if (v.resetAt <= now) this.memoryBuckets.delete(k);
+    }
+  }
+
+  private async deleteKeysInBatches(keys: string[]): Promise<void> {
+    for (let offset = 0; offset < keys.length; offset += STORAGE_DELETE_BATCH_SIZE) {
+      await this.state.storage.delete(keys.slice(offset, offset + STORAGE_DELETE_BATCH_SIZE));
+    }
+  }
+
+  private async checkVisitorLog(request: Request): Promise<Response> {
+    const parsed = await this.readBoundedJson(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body;
+
+    const subnetKey = typeof body.subnetKey === 'string' ? body.subnetKey.slice(0, 128) : '';
+    const dedupeKey = typeof body.dedupeKey === 'string' ? body.dedupeKey.slice(0, 128) : '';
+    const subnetMax = Number(body.subnetMax);
+    const windowMs = Number(body.windowMs);
+    if (!subnetKey || !dedupeKey || !Number.isInteger(subnetMax) || subnetMax <= 0 || !Number.isInteger(windowMs) || windowMs < 1000) {
+      return Response.json({ error: 'Invalid visitor check payload' }, { status: 400 });
+    }
+
+    const now = Date.now();
+    this.sweepExpiredMemoryBuckets(now);
+
+    // 1. 先检查单路径 10 分钟去重：重复访问直接跳过，不白白消耗子网配额
+    const dedupeStorageKey = `${RATE_LIMIT_STORAGE_PREFIX}visitor-log:${dedupeKey}`;
+    const existingDedupe = this.memoryBuckets.get(dedupeStorageKey);
+    if (existingDedupe && existingDedupe.resetAt > now) {
+      return Response.json({ allowed: false });
+    }
+
+    // 2. 仅首次路径访问才检查并累加子网配额
+    const subnetStorageKey = `${RATE_LIMIT_STORAGE_PREFIX}visitor-subnet-cap:${subnetKey}`;
+    let subnetState = this.memoryBuckets.get(subnetStorageKey);
+    if (!subnetState || subnetState.resetAt <= now) {
+      const persisted = await this.state.storage.get<{ count: number; resetAt: number }>(subnetStorageKey);
+      subnetState = !persisted || persisted.resetAt <= now
+        ? { count: 0, resetAt: now + windowMs }
+        : persisted;
+    }
+    if (subnetState.count >= subnetMax) {
+      this.memoryBuckets.set(subnetStorageKey, subnetState);
+      return Response.json({ allowed: false });
+    }
+
+    subnetState.count += 1;
+    this.memoryBuckets.set(subnetStorageKey, subnetState);
+    this.memoryBuckets.set(dedupeStorageKey, { count: 1, resetAt: now + windowMs });
+    if (subnetState.count >= subnetMax) {
+      this.state.waitUntil(this.state.storage.put(subnetStorageKey, subnetState));
+      await this.scheduleCleanupAlarm(now);
+    }
+
+    return Response.json({ allowed: true });
+  }
+
+  private async checkRateLimit(request: Request): Promise<Response> {
+    const parsed = await this.readBoundedJson(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body;
 
     const bucket = typeof body.bucket === 'string' ? body.bucket.slice(0, 96) : '';
     const ip = typeof body.ip === 'string' ? body.ip.slice(0, 128) : '';
@@ -65,13 +141,8 @@ export class RateLimitDO {
       await this.scheduleCleanupAlarm(now);
     }
 
-    this.sweepCounter += 1;
-    if (this.sweepCounter % 256 === 0) {
-      for (const [k, v] of this.memoryBuckets.entries()) {
-        if (v.resetAt <= now) this.memoryBuckets.delete(k);
-      }
-      await this.cleanupExpiredBuckets(now);
-    }
+    // 热路径仅做轻量内存过期清理，持久化存储清理交给定时 alarm() 异步批处理
+    this.sweepExpiredMemoryBuckets(now);
 
     const retryAfter = Math.max(1, Math.ceil((state.resetAt - now) / 1000));
     const remaining = Math.max(0, max - state.count);
@@ -93,7 +164,9 @@ export class RateLimitDO {
       for (const [key, value] of entries) {
         if (!value || value.resetAt <= now) expired.push(key);
       }
-      await Promise.all(expired.map(key => this.state.storage.delete(key)));
+      if (expired.length > 0) {
+        await this.deleteKeysInBatches(expired);
+      }
     } catch {
       // Best effort; active buckets overwrite themselves.
     }
@@ -106,7 +179,7 @@ export class RateLimitDO {
         await this.state.storage.setAlarm(now + RATE_LIMIT_CLEANUP_ALARM_MS);
       }
     } catch {
-      // Best effort; request-triggered sweeps still run.
+      // Best effort; alarm will be re-scheduled on next limit trigger.
     }
   }
 
@@ -131,7 +204,10 @@ export class RateLimitDO {
       const oldest = overflow > 0
         ? active.sort((a, b) => a.resetAt - b.resetAt).slice(0, overflow).map(item => item.key)
         : [];
-      await Promise.all([...expired, ...oldest].map(key => this.state.storage.delete(key)));
+      const toDelete = [...expired, ...oldest];
+      if (toDelete.length > 0) {
+        await this.deleteKeysInBatches(toDelete);
+      }
     } catch {
       // Best effort; rate-limit correctness does not depend on compaction.
     }

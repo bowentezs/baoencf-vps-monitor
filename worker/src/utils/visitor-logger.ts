@@ -30,39 +30,23 @@ function sweepExpiredLocalBuckets(now: number): void {
 async function checkVisitorAllowed(c: AppContext, subnetKey: string, dedupeKey: string): Promise<boolean> {
   const now = Date.now();
 
-  // 1. 若配置了 Durable Objects RATE_LIMIT，使用全局强一致防抖 + 子网总限额
+  // 1. 若配置了 Durable Objects RATE_LIMIT，单次原子 RPC 完成「先去重、再扣子网配额」
   if (c.env.RATE_LIMIT) {
     try {
       const doId = c.env.RATE_LIMIT.idFromName('visitor-limiter');
       const stub = c.env.RATE_LIMIT.get(doId);
-      const subnetRes = await stub.fetch(new Request('https://do/rate-limit', {
+      const res = await stub.fetch(new Request('https://do/visitor-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          bucket: 'visitor-subnet-cap',
-          ip: subnetKey,
-          max: VISITOR_SUBNET_MAX_PER_WINDOW,
-          windowMs: LOCAL_DEDUPE_WINDOW_MS,
-        }),
-      }));
-      if (subnetRes.ok) {
-        const subnetData = await subnetRes.json() as { allowed?: boolean };
-        if (!subnetData.allowed) return false;
-      }
-
-      const res = await stub.fetch(new Request('https://do/rate-limit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bucket: 'visitor-log',
-          ip: dedupeKey,
-          max: 1,
+          subnetKey,
+          dedupeKey,
+          subnetMax: VISITOR_SUBNET_MAX_PER_WINDOW,
           windowMs: LOCAL_DEDUPE_WINDOW_MS,
         }),
       }));
       if (res.ok) {
         const data = await res.json() as { allowed?: boolean };
-        // allowed 为 true 表示本次为窗口期内的第 1 次访问，允许记录；false 表示已超限，跳过
         return Boolean(data.allowed);
       }
     } catch {
@@ -70,19 +54,19 @@ async function checkVisitorAllowed(c: AppContext, subnetKey: string, dedupeKey: 
     }
   }
 
-  // 2. 本地内存降级防抖保护
+  // 2. 本地内存降级防抖保护：先判单路径去重，再检查/累加子网限额
   if (localSeenMap.size >= LOCAL_MAP_MAX_ENTRIES || localSubnetCountMap.size >= LOCAL_MAP_MAX_ENTRIES) {
     sweepExpiredLocalBuckets(now);
-  }
-
-  const subnetEntry = localSubnetCountMap.get(subnetKey);
-  if (subnetEntry && subnetEntry.resetAt > now) {
-    if (subnetEntry.count >= VISITOR_SUBNET_MAX_PER_WINDOW) return false;
   }
 
   const lastSeen = localSeenMap.get(dedupeKey);
   if (lastSeen && now - lastSeen < LOCAL_DEDUPE_WINDOW_MS) {
     return false;
+  }
+
+  const subnetEntry = localSubnetCountMap.get(subnetKey);
+  if (subnetEntry && subnetEntry.resetAt > now) {
+    if (subnetEntry.count >= VISITOR_SUBNET_MAX_PER_WINDOW) return false;
   }
 
   localSeenMap.set(dedupeKey, now);

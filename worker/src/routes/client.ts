@@ -637,6 +637,8 @@ async function updateLiveReport(
         hidden,
         source_ip: requestClientIp(c),
         region: requestRegion(c),
+        network_synced: true,
+        basic_info_synced: true,
         ...reportBody,
         timestamp: nowMs,
         ttl_ms: liveReportTtlMs(report),
@@ -1056,29 +1058,42 @@ clientRoutes.post('/register', async (c) => {
 
 // 获取 Agent 动态上报策略（HTTP 模式使用）
 clientRoutes.get('/policy', clientIdentityAuth, async (c) => {
+  const clientUuid = c.get('clientUuid')!;
   try {
-    return c.json(await fallbackAgentPolicy(getDatabase(c.env), c.get('clientUuid')));
-  } catch {
-    try {
-      return c.json(await fallbackAgentPolicy(getDatabase(c.env), c.get('clientUuid')));
-    } catch {
-      return c.json({
-        type: 'policy',
-        mode: 'idle',
-        sample_interval_sec: 120,
-        report_interval_sec: 120,
-        ping_interval_sec: 120,
-        ping_policy_version: 'fallback',
-        ping_tasks: [],
-        website_probe_tasks: [],
-        report_now: false,
-        viewer_count: 0,
-        viewer_ttl_sec: 120,
-        policy_ttl_sec: 120,
-        idle_policy_ttl_sec: 120,
-        timestamp: Date.now(),
-      });
+    const doId = c.env.LIVE_DATA.idFromName('global');
+    const stub = c.env.LIVE_DATA.get(doId);
+    const response = await stub.fetch(
+      new Request(`https://do/policy?client_id=${encodeURIComponent(clientUuid)}`, { method: 'GET' }),
+    );
+    if (response.ok) {
+      const policy = await response.json();
+      if (policy && typeof policy === 'object' && !Array.isArray(policy)) {
+        return c.json(policy);
+      }
     }
+  } catch {
+    // DO 不可用时降级到数据库构建的静态空闲策略
+  }
+
+  try {
+    return c.json(await fallbackAgentPolicy(getDatabase(c.env), clientUuid));
+  } catch {
+    return c.json({
+      type: 'policy',
+      mode: 'idle',
+      sample_interval_sec: 120,
+      report_interval_sec: 120,
+      ping_interval_sec: 120,
+      ping_policy_version: 'fallback',
+      ping_tasks: [],
+      website_probe_tasks: [],
+      report_now: false,
+      viewer_count: 0,
+      viewer_ttl_sec: 120,
+      policy_ttl_sec: 120,
+      idle_policy_ttl_sec: 120,
+      timestamp: Date.now(),
+    });
   }
 });
 

@@ -1,38 +1,14 @@
-const EXACT_PROTECTED_PATHS = new Set([
-  '/api/admin/account/username',
-  '/api/admin/account/chpasswd',
-  '/api/admin/clients/add',
-  '/api/admin/clients/batch-hide',
-  '/api/admin/clients/batch-remove',
-  '/api/admin/record/clear',
-  '/api/admin/record/clear/all',
-  '/api/admin/download/backup',
-  '/api/admin/upload/backup',
-  '/api/admin/account/mfa/setup',
-  '/api/admin/account/mfa/enable',
-  '/api/admin/account/mfa/recovery-codes',
-  '/api/admin/account/mfa/disable',
-  '/api/admin/account/passkeys/options',
-  '/api/admin/account/passkeys',
-  '/api/admin/account/passkeys/delete',
-  // 手动触发维护任务会立即清理历史记录，同样需要 MFA step-up，防止被劫持会话绕过 record/clear 的保护。
-  '/api/admin/cron/run',
-  '/api/admin/maintenance/cleanup',
-  '/api/admin/visitor-logs/clear',
-  '/api/admin/site-logo',
-  '/api/admin/site-logo/reset',
-  '/api/admin/test/sendMessage',
+// 默认拦截所有管理端写操作，仅显式豁免 MFA Step-Up 验证接口自身，避免新增写路由遗漏保护。
+const EXEMPT_ADMIN_WRITE_PATHS = new Set([
+  '/api/admin/account/mfa/step-up',
 ]);
 
-const CLIENT_SECRET_PATH = /^\/api\/admin\/clients\/[^/]+\/(?:edit|remove|token(?:\/install|\/rotate)?)$/;
-const THEME_WRITE_PATH = /^\/api\/admin\/themes\/(?:upload|set|settings|delete)$/;
-
-// 配置类写操作（系统设置、监控任务、通知渠道）同样要求 MFA step-up，防止会话被劫持后静默篡改。
-const CONFIG_WRITE_PATH = /^\/api\/admin\/(?:settings|ping\/|websites\/|notification\/)/;
+const PROTECTED_WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 export function isMfaStepUpProtectedRequest(method: string, pathname: string): boolean {
   const upperMethod = method.toUpperCase();
-  if (upperMethod !== 'POST' && upperMethod !== 'DELETE') return false;
+  if (!PROTECTED_WRITE_METHODS.has(upperMethod)) return false;
+
   let normalizedPath = pathname;
   try {
     normalizedPath = decodeURI(pathname);
@@ -42,13 +18,8 @@ export function isMfaStepUpProtectedRequest(method: string, pathname: string): b
   if (normalizedPath.length > 1) {
     normalizedPath = normalizedPath.replace(/\/+$/, '');
   }
-  if (upperMethod === 'DELETE') {
-    return CONFIG_WRITE_PATH.test(normalizedPath) || CLIENT_SECRET_PATH.test(normalizedPath) || THEME_WRITE_PATH.test(normalizedPath);
-  }
-  return (
-    EXACT_PROTECTED_PATHS.has(normalizedPath) ||
-    CLIENT_SECRET_PATH.test(normalizedPath) ||
-    THEME_WRITE_PATH.test(normalizedPath) ||
-    CONFIG_WRITE_PATH.test(normalizedPath)
-  );
+
+  if (!normalizedPath.startsWith('/api/admin/')) return false;
+  if (EXEMPT_ADMIN_WRITE_PATHS.has(normalizedPath)) return false;
+  return true;
 }

@@ -45,6 +45,7 @@ import {
   AgentInstallPlatform,
   buildAgentInstallCommand,
   buildAgentUninstallAllCommand,
+  cfMonitorAgentScriptRefFromRevision,
   defaultAgentInstallOptions,
   normalizeServerUrl,
 } from '../../utils/agentInstallCommand';
@@ -397,6 +398,16 @@ function GenerateCommandDialog({ client, open, onOpenChange }: { client: Command
         .catch(() => {
           if (!cancelled) setServerUrl(window.location.origin);
         });
+      // 默认钉住当前已部署 Commit SHA，避免生成指向可变 main 分支的安装脚本命令
+      fetch('/api/version')
+        .then(res => (res.ok ? res.json() : null))
+        .then((ver: { hash?: unknown } | null) => {
+          const pinnedRef = typeof ver?.hash === 'string' ? cfMonitorAgentScriptRefFromRevision(ver.hash) : '';
+          if (!cancelled && pinnedRef) {
+            setInstallOptions(prev => (prev.scriptRef ? prev : { ...prev, scriptRef: pinnedRef }));
+          }
+        })
+        .catch(() => undefined);
     }
     return () => { cancelled = true; };
   }, [client.token, open]);

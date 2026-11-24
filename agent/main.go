@@ -1134,7 +1134,7 @@ func executeHTTPPing(target string) float64 {
 		return dialPublicTCP(ctx, network, host, port, 5*time.Second)
 	}
 	defer transport.CloseIdleConnections()
-	client := &http.Client{Timeout: 5 * time.Second, Transport: transport}
+	client := &http.Client{Timeout: 5 * time.Second, Transport: transport, CheckRedirect: boundedPublicRedirectPolicy}
 	resp, err := client.Get(parsed.String())
 	elapsed := time.Since(start).Milliseconds()
 
@@ -1209,7 +1209,7 @@ func executeWebsiteHTTPProbe(task WebsiteProbeTask) WebsiteProbeResult {
 	} else if timeout > 30*time.Second {
 		timeout = 30 * time.Second
 	}
-	client := &http.Client{Timeout: timeout, Transport: publicHTTPTransport(timeout)}
+	client := &http.Client{Timeout: timeout, Transport: publicHTTPTransport(timeout), CheckRedirect: boundedPublicRedirectPolicy}
 	defer client.CloseIdleConnections()
 	return executeWebsiteHTTPProbeWithClient(task, client)
 }
@@ -1245,6 +1245,16 @@ func executeWebsiteHTTPProbeWithClient(task WebsiteProbeTask, client *http.Clien
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 512))
 	return normalizeWebsiteProbeHTTPResult(task, resp.StatusCode, elapsed)
+}
+
+func boundedPublicRedirectPolicy(req *http.Request, via []*http.Request) error {
+	if len(via) >= 5 {
+		return errors.New("stopped after 5 redirects")
+	}
+	if req.URL == nil || (req.URL.Scheme != "http" && req.URL.Scheme != "https") {
+		return errors.New("blocked non-http redirect")
+	}
+	return nil
 }
 
 func publicHTTPTransport(timeout time.Duration) *http.Transport {
@@ -3269,6 +3279,7 @@ func connectWebSocket(endpoint string, agentToken string) (*safeWebSocketConn, e
 		}
 		return nil, err
 	}
+	conn.SetReadLimit(1 << 20)
 	return &safeWebSocketConn{conn: conn}, nil
 }
 

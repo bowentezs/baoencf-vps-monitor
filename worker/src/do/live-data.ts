@@ -680,6 +680,7 @@ export class LiveDataDO {
     expiresAt?: number,
     ws?: WebSocket,
     network?: ReportNetworkMetadata,
+    skipNetworkMetadataSync = false,
   ): MonitorReportPayload {
     const report = this.sanitizeReport(
       normalizeMonitorReport(data),
@@ -700,7 +701,9 @@ export class LiveDataDO {
     this.clientLastReportTimes.set(clientId, now);
     this.expiredViewersNotified.delete(clientId);
     if (ws) this.rememberAgentReportAttachment(ws, clientId, clientName, hidden, report, now, expiresAt);
-    this.runBackground('do_live_network_metadata', this.syncNetworkMetadataFromReport(clientId, clientName, hidden, report, now));
+    if (!skipNetworkMetadataSync) {
+      this.runBackground('do_live_network_metadata', this.syncNetworkMetadataFromReport(clientId, clientName, hidden, report, now));
+    }
 
     if (this.isVisibleClient(next, now) || next.hidden) {
       this.broadcastToViewers({
@@ -1205,7 +1208,8 @@ export class LiveDataDO {
       if (Array.isArray(websitesPatch.upsert)) {
         const publicWebsites = websitesPatch.upsert
           .filter(isObjectPayload)
-          .filter(item => !booleanField(item, 'hidden'));
+          .filter(item => !booleanField(item, 'hidden'))
+          .map(item => this.publicWebsiteMetadata(item));
         if (publicWebsites.length > 0) {
           websitesPatch.upsert = publicWebsites;
           hasContent = true;
@@ -1616,6 +1620,51 @@ export class LiveDataDO {
     return broadcastClient;
   }
 
+  private publicWebsiteMetadata(website: JsonObject): JsonObject {
+    const publicFields = [
+      'id',
+      'name',
+      'url',
+      'interval_sec',
+      'status',
+      'last_checked_at',
+      'last_status_code',
+      'last_raw_status_code',
+      'last_latency_ms',
+      'last_effective_reason',
+      'sort_order',
+    ] as const;
+    const safe: JsonObject = {};
+    for (const key of publicFields) {
+      if (website[key] !== undefined) {
+        safe[key] = website[key];
+      }
+    }
+    if (Array.isArray(website.checks)) {
+      safe.checks = website.checks
+        .filter(isObjectPayload)
+        .map((check) => {
+          const safeCheck: JsonObject = {};
+          for (const key of [
+            'checked_at',
+            'ok',
+            'effective_status',
+            'effective_reason',
+            'status_code',
+            'raw_status_code',
+            'latency_ms',
+            'source_type',
+          ] as const) {
+            if (check[key] !== undefined) {
+              safeCheck[key] = check[key];
+            }
+          }
+          return safeCheck;
+        });
+    }
+    return safe;
+  }
+
   private async readAdminClientsSnapshot(): Promise<AdminClientsSnapshot | null> {
     const snapshot = await this.state.storage.get<AdminClientsSnapshot>(ADMIN_CLIENTS_SNAPSHOT_KEY);
     if (!snapshot || !Array.isArray(snapshot.clients)) {
@@ -1697,6 +1746,8 @@ export class LiveDataDO {
     const ttlMs = this.boundedHttpTtlMs(payload.ttl_ms);
     const clientName = typeof payload.name === 'string' && payload.name.trim() !== '' ? payload.name.trim() : payload.uuid;
     const hidden = booleanField(payload, 'hidden');
+    const networkSynced = booleanField(payload, 'network_synced');
+    const basicInfoSynced = booleanField(payload, 'basic_info_synced');
     const reportsToPersist: Array<{ report: JsonObject; reportTime: number }> = [];
     for (let index = 0; index < reports.length; index += 1) {
       const rawReport = reports[index];
@@ -1712,6 +1763,7 @@ export class LiveDataDO {
           now + ttlMs,
           undefined,
           network,
+          networkSynced,
         );
         reportsToPersist.push({ report, reportTime });
         this.runBackground('ping_persistence', this.persistPingResultsFromReport(payload.uuid, rawReport, reportTime));
@@ -1724,7 +1776,7 @@ export class LiveDataDO {
     }
 
     await this.scheduleExpiryAlarm(now);
-    const basicInfoReport = this.latestBasicInfoReport(reports);
+    const basicInfoReport = basicInfoSynced ? null : this.latestBasicInfoReport(reports);
     if (basicInfoReport) {
       this.runBackground('do_basic_info_sync', this.syncBasicInfoFromReport(payload.uuid, clientName, hidden, basicInfoReport));
     }
@@ -2006,7 +2058,8 @@ export class LiveDataDO {
     }
 
     if (request.method === 'GET' && url.pathname === '/policy') {
-      return Response.json(await this.buildAgentPolicy(Date.now(), false));
+      const clientId = url.searchParams.get('client_id')?.trim() || undefined;
+      return Response.json(await this.buildAgentPolicy(Date.now(), false, false, clientId));
     }
 
     // WebSocket 升级

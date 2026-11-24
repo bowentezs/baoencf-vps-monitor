@@ -53,11 +53,18 @@ for (const [method, path] of configWriteRequests) {
   });
 }
 
-test('does not recursively protect the step-up endpoint or ordinary edits', () => {
+test('protects reorder and any future PUT/PATCH/DELETE admin writes by default', () => {
+  assert.equal(isMfaStepUpProtectedRequest('POST', '/api/admin/clients/reorder'), true);
+  assert.equal(isMfaStepUpProtectedRequest('PUT', '/api/admin/clients/node-1'), true);
+  assert.equal(isMfaStepUpProtectedRequest('PATCH', '/api/admin/settings'), true);
+  assert.equal(isMfaStepUpProtectedRequest('DELETE', '/api/admin/unknown/resource'), true);
+});
+
+test('does not recursively protect the step-up endpoint or safe read requests', () => {
   assert.equal(isMfaStepUpProtectedRequest('POST', '/api/admin/account/mfa/step-up'), false);
   assert.equal(isMfaStepUpProtectedRequest('GET', '/api/admin/account/mfa'), false);
-  assert.equal(isMfaStepUpProtectedRequest('POST', '/api/admin/clients/reorder'), false);
   assert.equal(isMfaStepUpProtectedRequest('GET', '/api/admin/clients/node-1/token'), false);
+  assert.equal(isMfaStepUpProtectedRequest('POST', '/api/login'), false);
 });
 
 test('normalizes percent-encoded and trailing-slash protected paths', () => {

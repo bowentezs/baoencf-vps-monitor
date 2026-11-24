@@ -1,3 +1,5 @@
+import { normalizeIpSubnetKey } from '../utils/request-ip';
+
 const encoder = new TextEncoder();
 const TOKEN_TTL_MS = 60_000;
 
@@ -74,7 +76,7 @@ export async function createViewerToken({
   const boundedTtlMs = Number.isFinite(ttlMs) && ttlMs > 0 ? ttlMs : TOKEN_TTL_MS;
   const payload: ViewerTokenPayload = {
     exp: now + boundedTtlMs,
-    ip,
+    ip: normalizeIpSubnetKey(ip),
     nonce: randomNonce(),
   };
   const payloadText = bytesToBase64Url(encoder.encode(JSON.stringify(payload)));
@@ -113,7 +115,7 @@ export async function verifyViewerToken({
   }
 
   if (typeof payload.exp !== 'number' || payload.exp < now) return false;
-  if (typeof payload.ip !== 'string' || payload.ip !== ip) return false;
+  if (typeof payload.ip !== 'string' || payload.ip !== normalizeIpSubnetKey(ip)) return false;
   if (typeof payload.nonce !== 'string' || payload.nonce.length < 16) return false;
   return true;
 }

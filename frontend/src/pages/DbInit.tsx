@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Badge, Box, Button, Card, Flex, Heading, Separator, Text, TextField } from '@radix-ui/themes';
 import { CheckCircle2, Database, KeyRound, Loader2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { CSRF_COOKIE_NAME, readCookie } from '../utils/api';
 
 type InitInfo = {
   ok: boolean;
@@ -50,9 +51,15 @@ export default function DbInit() {
     setLoading(true);
     setResult(null);
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const csrfToken = readCookie(CSRF_COOKIE_NAME);
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
       const response = await fetch('/api/setup/database/init', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({ accessToken: token.trim() }),
       });
       const body = await readJson(response);

@@ -11,6 +11,9 @@ import { sanitizeSetupDiagnosticDetail } from '../utils/setup-diagnostics';
 import { readJsonWithLimit } from '../utils/request-body';
 import { getCloudflareClientIp } from '../utils/request-ip';
 import { readLiveSnapshot, readRateLimitResult } from '../utils/do-response';
+import { getAdminSessionToken, verifyAdminCsrfToken } from '../auth/session';
+import { verifyAdminToken } from '../auth/jwt';
+import { validateAdminSession } from '../auth/admin-session';
 import { BUNDLED_SUPABASE_MIGRATIONS, type BundledMigration } from '../generated/supabase-migrations';
 
 type SetupCheckStatus = 'ok' | 'warning' | 'error' | 'pending' | 'disabled';
@@ -240,8 +243,12 @@ function sqlString(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-function redactSetupInitError(value: unknown): string {
-  return sanitizeSetupDiagnosticDetail(String(value ?? '').replace(/\bsbp_[A-Za-z0-9_]+/g, 'sbp_[REDACTED]'));
+function redactSetupInitError(value: unknown, projectRef?: string | null): string {
+  let text = String(value ?? '').replace(/\bsbp_[A-Za-z0-9_]+/g, 'sbp_[REDACTED]');
+  if (projectRef) {
+    text = text.split(projectRef).join('[PROJECT_REF]');
+  }
+  return sanitizeSetupDiagnosticDetail(text);
 }
 
 function extractQueryRows(payload: unknown): Record<string, unknown>[] {
@@ -497,6 +504,36 @@ setupRoutes.post('/database/init', async (c) => {
     return c.json({ error: 'SUPABASE_URL is not configured as a Supabase project URL.' }, 503);
   }
 
+  // 系统已存在管理员时，要求管理员会话认证与 CSRF 校验，禁止匿名公网滥用该接口探测管理 API。
+  let adminStatus: 'present' | 'absent' | 'unknown' = 'unknown';
+  try {
+    adminStatus = await adminAccountStatus(getDatabase(c.env));
+  } catch {
+    adminStatus = 'unknown';
+  }
+  if (adminStatus === 'present') {
+    const token = getAdminSessionToken(c);
+    if (!token) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    let payload = null;
+    try {
+      payload = await verifyAdminToken(token, c.env);
+    } catch {
+      payload = null;
+    }
+    if (!payload) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const sessionUser = await validateAdminSession(getDatabase(c.env), payload);
+    if (!sessionUser) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    if (!verifyAdminCsrfToken(c)) {
+      return c.json({ error: 'CSRF token 无效，请刷新页面后重试' }, 403);
+    }
+  }
+
   const parsed = await readJsonWithLimit(c.req.raw, 64 * 1024);
   if (!parsed.ok) {
     if (parsed.reason === 'too_large') {
@@ -517,7 +554,7 @@ setupRoutes.post('/database/init', async (c) => {
     const result = await applyBundledMigrations(projectRef, accessToken);
     return c.json({ success: true, project_ref: projectRef, ...result });
   } catch (error) {
-    return c.json({ error: redactSetupInitError(error) }, 500);
+    return c.json({ error: redactSetupInitError(error, projectRef) }, 500);
   }
 });
 
